@@ -1,0 +1,16 @@
+[package]
+name = "redis-wasm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Portable RESP and YYDS storage primitives shared by every binding"
+readme = "readme.md"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde_json = { workspace = true }

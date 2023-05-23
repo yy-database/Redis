@@ -1,0 +1,22 @@
+[package]
+name = "redis-napi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Node-API binding for the RESP and `.yyds` primitives"
+publish = false
+
+[lib]
+name = "redis_napi"
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { workspace = true }
+napi-derive = { workspace = true }
+redis-wasm = { path = "../redis-wasm" }
+serde_json = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
