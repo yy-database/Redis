@@ -1,0 +1,68 @@
+//! Socket loop composed from the native framing primitives.
+
+import { createServer } from 'node:net';
+import { execute } from './commands.js';
+import { decodeCommand, encodeReply, Store } from './native.js';
+import { error as replyError } from './reply.js';
+
+const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
+
+/**
+ * Starts an emulated server bound to `host`, persisting through `.yyds` and `.yykv`.
+ *
+ * The caller owns the process lifetime. `close` stops the listener and the
+ * open connections without touching the storage directory.
+ */
+export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}) {
+    const store = new Store(dataDir);
+    const connections = new Set();
+    const listener = createServer(socket => {
+        connections.add(socket);
+        const session = { db: 0, protocol: 2, queued: null, name: '' };
+        let pending = Buffer.alloc(0);
+        socket.on('data', chunk => {
+            pending = Buffer.concat([pending, chunk]);
+            while (pending.length > 0) {
+                let decoded;
+                try {
+                    decoded = decodeCommand(pending);
+                }
+                catch {
+                    socket.write(encodeReply(replyError(PROTOCOL_ERROR), session.protocol));
+                    socket.destroy();
+                    return;
+                }
+                if (decoded === null) {
+                    return;
+                }
+                pending = pending.subarray(decoded.consumed);
+                const result = execute(store, session, decoded.args);
+                socket.write(encodeReply(result.reply, session.protocol));
+                if (result.close) {
+                    socket.end();
+                    return;
+                }
+            }
+        });
+        socket.on('close', () => connections.delete(socket));
+        socket.on('error', () => connections.delete(socket));
+    });
+    await new Promise((resolve, reject) => {
+        listener.once('error', reject);
+        listener.listen(port, host, resolve);
+    });
+    const address = listener.address();
+    return {
+        host,
+        port: address.port,
+        dataDir: store.dataDir(),
+        store,
+        close: () => new Promise(resolve => {
+            for (const socket of connections) {
+                socket.destroy();
+            }
+            connections.clear();
+            listener.close(() => resolve());
+        }),
+    };
+}
