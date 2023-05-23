@@ -16,6 +16,8 @@ target/
 node_modules/
 dist/
 *.tsbuildinfo
+projects/redis.ts/platforms/*/lib/*.node
+projects/redis.ts/platforms/*/lib/*.wasm
 
 # Python
 __pycache__/

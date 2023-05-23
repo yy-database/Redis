@@ -1,0 +1,37 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .: {}
+
+  projects/redis.ts/packages/redis:
+    optionalDependencies:
+      '@yydb/redis-darwin-arm64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-darwin-arm64
+      '@yydb/redis-darwin-x64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-darwin-x64
+      '@yydb/redis-linux-x64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-linux-x64
+      '@yydb/redis-unknown-wasm32':
+        specifier: workspace:*
+        version: link:../../platforms/redis-unknown-wasm32
+      '@yydb/redis-win32-x64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-win32-x64
+
+  projects/redis.ts/platforms/redis-darwin-arm64: {}
+
+  projects/redis.ts/platforms/redis-darwin-x64: {}
+
+  projects/redis.ts/platforms/redis-linux-x64: {}
+
+  projects/redis.ts/platforms/redis-unknown-wasm32: {}
+
+  projects/redis.ts/platforms/redis-win32-x64: {}
