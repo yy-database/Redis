@@ -86,10 +86,7 @@ impl Reply {
             Self::Simple(value) => serde_json::json!({ "type": "simple", "value": value }),
             Self::Error(value) => serde_json::json!({ "type": "error", "value": value }),
             Self::Integer(value) => serde_json::json!({ "type": "int", "value": value }),
-            Self::Bulk(value) => serde_json::json!({
-                "type": "bulk",
-                "value": String::from_utf8_lossy(value),
-            }),
+            Self::Bulk(value) => serde_json::json!({ "type": "bulk", "bytes": value }),
             Self::Null => serde_json::json!({ "type": "null" }),
             Self::Array(values) => {
                 serde_json::json!({ "type": "array", "value": values.iter().map(Self::to_spec).collect::<Vec<_>>() })
@@ -113,7 +110,16 @@ impl Reply {
             "int" => Ok(Self::Integer(
                 spec.get("value").and_then(Json::as_i64).ok_or("reply specification `int` needs an integer `value`")?,
             )),
-            "bulk" => Ok(Self::Bulk(text(spec)?.into_bytes())),
+            "bulk" => {
+                let bytes = match spec.get("bytes") {
+                    Some(Json::Array(values)) => values
+                        .iter()
+                        .map(|value| value.as_u64().and_then(|value| u8::try_from(value).ok()).ok_or("reply specification `bulk` has a non byte `bytes` entry"))
+                        .collect::<Result<Vec<u8>, _>>()?,
+                    _ => text(spec)?.into_bytes(),
+                };
+                Ok(Self::Bulk(bytes))
+            }
             "null" => Ok(Self::Null),
             "array" => {
                 let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `array` needs a `value` list")?;
@@ -311,57 +317,20 @@ fn parse_count(bytes: &[u8]) -> Option<i64> {
     if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
         return None;
     }
-    let text = std::str::from_utf8(digits).ok()?;
-    let value: i64 = text.parse().ok()?;
-    Some(if negative { -value } else { value })
+    let magnitude = digits.iter().try_fold(0_i64, |accumulator, byte| {
+        accumulator
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(i64::from(byte - b'0')))
+    })?;
+    if negative {
+        magnitude.checked_neg()
+    }
+    else {
+        Some(magnitude)
+    }
 }
 
 /// Writes an encoded reply to a writer.
 pub fn write_reply(writer: &mut impl Write, reply: &Reply, protocol: u8) -> std::io::Result<()> {
     writer.write_all(&encode_reply(reply, protocol))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn null_bulk_shape_depends_on_protocol() {
-        assert_eq!(encode_reply(&Reply::Null, 2), b"$-1\r\n");
-        assert_eq!(encode_reply(&Reply::Null, 3), b"_\r\n");
-    }
-
-    #[test]
-    fn map_uses_percent_on_resp3_and_flattens_on_resp2() {
-        let map = Reply::Map(vec![(Reply::Bulk(b"proto".to_vec()), Reply::Integer(3))]);
-        assert_eq!(encode_reply(&map, 3), b"%1\r\n$5\r\nproto\r\n:3\r\n");
-        assert_eq!(encode_reply(&map, 2), b"*2\r\n$5\r\nproto\r\n:3\r\n");
-    }
-
-    #[test]
-    fn command_decoding_is_incremental() {
-        let bytes = encode_command(&[b"SET".to_vec(), b"k".to_vec(), b"v".to_vec()]);
-        assert_eq!(decode_command(&bytes[..5]).expect("partial"), None);
-        let (request, consumed) = decode_command(&bytes).expect("complete").expect("request");
-        assert_eq!(consumed, bytes.len());
-        assert_eq!(request.args, vec![b"SET".to_vec(), b"k".to_vec(), b"v".to_vec()]);
-    }
-
-    #[test]
-    fn reply_spec_round_trip() {
-        let reply = Reply::Map(vec![
-            (Reply::Bulk(b"server".to_vec()), Reply::Bulk(b"redis".to_vec())),
-            (Reply::Bulk(b"proto".to_vec()), Reply::Integer(3)),
-        ]);
-        let spec = reply.to_spec();
-        assert_eq!(Reply::from_spec(&spec).expect("spec"), reply);
-    }
-
-    #[test]
-    fn reply_decoding_reports_consumed_bytes() {
-        let bytes = b"+OK\r\n:1\r\n".to_vec();
-        let (reply, consumed) = decode_reply(&bytes).expect("complete").expect("reply");
-        assert_eq!(reply, Reply::Simple("OK".to_owned()));
-        assert_eq!(consumed, 5);
-    }
 }

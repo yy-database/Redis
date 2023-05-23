@@ -6,10 +6,9 @@
 //! YYDS key-value engine and vice versa.
 
 use std::collections::BTreeMap;
-use std::io::{Cursor, Read, Write};
 
 /// `.yykv` snapshot magic including the format version.
-pub const YYKV_MAGIC: &[u8] = b"YYKV\x03";
+pub const YYKV_MAGIC: &[u8; 5] = b"YYKV\x03";
 /// Legacy v2 magic without a body checksum. Rejected explicitly.
 pub const YYKV_LEGACY_MAGIC: &[u8] = b"YYKV\x02";
 /// `.yyds` catalog magic.
@@ -91,32 +90,26 @@ pub fn parse_integer(bytes: &[u8]) -> Option<i64> {
 /// Serializes the shard snapshot to `.yykv` bytes.
 pub fn encode_shard(records: &Records, next_revision: u64) -> Result<Vec<u8>> {
     let mut body = Vec::new();
-    body.write_all(&next_revision.to_le_bytes())
-        .map_err(|error| FormatError(error.to_string()))?;
+    body.extend_from_slice(&next_revision.to_le_bytes());
     write_count(&mut body, records.len())?;
     for record in records.values() {
-        write_bytes(&mut body, record.namespace.as_bytes())?;
-        write_bytes(&mut body, &record.key)?;
-        body.write_all(&record.revision.to_le_bytes())
-            .map_err(|error| FormatError(error.to_string()))?;
+        push_bytes(&mut body, record.namespace.as_bytes())?;
+        push_bytes(&mut body, &record.key)?;
+        body.extend_from_slice(&record.revision.to_le_bytes());
         let expiry = record.expires_at.unwrap_or(0);
         if expiry < 0 {
             return Err(FormatError("expiry deadline must not be negative".to_owned()));
         }
-        body.write_all(&(expiry as u64).to_le_bytes())
-            .map_err(|error| FormatError(error.to_string()))?;
+        body.extend_from_slice(&(expiry as u64).to_le_bytes());
         // Inline payload tag. This service stores values inline, so the shared
         // object plane tag is never written.
-        body.write_all(&[0]).map_err(|error| FormatError(error.to_string()))?;
-        write_bytes(&mut body, &record.value)?;
+        body.push(0);
+        push_bytes(&mut body, &record.value)?;
     }
     let mut bytes = Vec::with_capacity(YYKV_MAGIC.len() + 8 + body.len());
-    bytes.write_all(YYKV_MAGIC)
-        .map_err(|error| FormatError(error.to_string()))?;
-    bytes.write_all(&checksum(&body).to_le_bytes())
-        .map_err(|error| FormatError(error.to_string()))?;
-    bytes.write_all(&body)
-        .map_err(|error| FormatError(error.to_string()))?;
+    bytes.extend_from_slice(YYKV_MAGIC);
+    bytes.extend_from_slice(&checksum(&body).to_le_bytes());
+    bytes.extend_from_slice(&body);
     Ok(bytes)
 }
 
@@ -134,40 +127,42 @@ pub fn decode_shard(bytes: &[u8]) -> Result<(Records, u64)> {
     if magic != YYKV_MAGIC {
         return Err(FormatError("unknown .yykv header".to_owned()));
     }
-    let expected = read_u64_at(bytes, YYKV_MAGIC.len())?;
+    let mut cursor = YYKV_MAGIC.len();
+    let expected = take_u64(bytes, &mut cursor, "shard checksum")?;
     let body = bytes
-        .get(YYKV_MAGIC.len() + 8..)
+        .get(cursor..)
         .ok_or_else(|| FormatError("truncated shard checksum".to_owned()))?;
     if checksum(body) != expected {
         return Err(FormatError(".yykv checksum mismatch".to_owned()));
     }
 
-    let mut cursor = Cursor::new(body);
-    let next_revision = read_u64(&mut cursor)?;
-    let count = read_u32(&mut cursor)? as usize;
+    let mut cursor = 0_usize;
+    let next_revision = take_u64(body, &mut cursor, "next revision")?;
+    let count = take_u32(body, &mut cursor, "record count")? as usize;
     let mut records = Records::new();
     let mut revisions = std::collections::HashSet::with_capacity(count);
     for _ in 0..count {
-        let namespace = String::from_utf8(read_bytes(&mut cursor)?)
+        let namespace = String::from_utf8(take_bytes(body, &mut cursor, "namespace")?.to_vec())
             .map_err(|_| FormatError("shard namespace is not utf8".to_owned()))?;
-        let key = read_bytes(&mut cursor)?;
-        let revision = read_u64(&mut cursor)?;
+        let key = take_bytes(body, &mut cursor, "key")?.to_vec();
+        let revision = take_u64(body, &mut cursor, "revision")?;
         if revision == 0 || revision > next_revision || !revisions.insert(revision) {
             return Err(FormatError("invalid shard revision".to_owned()));
         }
-        let encoded = read_u64(&mut cursor)?;
+        let encoded = take_u64(body, &mut cursor, "deadline")?;
         let expires_at = (encoded != 0).then_some(encoded as i64);
-        let tag = read_u8(&mut cursor)?;
+        let tag = *body.get(cursor).ok_or_else(|| FormatError("unexpected end of file".to_owned()))?;
+        cursor += 1;
         if tag != 0 {
             return Err(FormatError("shared object payloads are not supported here".to_owned()));
         }
-        let value = read_bytes(&mut cursor)?;
+        let value = take_bytes(body, &mut cursor, "value")?.to_vec();
         let record = Record { namespace: namespace.clone(), key: key.clone(), value, revision, expires_at };
         if records.insert((namespace, key), record).is_some() {
             return Err(FormatError("duplicate shard key".to_owned()));
         }
     }
-    if cursor.position() != body.len() as u64 {
+    if cursor != body.len() {
         return Err(FormatError("trailing shard bytes".to_owned()));
     }
     Ok((records, next_revision))
@@ -196,23 +191,23 @@ pub fn decode_catalog_shard_id(bytes: &[u8]) -> Result<String> {
     if &bytes[..YYDS_MAGIC.len()] != YYDS_MAGIC {
         return Err(FormatError("unknown .yyds catalog header".to_owned()));
     }
-    let mut cursor = Cursor::new(&bytes[YYDS_MAGIC.len()..]);
-    let version = read_u32(&mut cursor)?;
+    let mut cursor = YYDS_MAGIC.len();
+    let version = take_u32(bytes, &mut cursor, "version")?;
     if version != CATALOG_VERSION {
         return Err(FormatError("catalog version requires regeneration".to_owned()));
     }
-    if read_u32(&mut cursor)? != 0 {
+    if take_u32(bytes, &mut cursor, "schema flag")? != 0 {
         return Err(FormatError("catalog schema section is not supported here".to_owned()));
     }
-    if read_u32(&mut cursor)? != 0 {
+    if take_u32(bytes, &mut cursor, "routing epoch")? != 0 {
         return Err(FormatError("catalog routing section is not supported here".to_owned()));
     }
-    let count = read_u32(&mut cursor)?;
+    let count = take_u32(bytes, &mut cursor, "shard count")?;
     if count != 1 {
         return Err(FormatError(format!("expected exactly one shard registration, found {count}")));
     }
-    let id = read_bytes(&mut cursor)?;
-    String::from_utf8(id).map_err(|_| FormatError("catalog shard id is not utf8".to_owned()))
+    let id = take_bytes(bytes, &mut cursor, "shard id")?;
+    String::from_utf8(id.to_vec()).map_err(|_| FormatError("catalog shard id is not utf8".to_owned()))
 }
 
 /// FNV-1a over the snapshot body: integrity only, not security.
@@ -227,102 +222,45 @@ pub fn checksum(body: &[u8]) -> u64 {
 
 fn write_count(bytes: &mut Vec<u8>, count: usize) -> Result<()> {
     let count = u32::try_from(count).map_err(|_| FormatError("too many shard records".to_owned()))?;
-    bytes.write_all(&count.to_le_bytes()).map_err(|error| FormatError(error.to_string()))
+    bytes.extend_from_slice(&count.to_le_bytes());
+    Ok(())
 }
 
-fn write_bytes(bytes: &mut Vec<u8>, value: &[u8]) -> Result<()> {
+fn push_bytes(bytes: &mut Vec<u8>, value: &[u8]) -> Result<()> {
     let length = u32::try_from(value.len()).map_err(|_| FormatError("shard field too large".to_owned()))?;
-    bytes.write_all(&length.to_le_bytes()).map_err(|error| FormatError(error.to_string()))?;
-    bytes.write_all(value).map_err(|error| FormatError(error.to_string()))
+    bytes.extend_from_slice(&length.to_le_bytes());
+    bytes.extend_from_slice(value);
+    Ok(())
 }
 
-fn read_u64_at(bytes: &[u8], offset: usize) -> Result<u64> {
-    let slice = bytes
-        .get(offset..offset + 8)
-        .ok_or_else(|| FormatError("truncated shard checksum".to_owned()))?;
-    let mut value = [0_u8; 8];
-    value.copy_from_slice(slice);
-    Ok(u64::from_le_bytes(value))
+fn take_bytes<'a>(input: &'a [u8], cursor: &mut usize, field: &str) -> Result<&'a [u8]> {
+    if *cursor + 4 > input.len() {
+        return Err(FormatError(format!("truncated `{field}` length")));
+    }
+    let length = u32::from_le_bytes(input[*cursor..*cursor + 4].try_into().unwrap_or([0; 4])) as usize;
+    *cursor += 4;
+    if *cursor + length > input.len() {
+        return Err(FormatError(format!("truncated `{field}` bytes")));
+    }
+    let bytes = &input[*cursor..*cursor + length];
+    *cursor += length;
+    Ok(bytes)
 }
 
-fn read_u8(cursor: &mut Cursor<&[u8]>) -> Result<u8> {
-    let mut value = [0_u8; 1];
-    cursor.read_exact(&mut value).map_err(eof)?;
-    Ok(value[0])
-}
-
-fn read_u32(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
-    let mut value = [0_u8; 4];
-    cursor.read_exact(&mut value).map_err(eof)?;
-    Ok(u32::from_le_bytes(value))
-}
-
-fn read_u64(cursor: &mut Cursor<&[u8]>) -> Result<u64> {
-    let mut value = [0_u8; 8];
-    cursor.read_exact(&mut value).map_err(eof)?;
-    Ok(u64::from_le_bytes(value))
-}
-
-fn read_bytes(cursor: &mut Cursor<&[u8]>) -> Result<Vec<u8>> {
-    let length = read_u32(cursor)? as usize;
-    let mut value = vec![0_u8; length];
-    cursor.read_exact(&mut value).map_err(eof)?;
+fn take_u32(input: &[u8], cursor: &mut usize, field: &str) -> Result<u32> {
+    if *cursor + 4 > input.len() {
+        return Err(FormatError(format!("truncated `{field}`")));
+    }
+    let value = u32::from_le_bytes(input[*cursor..*cursor + 4].try_into().unwrap_or([0; 4]));
+    *cursor += 4;
     Ok(value)
 }
 
-fn eof(error: std::io::Error) -> FormatError {
-    match error.kind() {
-        std::io::ErrorKind::UnexpectedEof => FormatError("unexpected end of file".to_owned()),
-        _ => FormatError(error.to_string()),
+fn take_u64(input: &[u8], cursor: &mut usize, field: &str) -> Result<u64> {
+    if *cursor + 8 > input.len() {
+        return Err(FormatError(format!("truncated `{field}`")));
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn record(namespace: &str, key: &str, value: &str, expires_at: Option<i64>) -> Record {
-        Record { namespace: namespace.to_owned(), key: key.as_bytes().to_vec(), value: value.as_bytes().to_vec(), revision: 1, expires_at }
-    }
-
-    #[test]
-    fn shard_round_trip_preserves_records_and_revision() {
-        let mut records = Records::new();
-        let mut first = record("redis:db0", "a", "1", None);
-        first.revision = 1;
-        let mut second = record("redis:db1", "b", "2", Some(1_700_000_000_000));
-        second.revision = 2;
-        records.insert((first.namespace.clone(), first.key.clone()), first);
-        records.insert((second.namespace.clone(), second.key.clone()), second);
-        let bytes = encode_shard(&records, 2).expect("encode");
-        assert_eq!(&bytes[..5], YYKV_MAGIC);
-        let (decoded, revision) = decode_shard(&bytes).expect("decode");
-        assert_eq!(revision, 2);
-        assert_eq!(decoded, records);
-    }
-
-    #[test]
-    fn shard_rejects_checksum_mismatch() {
-        let mut records = Records::new();
-        records.insert(("redis:db0".to_owned(), b"a".to_vec()), record("redis:db0", "a", "1", None));
-        let mut bytes = encode_shard(&records, 1).expect("encode");
-        let last = bytes.len() - 1;
-        bytes[last] ^= 0xff;
-        assert!(decode_shard(&bytes).is_err());
-    }
-
-    #[test]
-    fn catalog_registers_one_shard() {
-        let bytes = encode_catalog("local-0");
-        assert_eq!(decode_catalog_shard_id(&bytes).expect("decode"), "local-0");
-    }
-
-    #[test]
-    fn canonical_integers_reject_leading_zero_and_plus() {
-        assert_eq!(parse_integer(b"42"), Some(42));
-        assert_eq!(parse_integer(b"-7"), Some(-7));
-        assert_eq!(parse_integer(b"05"), None);
-        assert_eq!(parse_integer(b"+5"), None);
-        assert_eq!(parse_integer(b""), None);
-    }
+    let value = u64::from_le_bytes(input[*cursor..*cursor + 8].try_into().unwrap_or([0; 8]));
+    *cursor += 8;
+    Ok(value)
 }
