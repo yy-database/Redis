@@ -266,7 +266,13 @@ fn parse_reply(kind: u8, header: &[u8], next: usize, input: &[u8]) -> Result<(Re
             }
             let mut offset = next;
             let mut values = Vec::new();
-            for _ in 0..count {
+            let replies = if kind == b'%' {
+                count.checked_mul(2).ok_or("reply aggregate length is out of range")?
+            }
+            else {
+                count
+            };
+            for _ in 0..replies {
                 let (value, consumed) = complete_reply(input, offset)?;
                 values.push(value);
                 offset = consumed;
