@@ -1,0 +1,12 @@
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "redis-pyo3"
+description = "Python binding for the RESP and `.yyds` primitives"
+requires-python = ">=3.12"
+dynamic = ["version"]
+
+[tool.maturin]
+module-name = "_native"
