@@ -326,7 +326,7 @@ export function decodeReply(bytes) {
         for (let index = 0; index < replies; index += 1) {
             const nested = decodeReply(bytes.subarray(offset));
             if (nested === null) {
-                throw new Error('incomplete nested reply');
+                return null;
             }
             values.push(nested.spec);
             offset += nested.consumed;

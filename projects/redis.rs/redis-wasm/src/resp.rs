@@ -235,34 +235,39 @@ pub fn decode_reply(input: &[u8]) -> Result<Option<(Reply, usize)>, String> {
     let Some((line, next)) = line(input, 1) else {
         return Ok(None);
     };
-    Ok(Some(parse_reply(input[0], line, next, input)?))
+    parse_reply(input[0], line, next, input)
 }
 
-fn parse_reply(kind: u8, header: &[u8], next: usize, input: &[u8]) -> Result<(Reply, usize), String> {
+fn parse_reply(
+    kind: u8,
+    header: &[u8],
+    next: usize,
+    input: &[u8],
+) -> Result<Option<(Reply, usize)>, String> {
     match kind {
-        b'+' => Ok((Reply::Simple(String::from_utf8_lossy(header).into_owned()), next)),
-        b'-' => Ok((Reply::Error(String::from_utf8_lossy(header).into_owned()), next)),
+        b'+' => Ok(Some((Reply::Simple(String::from_utf8_lossy(header).into_owned()), next))),
+        b'-' => Ok(Some((Reply::Error(String::from_utf8_lossy(header).into_owned()), next))),
         b':' => {
             let value = parse_count(header).ok_or("reply integer is not canonical")?;
-            Ok((Reply::Integer(value), next))
+            Ok(Some((Reply::Integer(value), next)))
         }
-        b'_' => Ok((Reply::Null, next)),
+        b'_' => Ok(Some((Reply::Null, next))),
         b'$' => {
             let length = parse_count(header).ok_or("reply bulk length is not canonical")?;
             if length < 0 {
-                return Ok((Reply::Null, next));
+                return Ok(Some((Reply::Null, next)));
             }
             let end = next + length as usize;
             let terminator = end + 2;
             if input.len() < terminator {
-                return Ok((Reply::Null, next));
+                return Ok(None);
             }
-            Ok((Reply::Bulk(input[next..end].to_vec()), terminator))
+            Ok(Some((Reply::Bulk(input[next..end].to_vec()), terminator)))
         }
         b'*' | b'%' => {
             let count = parse_count(header).ok_or("reply aggregate length is not canonical")?;
             if count < 0 {
-                return Ok((Reply::Null, next));
+                return Ok(Some((Reply::Null, next)));
             }
             let mut offset = next;
             let mut values = Vec::new();
@@ -273,7 +278,9 @@ fn parse_reply(kind: u8, header: &[u8], next: usize, input: &[u8]) -> Result<(Re
                 count
             };
             for _ in 0..replies {
-                let (value, consumed) = complete_reply(input, offset)?;
+                let Some((value, consumed)) = nested_reply(input, offset)? else {
+                    return Ok(None);
+                };
                 values.push(value);
                 offset = consumed;
             }
@@ -283,21 +290,24 @@ fn parse_reply(kind: u8, header: &[u8], next: usize, input: &[u8]) -> Result<(Re
                 while let (Some(key), Some(value)) = (iterator.next(), iterator.next()) {
                     entries.push((key, value));
                 }
-                Ok((Reply::Map(entries), offset))
+                Ok(Some((Reply::Map(entries), offset)))
             }
             else {
-                Ok((Reply::Array(values), offset))
+                Ok(Some((Reply::Array(values), offset)))
             }
         }
         other => Err(format!("unknown reply prefix '{}'", char::from(other))),
     }
 }
 
-/// Parses a nested reply that must be complete.
-fn complete_reply(input: &[u8], offset: usize) -> Result<(Reply, usize), String> {
-    match decode_reply(&input[offset..]) {
-        Ok(Some((reply, consumed))) => Ok((reply, offset + consumed)),
-        _ => Err("incomplete nested reply".to_owned()),
+/// Parses a nested reply, reporting `None` when the frame continues past `input`.
+fn nested_reply(input: &[u8], offset: usize) -> Result<Option<(Reply, usize)>, String> {
+    let Some(rest) = input.get(offset..) else {
+        return Ok(None);
+    };
+    match decode_reply(rest)? {
+        Some((reply, consumed)) => Ok(Some((reply, offset + consumed))),
+        None => Ok(None),
     }
 }
 

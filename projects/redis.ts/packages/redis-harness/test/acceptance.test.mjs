@@ -312,6 +312,16 @@ test('reply decoding reports the consumed bytes', () => {
     assert.deepEqual(JSON.parse(tail.spec), referenceDecodeReply(stream.subarray(first.length)).spec);
 });
 
+test('a truncated bulk reply reports incompleteness instead of a null value', () => {
+    const truncated = Buffer.from('$5\r\nhel');
+    assert.equal(decodeReply(truncated), null);
+    assert.equal(referenceDecodeReply(truncated), null);
+    assert.equal(decodeReply(Buffer.from('*2\r\n$3\r\nabc\r\n:4')), null);
+    const hole = Buffer.from('$0\r\n\r\n');
+    assert.deepEqual(JSON.parse(decodeReply(hole).spec), { type: 'bulk', bytes: [] });
+    assert.equal(decodeReply(hole).consumed, hole.length);
+});
+
 test('binary bulk bytes survive the round trip', () => {
     const spec = { type: 'bulk', bytes: [0, 255, 1] };
     const frame = encodeReply(spec, 2);
