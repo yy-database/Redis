@@ -81,6 +81,14 @@ export class Store {
         return this.native.append(db, bytes(key), bytes(suffix));
     }
 
+    keys(db) {
+        return this.native.keys(db);
+    }
+
+    setMany(db, keys, values) {
+        return this.native.setMany(db, keys.map(bytes), values.map(bytes));
+    }
+
     incrBy(db, key, delta) {
         return this.native.incrBy(db, bytes(key), delta);
     }
