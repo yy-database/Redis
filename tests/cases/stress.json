@@ -1,0 +1,105 @@
+{
+  "format": "redis.case/v1",
+  "table": "stress",
+  "cases": [
+    {
+      "id": "stress.scale.1000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "scale",
+      "count": 1000,
+      "prefix": "k:",
+      "expect": {
+        "size": 1000,
+        "keysLength": 1000,
+        "first": "6b3a303030303030",
+        "last": "6b3a303030393939",
+        "reopenSize": 1000,
+        "shardLen": 49915
+      }
+    },
+    {
+      "id": "stress.scale.100000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "scale",
+      "count": 100000,
+      "prefix": "k:",
+      "expect": {
+        "size": 100000,
+        "keysLength": 100000,
+        "first": "6b3a303030303030",
+        "last": "6b3a303939393939",
+        "reopenSize": 100000,
+        "shardLen": 5188915
+      }
+    },
+    {
+      "id": "stress.bulk.1mib",
+      "face": "stress",
+      "op": "stress",
+      "kind": "bulk",
+      "size": 1048576,
+      "expect": {
+        "length": 1048576,
+        "shardLen": 1048642,
+        "prefixHex": "30313233343536373839616263646566",
+        "suffixHex": "30313233343536373839616263646566"
+      }
+    },
+    {
+      "id": "stress.reply-bulk.1mib",
+      "face": "stress",
+      "op": "stress",
+      "kind": "reply-bulk",
+      "size": 1048576,
+      "expect": {
+        "frameLen": 1048588,
+        "consumed": 1048588
+      }
+    },
+    {
+      "id": "stress.nesting.48",
+      "face": "stress",
+      "op": "stress",
+      "kind": "nesting",
+      "depth": 48,
+      "expect": {
+        "frameLen": 199,
+        "consumed": 199
+      }
+    },
+    {
+      "id": "stress.stream.10000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "stream",
+      "count": 10000,
+      "expect": {
+        "totalConsumed": 347780,
+        "lastKey": "k9999",
+        "lastValue": "v9999"
+      }
+    },
+    {
+      "id": "stress.reply-stream.10000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "reply-stream",
+      "count": 10000,
+      "expect": {
+        "totalConsumed": 50000
+      }
+    },
+    {
+      "id": "stress.incr.1000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "incr",
+      "count": 1000,
+      "expect": {
+        "value": 1000
+      }
+    }
+  ]
+}

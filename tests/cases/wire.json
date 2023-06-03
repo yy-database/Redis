@@ -1,0 +1,5088 @@
+{
+  "format": "redis.case/v1",
+  "table": "wire",
+  "cases": [
+    {
+      "id": "wire.encode_command.ping",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "50494e47"
+      ],
+      "expect": {
+        "hex": "2a310d0a24340d0a50494e470d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.get",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "474554",
+        "6b"
+      ],
+      "expect": {
+        "hex": "2a320d0a24330d0a4745540d0a24310d0a6b0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.set-empty-value",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "534554",
+        "6b",
+        ""
+      ],
+      "expect": {
+        "hex": "2a330d0a24330d0a5345540d0a24310d0a6b0d0a24300d0a0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.set-space",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "534554",
+        "6772656574696e67",
+        "68656c6c6f20776f726c64"
+      ],
+      "expect": {
+        "hex": "2a330d0a24330d0a5345540d0a24380d0a6772656574696e670d0a2431310d0a68656c6c6f20776f726c640d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.echo-crlf",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "4543484f",
+        "0d0a"
+      ],
+      "expect": {
+        "hex": "2a320d0a24340d0a4543484f0d0a24320d0a0d0a0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.set-binary",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "534554",
+        "62696e",
+        "00ff01"
+      ],
+      "expect": {
+        "hex": "2a330d0a24330d0a5345540d0a24330d0a62696e0d0a24330d0a00ff010d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.mset",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "4d534554",
+        "61",
+        "31",
+        "62",
+        "32"
+      ],
+      "expect": {
+        "hex": "2a350d0a24340d0a4d5345540d0a24310d0a610d0a24310d0a310d0a24310d0a620d0a24310d0a320d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.utf8",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "534554",
+        "e994ae",
+        "e580bc"
+      ],
+      "expect": {
+        "hex": "2a330d0a24330d0a5345540d0a24330d0ae994ae0d0a24330d0ae580bc0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.hello",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "48454c4c4f",
+        "33"
+      ],
+      "expect": {
+        "hex": "2a320d0a24350d0a48454c4c4f0d0a24310d0a330d0a"
+      }
+    },
+    {
+      "id": "wire.encode_command.del-eight",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "44454c",
+        "6b30",
+        "6b31",
+        "6b32",
+        "6b33",
+        "6b34",
+        "6b35",
+        "6b36",
+        "6b37"
+      ],
+      "expect": {
+        "hex": "2a390d0a24330d0a44454c0d0a24320d0a6b300d0a24320d0a6b310d0a24320d0a6b320d0a24320d0a6b330d0a24320d0a6b340d0a24320d0a6b350d0a24320d0a6b360d0a24320d0a6b370d0a"
+      }
+    },
+    {
+      "id": "wire.decode_command.set",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0a6b65790d0a24350d0a76616c75650d0a",
+      "expect": {
+        "consumed": 33,
+        "argsHex": [
+          "534554",
+          "6b6579",
+          "76616c7565"
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.get",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a320d0a24330d0a4745540d0a24330d0a6b65790d0a",
+      "expect": {
+        "consumed": 22,
+        "argsHex": [
+          "474554",
+          "6b6579"
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.empty-argument",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24310d0a6b0d0a24300d0a0d0a",
+      "expect": {
+        "consumed": 26,
+        "argsHex": [
+          "534554",
+          "6b",
+          ""
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.binary-argument",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0a62696e0d0a24330d0a00ff010d0a",
+      "expect": {
+        "consumed": 31,
+        "argsHex": [
+          "534554",
+          "62696e",
+          "00ff01"
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.utf8-argument",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0ae994ae0d0a24330d0ae580bc0d0a",
+      "expect": {
+        "consumed": 31,
+        "argsHex": [
+          "534554",
+          "e994ae",
+          "e580bc"
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.eight-arguments",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a390d0a24330d0a44454c0d0a24320d0a6b300d0a24320d0a6b310d0a24320d0a6b320d0a24320d0a6b330d0a24320d0a6b340d0a24320d0a6b350d0a24320d0a6b360d0a24320d0a6b370d0a",
+      "expect": {
+        "consumed": 77,
+        "argsHex": [
+          "44454c",
+          "6b30",
+          "6b31",
+          "6b32",
+          "6b33",
+          "6b34",
+          "6b35",
+          "6b36",
+          "6b37"
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.stream-head",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0a6b65790d0a24350d0a76616c75650d0a2a320d0a24330d0a4745540d0a24330d0a6b65790d0a",
+      "expect": {
+        "consumed": 33,
+        "argsHex": [
+          "534554",
+          "6b6579",
+          "76616c7565"
+        ]
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.0",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.1",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.3",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.4",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.6",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a2433",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.9",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a53",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.32",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0a6b65790d0a24350d0a76616c75650d",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.31",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0a6b65790d0a24350d0a76616c7565",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.incomplete.30",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a5345540d0a24330d0a6b65790d0a24350d0a76616c75",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_command.error.inline",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "50494e470d0a",
+      "expect": {
+        "error": "ERR Protocol error: expected a multibulk request"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.zero-count",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a300d0a",
+      "expect": {
+        "error": "ERR Protocol error: invalid multibulk length"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.negative-count",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a2d310d0a",
+      "expect": {
+        "error": "ERR Protocol error: invalid multibulk length"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.non-numeric-count",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a6162630d0a",
+      "expect": {
+        "error": "ERR Protocol error: invalid multibulk length"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.oversized-count",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a313034383537370d0a",
+      "expect": {
+        "error": "ERR Protocol error: invalid multibulk length"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.non-bulk-argument",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a310d0a780d0a",
+      "expect": {
+        "error": "ERR Protocol error: expected a bulk string"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.negative-bulk",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a310d0a242d320d0a",
+      "expect": {
+        "error": "ERR Protocol error: invalid bulk length"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.non-numeric-bulk",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a310d0a246162630d0a",
+      "expect": {
+        "error": "ERR Protocol error: invalid bulk length"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.bulk-terminator",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a310d0a24320d0a61620d58",
+      "expect": {
+        "error": "ERR Protocol error: invalid bulk string terminator"
+      }
+    },
+    {
+      "id": "wire.decode_command.error.inline-after-header",
+      "face": "error",
+      "op": "decode_command",
+      "inputHex": "2a320d0a4745540d0a",
+      "expect": {
+        "error": "ERR Protocol error: expected a bulk string"
+      }
+    },
+    {
+      "id": "wire.encode_reply.simple-ok.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "expect": {
+        "hex": "2b4f4b0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.simple-ok.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "expect": {
+        "hex": "2b4f4b0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.simple-spaced.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "simple",
+        "value": "OK with detail"
+      },
+      "expect": {
+        "hex": "2b4f4b20776974682064657461696c0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.simple-spaced.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "simple",
+        "value": "OK with detail"
+      },
+      "expect": {
+        "hex": "2b4f4b20776974682064657461696c0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "error",
+        "value": "ERR no such key"
+      },
+      "expect": {
+        "hex": "2d455252206e6f2073756368206b65790d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "error",
+        "value": "ERR no such key"
+      },
+      "expect": {
+        "hex": "2d455252206e6f2073756368206b65790d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-zero.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "int",
+        "value": 0
+      },
+      "expect": {
+        "hex": "3a300d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-zero.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "int",
+        "value": 0
+      },
+      "expect": {
+        "hex": "3a300d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-positive.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "int",
+        "value": 17
+      },
+      "expect": {
+        "hex": "3a31370d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-positive.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "int",
+        "value": 17
+      },
+      "expect": {
+        "hex": "3a31370d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-negative.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "int",
+        "value": -42
+      },
+      "expect": {
+        "hex": "3a2d34320d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-negative.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "int",
+        "value": -42
+      },
+      "expect": {
+        "hex": "3a2d34320d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-large.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "int",
+        "value": 9007199254740991
+      },
+      "expect": {
+        "hex": "3a393030373139393235343734303939310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.int-large.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "int",
+        "value": 9007199254740991
+      },
+      "expect": {
+        "hex": "3a393030373139393235343734303939310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-empty.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": []
+      },
+      "expect": {
+        "hex": "24300d0a0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-empty.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": []
+      },
+      "expect": {
+        "hex": "24300d0a0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-text.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          104,
+          101,
+          108,
+          108,
+          111
+        ]
+      },
+      "expect": {
+        "hex": "24350d0a68656c6c6f0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-text.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          104,
+          101,
+          108,
+          108,
+          111
+        ]
+      },
+      "expect": {
+        "hex": "24350d0a68656c6c6f0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-binary.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          0,
+          255,
+          1
+        ]
+      },
+      "expect": {
+        "hex": "24330d0a00ff010d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-binary.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          0,
+          255,
+          1
+        ]
+      },
+      "expect": {
+        "hex": "24330d0a00ff010d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-utf8.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          229,
+          128,
+          188
+        ]
+      },
+      "expect": {
+        "hex": "24330d0ae580bc0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-utf8.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          229,
+          128,
+          188
+        ]
+      },
+      "expect": {
+        "hex": "24330d0ae580bc0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-long.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106
+        ]
+      },
+      "expect": {
+        "hex": "24313030300d0a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.bulk-long.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106
+        ]
+      },
+      "expect": {
+        "hex": "24313030300d0a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a6162636465666768696a0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.null.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "null"
+      },
+      "expect": {
+        "hex": "242d310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.null.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "null"
+      },
+      "expect": {
+        "hex": "5f0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-empty.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array",
+        "value": []
+      },
+      "expect": {
+        "hex": "2a300d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-empty.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "array",
+        "value": []
+      },
+      "expect": {
+        "hex": "2a300d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-single.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "int",
+            "value": 7
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a310d0a3a370d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-single.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "int",
+            "value": 7
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a310d0a3a370d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-mixed.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              98,
+              99
+            ]
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "int",
+            "value": -1
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a330d0a24330d0a6162630d0a242d310d0a3a2d310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-mixed.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              98,
+              99
+            ]
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "int",
+            "value": -1
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a330d0a24330d0a6162630d0a5f0d0a3a2d310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-nested.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  97
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  98
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a320d0a2a310d0a24310d0a610d0a2a310d0a24310d0a620d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-nested.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  97
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  98
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a320d0a2a310d0a24310d0a610d0a2a310d0a24310d0a620d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-three-deep.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      120
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a310d0a2a310d0a2a310d0a24310d0a780d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.array-three-deep.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      120
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a310d0a2a310d0a2a310d0a24310d0a780d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-empty.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map",
+        "value": []
+      },
+      "expect": {
+        "hex": "2a300d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-empty.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "map",
+        "value": []
+      },
+      "expect": {
+        "hex": "25300d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-single.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                107
+              ]
+            },
+            {
+              "type": "int",
+              "value": 7
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "2a320d0a24310d0a6b0d0a3a370d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-single.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                107
+              ]
+            },
+            {
+              "type": "int",
+              "value": 7
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "25310d0a24310d0a6b0d0a3a370d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-two.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                97
+              ]
+            },
+            {
+              "type": "int",
+              "value": 1
+            }
+          ],
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                98
+              ]
+            },
+            {
+              "type": "int",
+              "value": 2
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "2a340d0a24310d0a610d0a3a310d0a24310d0a620d0a3a320d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-two.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                97
+              ]
+            },
+            {
+              "type": "int",
+              "value": 1
+            }
+          ],
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                98
+              ]
+            },
+            {
+              "type": "int",
+              "value": 2
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "25320d0a24310d0a610d0a3a310d0a24310d0a620d0a3a320d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-nested-value.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                107
+              ]
+            },
+            {
+              "type": "array",
+              "value": [
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "2a320d0a24310d0a6b0d0a2a310d0a3a310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.map-nested-value.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "bulk",
+              "bytes": [
+                107
+              ]
+            },
+            {
+              "type": "array",
+              "value": [
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "25310d0a24310d0a6b0d0a2a310d0a3a310d0a"
+      }
+    },
+    {
+      "id": "wire.decode_reply.simple",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2b4f4b0d0a",
+      "expect": {
+        "consumed": 5,
+        "spec": {
+          "type": "simple",
+          "value": "OK"
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.simple-empty",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2b0d0a",
+      "expect": {
+        "consumed": 3,
+        "spec": {
+          "type": "simple",
+          "value": ""
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.simple-utf8",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2be697a5e69cac0d0a",
+      "expect": {
+        "consumed": 9,
+        "spec": {
+          "type": "simple",
+          "value": "日本"
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.error",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2d45525220756e6b6e6f776e20636f6d6d616e64202778270d0a",
+      "expect": {
+        "consumed": 26,
+        "spec": {
+          "type": "error",
+          "value": "ERR unknown command 'x'"
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.int-zero",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "3a300d0a",
+      "expect": {
+        "consumed": 4,
+        "spec": {
+          "type": "int",
+          "value": 0
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.int-positive",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "3a31370d0a",
+      "expect": {
+        "consumed": 5,
+        "spec": {
+          "type": "int",
+          "value": 17
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.int-negative",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "3a2d34320d0a",
+      "expect": {
+        "consumed": 6,
+        "spec": {
+          "type": "int",
+          "value": -42
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.int-large",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "3a393030373139393235343734303939310d0a",
+      "expect": {
+        "consumed": 19,
+        "spec": {
+          "type": "int",
+          "value": 9007199254740991
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.null-resp3",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "5f0d0a",
+      "expect": {
+        "consumed": 3,
+        "spec": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.null-resp2",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "242d310d0a",
+      "expect": {
+        "consumed": 5,
+        "spec": {
+          "type": "null"
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.bulk-empty",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "24300d0a0d0a",
+      "expect": {
+        "consumed": 6,
+        "spec": {
+          "type": "bulk",
+          "bytes": []
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.bulk-text",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "24350d0a68656c6c6f0d0a",
+      "expect": {
+        "consumed": 11,
+        "spec": {
+          "type": "bulk",
+          "bytes": [
+            104,
+            101,
+            108,
+            108,
+            111
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.bulk-binary",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "24330d0a00ff010d0a",
+      "expect": {
+        "consumed": 9,
+        "spec": {
+          "type": "bulk",
+          "bytes": [
+            0,
+            255,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.array-empty",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a300d0a",
+      "expect": {
+        "consumed": 4,
+        "spec": {
+          "type": "array",
+          "value": []
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.array-mixed",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a3a370d0a24330d0a6162630d0a",
+      "expect": {
+        "consumed": 17,
+        "spec": {
+          "type": "array",
+          "value": [
+            {
+              "type": "int",
+              "value": 7
+            },
+            {
+              "type": "bulk",
+              "bytes": [
+                97,
+                98,
+                99
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.array-with-null",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a330d0a3a310d0a24320d0a61620d0a5f0d0a",
+      "expect": {
+        "consumed": 19,
+        "spec": {
+          "type": "array",
+          "value": [
+            {
+              "type": "int",
+              "value": 1
+            },
+            {
+              "type": "bulk",
+              "bytes": [
+                97,
+                98
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.array-nested",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a2a310d0a24310d0a610d0a2a310d0a24310d0a620d0a",
+      "expect": {
+        "consumed": 26,
+        "spec": {
+          "type": "array",
+          "value": [
+            {
+              "type": "array",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    97
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "array",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    98
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.map-empty",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "25300d0a",
+      "expect": {
+        "consumed": 4,
+        "spec": {
+          "type": "map",
+          "value": []
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.map-single",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "25310d0a24310d0a6b0d0a3a370d0a",
+      "expect": {
+        "consumed": 15,
+        "spec": {
+          "type": "map",
+          "value": [
+            [
+              {
+                "type": "bulk",
+                "bytes": [
+                  107
+                ]
+              },
+              {
+                "type": "int",
+                "value": 7
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.map-two",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "25320d0a24310d0a610d0a3a310d0a24310d0a620d0a3a320d0a",
+      "expect": {
+        "consumed": 26,
+        "spec": {
+          "type": "map",
+          "value": [
+            [
+              {
+                "type": "bulk",
+                "bytes": [
+                  97
+                ]
+              },
+              {
+                "type": "int",
+                "value": 1
+              }
+            ],
+            [
+              {
+                "type": "bulk",
+                "bytes": [
+                  98
+                ]
+              },
+              {
+                "type": "int",
+                "value": 2
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.map-nested-value",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "25310d0a24310d0a6b0d0a2a310d0a3a310d0a",
+      "expect": {
+        "consumed": 19,
+        "spec": {
+          "type": "map",
+          "value": [
+            [
+              {
+                "type": "bulk",
+                "bytes": [
+                  107
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "int",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.map-inside-array",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a25310d0a24310d0a6b0d0a3a310d0a3a390d0a",
+      "expect": {
+        "consumed": 23,
+        "spec": {
+          "type": "array",
+          "value": [
+            {
+              "type": "map",
+              "value": [
+                [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      107
+                    ]
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "int",
+              "value": 9
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.0",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.1",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.2",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a32",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.4",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.8",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a2a310d0a",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.14",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a2a310d0a24310d0a610d",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.incomplete.18",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a320d0a2a310d0a24310d0a610d0a2a310d",
+      "expect": {
+        "incomplete": true
+      }
+    },
+    {
+      "id": "wire.decode_reply.stream-head",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2b4f4b0d0a2a320d0a3a370d0a24330d0a6162630d0a",
+      "expect": {
+        "consumed": 5,
+        "spec": {
+          "type": "simple",
+          "value": "OK"
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.non-canonical-int",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "3a312e350d0a",
+      "expect": {
+        "error": "reply integer is not canonical"
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.signed-int",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "3a2b310d0a",
+      "expect": {
+        "error": "reply integer is not canonical"
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.empty-int",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "3a0d0a",
+      "expect": {
+        "error": "reply integer is not canonical"
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.non-canonical-bulk",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "246162630d0a",
+      "expect": {
+        "error": "reply bulk length is not canonical"
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.non-canonical-aggregate",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "2a6162630d0a",
+      "expect": {
+        "error": "reply aggregate length is not canonical"
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.unknown-prefix",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "210d0a",
+      "expect": {
+        "error": "unknown reply prefix '!'"
+      }
+    },
+    {
+      "id": "wire.decode_reply.error.unknown-prefix-tilde",
+      "face": "error",
+      "op": "decode_reply",
+      "inputHex": "7e350d0a",
+      "expect": {
+        "error": "unknown reply prefix '~'"
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.one",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "1",
+      "expect": {
+        "value": 1
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.ten",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "10",
+      "expect": {
+        "value": 10
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.forty-two",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "42",
+      "expect": {
+        "value": 42
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.negative",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "-7",
+      "expect": {
+        "value": -7
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.zero",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "0",
+      "expect": {
+        "value": 0
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.negative-zero",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "-0",
+      "expect": {
+        "value": 0
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.max-safe",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "9007199254740991",
+      "expect": {
+        "value": 9007199254740991
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.min-safe",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "-9007199254740991",
+      "expect": {
+        "value": -9007199254740991
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.repeated-digit",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "111111111111111",
+      "expect": {
+        "value": 111111111111111
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.empty",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.minus-only",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "-",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.plus-sign",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "+1",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.leading-zero",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "01",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.double-zero",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "00",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.float",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "1.5",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.leading-space",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": " 1",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.trailing-space",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "1 ",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.hex",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "0x10",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.underscore",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "1_0",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.letters",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "abc",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.newline",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "1\n",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.overflow",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "9223372036854775808",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.underflow",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "-9223372036854775809",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.too-many-digits",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "12345678901234567890",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.parse_integer.rejected.arabic-digits",
+      "face": "error",
+      "op": "parse_integer",
+      "inputText": "١٢٣",
+      "expect": {
+        "value": null
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.missing-type",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {},
+      "expect": {
+        "error": "reply specification is missing `type`"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.unknown-type",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "stream"
+      },
+      "expect": {
+        "error": "unknown reply type 'stream'"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.int-not-integer",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "int",
+        "value": "x"
+      },
+      "expect": {
+        "error": "reply specification `int` needs an integer `value`"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.int-missing",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "int"
+      },
+      "expect": {
+        "error": "reply specification `int` needs an integer `value`"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.array-without-value",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array"
+      },
+      "expect": {
+        "error": "reply specification `array` needs a `value` list"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.map-without-value",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map"
+      },
+      "expect": {
+        "error": "reply specification `map` needs a `value` list"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.map-short-pair",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "int",
+              "value": 1
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "error": "each `map` entry needs exactly two replies"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.bulk-bad-byte",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          256
+        ]
+      },
+      "expect": {
+        "error": "reply specification `bulk` has a non byte `bytes` entry"
+      }
+    },
+    {
+      "id": "wire.encode_reply.error.simple-without-value",
+      "face": "error",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "simple"
+      },
+      "expect": {
+        "error": "reply specification needs a string `value`"
+      }
+    },
+    {
+      "id": "wire.encode_command.extra.echo",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "4543484f",
+        "78"
+      ],
+      "expect": {
+        "hex": "2a320d0a24340d0a4543484f0d0a24310d0a780d0a"
+      }
+    },
+    {
+      "id": "wire.decode_command.extra.echo",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a320d0a24340d0a4543484f0d0a24310d0a780d0a",
+      "expect": {
+        "consumed": 21,
+        "argsHex": [
+          "4543484f",
+          "78"
+        ]
+      }
+    },
+    {
+      "id": "wire.encode_command.extra.get-extra-argument",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "474554",
+        "6b",
+        "6578747261"
+      ],
+      "expect": {
+        "hex": "2a330d0a24330d0a4745540d0a24310d0a6b0d0a24350d0a65787472610d0a"
+      }
+    },
+    {
+      "id": "wire.decode_command.extra.get-extra-argument",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24330d0a4745540d0a24310d0a6b0d0a24350d0a65787472610d0a",
+      "expect": {
+        "consumed": 31,
+        "argsHex": [
+          "474554",
+          "6b",
+          "6578747261"
+        ]
+      }
+    },
+    {
+      "id": "wire.encode_command.extra.incrby-negative",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "494e43524259",
+        "6e",
+        "2d33"
+      ],
+      "expect": {
+        "hex": "2a330d0a24360d0a494e435242590d0a24310d0a6e0d0a24320d0a2d330d0a"
+      }
+    },
+    {
+      "id": "wire.decode_command.extra.incrby-negative",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a330d0a24360d0a494e435242590d0a24310d0a6e0d0a24320d0a2d330d0a",
+      "expect": {
+        "consumed": 31,
+        "argsHex": [
+          "494e43524259",
+          "6e",
+          "2d33"
+        ]
+      }
+    },
+    {
+      "id": "wire.encode_command.extra.scan-options",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "5343414e",
+        "30",
+        "4d41544348",
+        "612a",
+        "434f554e54",
+        "35"
+      ],
+      "expect": {
+        "hex": "2a360d0a24340d0a5343414e0d0a24310d0a300d0a24350d0a4d415443480d0a24320d0a612a0d0a24350d0a434f554e540d0a24310d0a350d0a"
+      }
+    },
+    {
+      "id": "wire.decode_command.extra.scan-options",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a360d0a24340d0a5343414e0d0a24310d0a300d0a24350d0a4d415443480d0a24320d0a612a0d0a24350d0a434f554e540d0a24310d0a350d0a",
+      "expect": {
+        "consumed": 58,
+        "argsHex": [
+          "5343414e",
+          "30",
+          "4d41544348",
+          "612a",
+          "434f554e54",
+          "35"
+        ]
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.simple-utf8.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "simple",
+        "value": "已收到"
+      },
+      "expect": {
+        "hex": "2be5b7b2e694b6e588b00d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.simple-utf8.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "simple",
+        "value": "已收到"
+      },
+      "expect": {
+        "hex": "2be5b7b2e694b6e588b00d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.bulk-one-byte.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          65
+        ]
+      },
+      "expect": {
+        "hex": "24310d0a410d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.bulk-one-byte.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          65
+        ]
+      },
+      "expect": {
+        "hex": "24310d0a410d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.array-of-maps.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "map",
+            "value": [
+              [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    107
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a310d0a2a320d0a24310d0a6b0d0a3a310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.array-of-maps.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "array",
+        "value": [
+          {
+            "type": "map",
+            "value": [
+              [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    107
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "hex": "2a310d0a25310d0a24310d0a6b0d0a3a310d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.map-int-key.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "int",
+              "value": 1
+            },
+            {
+              "type": "bulk",
+              "bytes": [
+                118
+              ]
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "2a320d0a3a310d0a24310d0a760d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.map-int-key.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "map",
+        "value": [
+          [
+            {
+              "type": "int",
+              "value": 1
+            },
+            {
+              "type": "bulk",
+              "bytes": [
+                118
+              ]
+            }
+          ]
+        ]
+      },
+      "expect": {
+        "hex": "25310d0a3a310d0a24310d0a760d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.bulk-255.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "expect": {
+        "hex": "243235350d0affffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.bulk-255.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "bulk",
+        "bytes": [
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "expect": {
+        "hex": "243235350d0affffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0d0a"
+      }
+    },
+    {
+      "id": "wire.decode_reply.extra.bulk-single-byte",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "24310d0a610d0a",
+      "expect": {
+        "consumed": 7,
+        "spec": {
+          "type": "bulk",
+          "bytes": [
+            97
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.extra.array-empty-bulk",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2a310d0a24300d0a0d0a",
+      "expect": {
+        "consumed": 10,
+        "spec": {
+          "type": "array",
+          "value": [
+            {
+              "type": "bulk",
+              "bytes": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.extra.map-null-value",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "25310d0a24310d0a6b0d0a242d310d0a",
+      "expect": {
+        "consumed": 16,
+        "spec": {
+          "type": "map",
+          "value": [
+            [
+              {
+                "type": "bulk",
+                "bytes": [
+                  107
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "wire.decode_reply.extra.int-zero",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "3a300d0a",
+      "expect": {
+        "consumed": 4,
+        "spec": {
+          "type": "int",
+          "value": 0
+        }
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.extra.seven",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "7",
+      "expect": {
+        "value": 7
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.extra.negative-one",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "-1",
+      "expect": {
+        "value": -1
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.extra.million",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "1000000",
+      "expect": {
+        "value": 1000000
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.extra.negative-million",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "-1000000",
+      "expect": {
+        "value": -1000000
+      }
+    },
+    {
+      "id": "wire.parse_integer.accepted.extra.thirteen-digits",
+      "face": "resp",
+      "op": "parse_integer",
+      "inputText": "1234567890123",
+      "expect": {
+        "value": 1234567890123
+      }
+    }
+  ]
+}

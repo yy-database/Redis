@@ -1,0 +1,1748 @@
+{
+  "format": "redis.case/v1",
+  "table": "command-dispatch",
+  "cases": [
+    {
+      "id": "dispatch.arity.get",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "GET"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'get' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.set",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'set' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.del",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "DEL"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'del' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.mset",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MSET",
+            "a",
+            "1",
+            "b"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'mset' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.ping",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PING",
+            "a",
+            "b"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'ping' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.select",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SELECT"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'select' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.flushdb",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "FLUSHDB",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'flushdb' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.dbsize",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "DBSIZE",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'dbsize' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.rename",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "RENAME",
+            "a"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'rename' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.ttl",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "TTL"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'ttl' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.persist",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PERSIST"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'persist' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.keys",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "KEYS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'keys' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.append",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "APPEND",
+            "k"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'append' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.getex",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "GETEX"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'getex' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.client",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.client-setinfo",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "SETINFO",
+            "lib"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|setinfo' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.client-getname",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|getname' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.mget",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MGET"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.getset",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "GETSET",
+            "k"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.incr",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "INCR",
+            "a",
+            "b"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.incrby",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "INCRBY",
+            "k"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.arity.quit",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "QUIT",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'quit' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.empty-request",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [],
+          "reply": {
+            "type": "error",
+            "value": "ERR Protocol error or request limit exceeded"
+          },
+          "close": true
+        }
+      ]
+    },
+    {
+      "id": "dispatch.unsupported-command",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SADD",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unsupported command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.quit",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "QUIT"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          },
+          "close": true
+        }
+      ]
+    },
+    {
+      "id": "dispatch.ping",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PING"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "PONG"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.echo",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "ECHO",
+            "hi"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              104,
+              105
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.options.unknown",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "FOO"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unsupported SET options"
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.options.duplicate-expiry",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "EX",
+            "10",
+            "EX",
+            "20"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.options.aspirational",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "EX",
+            "10",
+            "XX"
+          ],
+          "reply": {
+            "type": "null"
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.ex.zero",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "EX",
+            "0"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR invalid expire time in 'set' command"
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.keep-ttl-and-ex",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "KEEPTTL",
+            "EX",
+            "10"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.keepttl",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "w",
+            "KEEPTTL"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": true
+              },
+              "call": "deadline_set"
+            },
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bytes": "77"
+              },
+              "call": "get"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.getex.persist-extra",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "GETEX",
+            "k",
+            "PERSIST",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.getex.ex-zero",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "GETEX",
+            "k",
+            "EX",
+            "0"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR invalid expire time in 'getex' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.getex.unknown-option",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "GETEX",
+            "k",
+            "FOO"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.expire.non-integer",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "abc"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR value is not an integer or out of range"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.expire.negative-deletes",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "-1"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dispatch.expire.missing-key",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "60"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.invalid-cursor",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "abc"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR invalid cursor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.negative-cursor",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "-1"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR invalid cursor"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.zero-count",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "0",
+            "COUNT",
+            "0"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.missing-value",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "0",
+            "MATCH"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.unknown-option",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "0",
+            "FOO",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.paging",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "63",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "64",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "65",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "0",
+            "COUNT",
+            "2"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "SCAN",
+            "2",
+            "COUNT",
+            "2"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  52
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      99
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      100
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "SCAN",
+            "4",
+            "COUNT",
+            "2"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  48
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      101
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.scan.match",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "63",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "64",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "65",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "SCAN",
+            "0",
+            "MATCH",
+            "a*"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  48
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.glob.star-middle",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "63",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "64",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "65",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "KEYS",
+            "a*b"
+          ],
+          "reply": {
+            "type": "array",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.exec",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "simple",
+                "value": "OK"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.nested",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR MULTI calls can not be nested"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.exec-without-multi",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR EXEC without MULTI"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.discard-without-multi",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "DISCARD"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR DISCARD without MULTI"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.discard",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "DISCARD"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "EXISTS",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.rejects-planning-error",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "GET"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'get' command"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "simple",
+                "value": "OK"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.select.out-of-range",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SELECT",
+            "16"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR DB index is out of range"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.select.switches-database",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "db": 1,
+          "keyHex": "78",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "DBSIZE"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "SELECT",
+            "1"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "DBSIZE"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.setname",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "SETNAME",
+            "app"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              97,
+              112,
+              112
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.getname-unset",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.id",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "ID"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.unknown-subcommand",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "FOO"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unsupported CLIENT subcommand"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.setinfo",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "SETINFO",
+            "LIB-NAME",
+            "redis-py"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        }
+      ]
+    }
+  ]
+}
