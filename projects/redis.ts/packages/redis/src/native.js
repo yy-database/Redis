@@ -89,6 +89,10 @@ export class Store {
         return this.native.setMany(db, keys.map(bytes), values.map(bytes));
     }
 
+    flush() {
+        return this.native.flush();
+    }
+
     incrBy(db, key, delta) {
         return this.native.incrBy(db, bytes(key), delta);
     }

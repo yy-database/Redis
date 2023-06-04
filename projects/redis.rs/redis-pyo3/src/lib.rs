@@ -131,6 +131,11 @@ impl Store {
         self.node.set_many(db, &entries).map_err(runtime)
     }
 
+    /// Writes counter updates buffered since the last flush, marking the durability boundary.
+    fn flush(&mut self) -> PyResult<()> {
+        self.node.flush().map_err(runtime)
+    }
+
     /// Adds `delta` to an integer value, preserving its deadline.
     ///
     /// Returns `(value, error)`. `error` carries the Redis error text when the
