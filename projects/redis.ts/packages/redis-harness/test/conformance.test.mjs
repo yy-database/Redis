@@ -167,6 +167,7 @@ function runSteps(store, steps, directory) {
     const seen = [];
     for (const entry of steps) {
         if (entry.call === 'reopen') {
+            current.flush();
             current = new NativeStore(directory);
             seen.push({ call: 'reopen', value: null });
             continue;
@@ -264,6 +265,7 @@ function runCase(entry) {
             const store = new NativeStore(directory);
             if (entry.op === 'layout') {
                 runSteps(store, entry.steps, directory);
+                store.flush();
                 const shard = readFileSync(join(directory, 'local-0.yykv')).toString('hex');
                 const catalog = readFileSync(join(directory, 'local-0.yyds')).toString('hex');
                 assert.equal(shard, entry.shardHex);
@@ -427,16 +429,33 @@ function runStress(entry) {
         case 'incr': {
             const directory = temporaryDir();
             const store = new NativeStore(directory);
+            if (entry.seed > 0) {
+                const keys = [];
+                const values = [];
+                for (let index = 0; index < entry.seed; index += 1) {
+                    keys.push(Buffer.from(`${entry.prefix}${String(index).padStart(6, '0')}`));
+                    values.push(Buffer.from(`v${index}`));
+                }
+                store.setMany(0, keys, values);
+            }
             const started = Date.now();
             let last = null;
             for (let index = 0; index < entry.count; index += 1) {
                 last = store.incrBy(0, Buffer.from('counter'), 1);
             }
             const writeMs = Date.now() - started;
+            const flushStarted = Date.now();
+            store.flush();
+            const flushMs = Date.now() - flushStarted;
             assert.equal(last.value, entry.expect.value);
             assert.equal(store.get(0, Buffer.from('counter')).toString(), String(entry.expect.value));
-            assert.ok(writeMs < 120_000);
-            return { writeMs, value: last.value };
+            const reopened = Date.now();
+            const again = new NativeStore(directory);
+            const persisted = again.get(0, Buffer.from('counter'));
+            const reopenMs = Date.now() - reopened;
+            assert.equal(persisted.toString(), String(entry.expect.value));
+            assert.ok(writeMs < 120_000 && flushMs < 120_000 && reopenMs < 120_000);
+            return { writeMs, flushMs, reopenMs, value: last.value, persisted: true };
         }
         default:
             throw new Error(`unsupported stress kind ${entry.kind}`);

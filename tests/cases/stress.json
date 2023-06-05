@@ -100,6 +100,38 @@
       "expect": {
         "value": 1000
       }
+    },
+    {
+      "id": "stress.incr.10000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "incr",
+      "count": 10000,
+      "expect": {
+        "value": 10000
+      }
+    },
+    {
+      "id": "stress.incr.100000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "incr",
+      "count": 100000,
+      "expect": {
+        "value": 100000
+      }
+    },
+    {
+      "id": "stress.incr-seeded.100000",
+      "face": "stress",
+      "op": "stress",
+      "kind": "incr",
+      "seed": 100000,
+      "prefix": "k:",
+      "count": 10000,
+      "expect": {
+        "value": 10000
+      }
     }
   ]
 }

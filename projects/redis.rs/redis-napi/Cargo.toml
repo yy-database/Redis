@@ -10,7 +10,7 @@ publish = false
 
 [lib]
 name = "redis_napi"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 napi = { workspace = true }
