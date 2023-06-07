@@ -35,17 +35,42 @@ pub struct Node {
 
 impl Node {
     /// Opens the storage directory, creating the catalog and an empty shard when absent.
+    ///
+    /// An existing catalog is fully validated before any read or write: magic,
+    /// format version, reserved sections, shard count, shard id shape, exact
+    /// length, and the presence of the shard it registers. Every failure names
+    /// the exact field in its message. A missing catalog keeps the previous
+    /// behavior: the catalog is created and the shard is read from, or created
+    /// at, the derived path.
     pub fn open(data_dir: impl AsRef<Path>) -> io::Result<Self> {
         let data_dir = data_dir.as_ref().to_path_buf();
         fs::create_dir_all(&data_dir)?;
-        let shard_path = data_dir.join(SHARD_FILE);
         let catalog_path = data_dir.join(CATALOG_FILE);
-        if !catalog_path.exists() {
-            write_durable(&catalog_path, &format::encode_catalog("local-0"))?;
-        }
+        let registered = match fs::read(&catalog_path) {
+            Ok(bytes) => Some(
+                format::decode_catalog_shard_id(&bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?,
+            ),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        let catalog_existed = registered.is_some();
+        let shard_id = match registered {
+            Some(id) => id,
+            None => {
+                write_durable(&catalog_path, &format::encode_catalog("local-0"))?;
+                "local-0".to_owned()
+            }
+        };
+        let shard_path = data_dir.join(format!("{shard_id}.yykv"));
         let (records, next_revision) = if shard_path.exists() {
             let bytes = fs::read(&shard_path)?;
             format::decode_shard(&bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+        }
+        else if catalog_existed {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("catalog.shard-file: `{shard_id}.yykv` is missing"),
+            ));
         }
         else {
             let records = Records::new();
