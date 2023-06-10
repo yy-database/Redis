@@ -19,7 +19,7 @@ const redis = await installed.load();
 const binding = (await import(pathToFileURL(installed.resolve(`@yydb/redis-${installed.platform}`)).href)).default;
 const NativeStore = binding.Store;
 
-const { decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, execute } = redis;
+const { decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, repairShard, execute } = redis;
 
 const directories = [];
 const observations = [];
@@ -36,6 +36,14 @@ function temporaryDir() {
     const directory = mkdtempSync(join(tmpdir(), 'redis-conformance-'));
     directories.push(directory);
     return directory;
+}
+
+function seedDirectory(entry, directory) {
+    for (const seed of entry.seed ?? []) {
+        const path = join(directory, seed.path);
+        mkdirSync(join(path, '..'), { recursive: true });
+        writeFileSync(path, bytes(seed.hex));
+    }
 }
 
 function writeReport() {
@@ -172,6 +180,14 @@ function runSteps(store, steps, directory) {
             seen.push({ call: 'reopen', value: null });
             continue;
         }
+        if (entry.call === 'repair_shard') {
+            const shardId = repairShard(directory);
+            if (entry.expect !== undefined) {
+                assertExpectation(shardId, entry.expect, entry.call);
+            }
+            seen.push({ call: 'repair_shard', value: shardId });
+            continue;
+        }
         const value = perform(current, entry);
         if (entry.expect !== undefined) {
             assertExpectation(value, entry.expect, entry.call);
@@ -246,11 +262,7 @@ function runCase(entry) {
         case 'store':
         case 'layout': {
             const directory = temporaryDir();
-            for (const seed of entry.seed ?? []) {
-                const path = join(directory, seed.path);
-                mkdirSync(join(path, '..'), { recursive: true });
-                writeFileSync(path, bytes(seed.hex));
-            }
+            seedDirectory(entry, directory);
             if (entry.expectOpenError !== undefined) {
                 let message;
                 try {
@@ -274,6 +286,24 @@ function runCase(entry) {
                 return { shardHex: shard, catalogHex: catalog, shardLen: shard.length / 2 };
             }
             return { steps: runSteps(store, entry.steps, directory) };
+        }
+        case 'repair': {
+            const directory = temporaryDir();
+            seedDirectory(entry, directory);
+            let message = null;
+            try {
+                new NativeStore(directory);
+            }
+            catch (cause) {
+                message = cause.message;
+            }
+            assert.equal(message, entry.expectOpenError);
+            const shardId = repairShard(directory);
+            assert.equal(shardId, entry.expectShardId);
+            const catalog = readFileSync(join(directory, 'local-0.yyds')).toString('hex');
+            assert.equal(catalog, entry.catalogHex);
+            const store = new NativeStore(directory);
+            return { openError: message, shardId, catalogHex: catalog, steps: runSteps(store, entry.steps, directory) };
         }
         case 'command': {
             const directory = temporaryDir();

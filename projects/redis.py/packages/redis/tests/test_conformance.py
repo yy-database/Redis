@@ -13,9 +13,25 @@ from pathlib import Path
 
 import pytest
 
-from redis import Store, decode_command, decode_reply, encode_command, encode_reply, parse_integer
+from redis import (
+    Store,
+    decode_command,
+    decode_reply,
+    encode_command,
+    encode_reply,
+    parse_integer,
+    repair_shard,
+)
 
 CASES_ENV = "REDIS_CONFORMANCE_REPORT"
+
+
+def _seed_directory(entry, directory):
+    for seed in entry.get("seed", []):
+        path = os.path.join(directory, seed["path"])
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as handle:
+            handle.write(raw(seed["hex"]))
 
 
 def _repository_root():
@@ -133,6 +149,12 @@ def run_steps(store, steps, directory):
             current.flush()
             current = Store(directory)
             seen.append({"call": "reopen", "value": None})
+            continue
+        if entry["call"] == "repair_shard":
+            shard_id = repair_shard(directory)
+            if "expect" in entry:
+                assert_expectation(shard_id, entry["expect"], entry["call"])
+            seen.append({"call": "repair_shard", "value": shard_id})
             continue
         value = perform(current, entry)
         if "expect" in entry:
@@ -258,11 +280,7 @@ def run_case(entry):
         return {"value": value}
     if op in ("store", "layout"):
         directory = tempfile.mkdtemp(prefix="redis-conformance-")
-        for seed in entry.get("seed", []):
-            path = os.path.join(directory, seed["path"])
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "wb") as handle:
-                handle.write(raw(seed["hex"]))
+        _seed_directory(entry, directory)
         if "expectOpenError" in entry:
             message = None
             try:
@@ -282,6 +300,26 @@ def run_case(entry):
             assert len(shard) // 2 == entry["shardLen"]
             return {"shardHex": shard, "catalogHex": catalog, "shardLen": len(shard) // 2}
         return {"steps": run_steps(store, entry["steps"], directory)}
+    if op == "repair":
+        directory = tempfile.mkdtemp(prefix="redis-conformance-")
+        _seed_directory(entry, directory)
+        message = None
+        try:
+            Store(directory)
+        except RuntimeError as error:
+            message = str(error)
+        assert message == entry["expectOpenError"]
+        shard_id = repair_shard(directory)
+        assert shard_id == entry["expectShardId"]
+        catalog = Path(directory, "local-0.yyds").read_bytes().hex()
+        assert catalog == entry["catalogHex"]
+        store = Store(directory)
+        return {
+            "openError": message,
+            "shardId": shard_id,
+            "catalogHex": catalog,
+            "steps": run_steps(store, entry["steps"], directory),
+        }
     if op == "command":
         directory = tempfile.mkdtemp(prefix="redis-conformance-")
         store = Store(directory)
