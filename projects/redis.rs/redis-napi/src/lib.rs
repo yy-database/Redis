@@ -86,6 +86,15 @@ pub struct Store {
     node: Node,
 }
 
+/// Creates the shard registered by an existing `.yyds` catalog when it is missing.
+///
+/// Recovery entry for the `catalog.shard-file` open error. The catalog is
+/// validated but never rewritten, and an existing shard is never overwritten.
+#[napi]
+pub fn repair_shard(data_dir: String) -> std::result::Result<String, napi::Error> {
+    redis_wasm::store::repair_missing_shard(data_dir).map_err(reason)
+}
+
 #[napi]
 impl Store {
     /// Opens the storage directory, creating the catalog and an empty shard when absent.

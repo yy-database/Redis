@@ -40,33 +40,28 @@ impl Node {
     /// format version, reserved sections, shard count, shard id shape, exact
     /// length, and the presence of the shard it registers. Every failure names
     /// the exact field in its message. A missing catalog keeps the previous
-    /// behavior: the catalog is created and the shard is read from, or created
-    /// at, the derived path.
+    /// behavior: the shard is read from, or created at, the derived path and the
+    /// catalog is then created around it.
+    ///
+    /// The shard is written before the catalog because the catalog is the
+    /// registration of the shard. A crash between the two renames therefore
+    /// leaves a directory whose next open recreates the catalog around the shard
+    /// that already exists, instead of leaving a registration with no data.
     pub fn open(data_dir: impl AsRef<Path>) -> io::Result<Self> {
         let data_dir = data_dir.as_ref().to_path_buf();
         fs::create_dir_all(&data_dir)?;
         let catalog_path = data_dir.join(CATALOG_FILE);
-        let registered = match fs::read(&catalog_path) {
-            Ok(bytes) => Some(
-                format::decode_catalog_shard_id(&bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?,
-            ),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error),
-        };
-        let catalog_existed = registered.is_some();
-        let shard_id = match registered {
-            Some(id) => id,
-            None => {
-                write_durable(&catalog_path, &format::encode_catalog("local-0"))?;
-                "local-0".to_owned()
-            }
+        let registered = read_catalog(&catalog_path)?;
+        let shard_id = match &registered {
+            Some(id) => id.clone(),
+            None => "local-0".to_owned(),
         };
         let shard_path = data_dir.join(format!("{shard_id}.yykv"));
         let (records, next_revision) = if shard_path.exists() {
             let bytes = fs::read(&shard_path)?;
             format::decode_shard(&bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
         }
-        else if catalog_existed {
+        else if registered.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("catalog.shard-file: `{shard_id}.yykv` is missing"),
@@ -77,6 +72,9 @@ impl Node {
             write_durable(&shard_path, &encode(&records, 1)?)?;
             (records, 1)
         };
+        if registered.is_none() {
+            write_durable(&catalog_path, &format::encode_catalog("local-0"))?;
+        }
         Ok(Self {
             data_dir,
             shard_path,
@@ -305,6 +303,48 @@ impl Node {
 impl Drop for Node {
     fn drop(&mut self) {
         let _ = self.flush();
+    }
+}
+
+/// Creates the shard registered by an existing catalog when its file is absent.
+///
+/// This is the explicit recovery entry for the `catalog.shard-file` open error:
+/// a directory whose catalog survived but whose registered `.yykv` never reached
+/// the disk, for example a catalog written by another tool or restored from a
+/// backup that carried only `.yyds`. The catalog is validated but never rewritten,
+/// and an existing shard is never overwritten, so calling this on a healthy
+/// directory changes nothing. Returns the registered shard id.
+pub fn repair_missing_shard(data_dir: impl AsRef<Path>) -> io::Result<String> {
+    let data_dir = data_dir.as_ref().to_path_buf();
+    let catalog_path = data_dir.join(CATALOG_FILE);
+    let bytes = fs::read(&catalog_path).map_err(|error| {
+        if error.kind() == io::ErrorKind::NotFound {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("catalog.file: `{CATALOG_FILE}` is missing; open the directory normally to create it"),
+            )
+        }
+        else {
+            error
+        }
+    })?;
+    let shard_id = format::decode_catalog_shard_id(&bytes)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?;
+    let shard_path = data_dir.join(format!("{shard_id}.yykv"));
+    if !shard_path.exists() {
+        write_durable(&shard_path, &encode(&Records::new(), 1)?)?;
+    }
+    Ok(shard_id)
+}
+
+/// Reads and validates an existing `.yyds`, or `None` when the file is absent.
+fn read_catalog(path: &Path) -> io::Result<Option<String>> {
+    match fs::read(path) {
+        Ok(bytes) => format::decode_catalog_shard_id(&bytes)
+            .map(Some)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string())),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
     }
 }
 
