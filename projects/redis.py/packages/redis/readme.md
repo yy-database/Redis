@@ -57,11 +57,17 @@ Not supported:
 Acceptance runs against an installed wheel
 -----------------------------------------
 
-`npm run gate:test-count:py` builds the wheel, installs it into a fresh virtual
-environment, and only then runs the cases. The environment borrows the host
-`pytest` through `--system-site-packages` so the run needs no network. The
-extension under test is still the one installed into the environment, and the
-cases assert that the loaded module file lives under
-`venv/Lib/site-packages/_native/` (`.pyd` on Windows, `.so` elsewhere). Do not
-treat the run as a source tree test: importing the package without that wheel
-must fail.
+`npm run gate:test-count:py` builds the wheel, installs it into a fingerprinted
+virtual environment under the system temporary directory
+(`redis-python-<fingerprint>`), and only then runs the cases. The environment is
+created on first use and reused while the source fingerprint is unchanged; run
+`node scripts/run-python-tests.mjs --force` to rebuild it. The environment
+borrows the host `pytest` through `--system-site-packages` so the run needs no
+network.
+
+The wheel contains the `_native` extension only. The composed `redis` package is
+this source directory and is not packaged into the wheel: the acceptance suite
+adds `projects/redis.py/packages` to `sys.path` and imports `_native` from the
+environment. The cases assert that the loaded extension lives under
+`venv/Lib/site-packages/_native/` (`.pyd` on Windows, `.so` elsewhere), so
+importing the package without that wheel must fail.
