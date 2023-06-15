@@ -7,14 +7,13 @@
 
 use std::collections::BTreeMap;
 
+use database_formats::yy::yyds;
+use database_types::cluster::{Error as CatalogSourceError, ShardId};
+
 /// `.yykv` snapshot magic including the format version.
 pub const YYKV_MAGIC: &[u8; 5] = b"YYKV\x03";
 /// Legacy v2 magic without a body checksum. Rejected explicitly.
 pub const YYKV_LEGACY_MAGIC: &[u8] = b"YYKV\x02";
-/// `.yyds` catalog magic.
-pub const YYDS_MAGIC: &[u8] = b"YYDS\x01";
-/// Catalog format version, fixed at zero for the 0.x contract.
-const CATALOG_VERSION: u32 = 0;
 
 /// One stored record inside the shard.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,18 +168,12 @@ pub fn decode_shard(bytes: &[u8]) -> Result<(Records, u64)> {
 }
 
 /// Serializes `.yyds` catalog bytes registering one shard.
+///
+/// The byte layout belongs to `database-formats`; this crate only decides which
+/// shard a local store registers and how the file is named, written, and renamed.
 pub fn encode_catalog(shard_id: &str) -> Vec<u8> {
-    let mut out = Vec::new();
-    out.extend_from_slice(YYDS_MAGIC);
-    out.extend_from_slice(&CATALOG_VERSION.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
-    out.extend_from_slice(&1u32.to_le_bytes());
-    out.extend_from_slice(&(shard_id.len() as u32).to_le_bytes());
-    out.extend_from_slice(shard_id.as_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
-    out
+    yyds::encode_catalog(None, None, &[ShardId(shard_id.to_owned())], None, &[])
+        .expect("one shard registration is always within the catalog limits")
 }
 
 /// Structured `.yyds` validation failure: `field` names the exact check that failed.
@@ -202,72 +195,135 @@ impl std::error::Error for CatalogError {}
 
 /// Parses and validates a `.yyds` catalog, returning the registered shard id.
 ///
-/// Checks the magic, the format version, the two reserved sections, the shard
-/// count, the shape of the shard id, and that no bytes follow the registration.
+/// Parsing, the format version, the single-registration rule, and the `ShardId`
+/// shape check all come from `database-formats`. Only the wording of a rejection
+/// is owned here, so the store keeps its stable `catalog.<field>: <detail>` text.
 pub fn decode_catalog_shard_id(bytes: &[u8]) -> std::result::Result<String, CatalogError> {
+    match yyds::decode_catalog_shard_id(bytes) {
+        Ok(shard) => Ok(shard.0),
+        Err(source) => Err(catalog_error(bytes, &source)),
+    }
+}
+
+/// Translates an upstream rejection into the store's stable message.
+///
+/// Upstream errors carry a category but not the offending value, so the value-bearing
+/// messages are rebuilt by reading the same field again. This walk never decides
+/// whether a catalog is valid: it only explains a rejection upstream already made.
+fn catalog_error(bytes: &[u8], source: &CatalogSourceError) -> CatalogError {
     let reject = |field: &'static str, detail: String| CatalogError { field, detail };
-    let header_len = YYDS_MAGIC.len() + 4;
-    if bytes.len() < YYDS_MAGIC.len() {
-        return Err(reject("length", "truncated header".to_owned()));
-    }
-    if &bytes[..YYDS_MAGIC.len()] != YYDS_MAGIC {
-        return Err(reject("magic", "expected \"YYDS\\x01\"".to_owned()));
-    }
-    if bytes.len() < header_len {
-        return Err(reject("length", "truncated version".to_owned()));
-    }
-    let mut cursor = YYDS_MAGIC.len();
-    let version = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4]));
-    cursor += 4;
-    if version != CATALOG_VERSION {
-        return Err(reject("version", format!("expected {CATALOG_VERSION}, found {version}")));
-    }
-    for (field, expected) in [("schema", "schema flag"), ("routing", "routing section")] {
-        if bytes.len() < cursor + 4 {
-            return Err(reject("length", format!("truncated {expected}")));
+    // The legacy order explains the header first, then the single-registration rule.
+    match source {
+        CatalogSourceError::Corrupt("unknown catalog header") => {
+            return reject("magic", "expected \"YYDS\\x01\"".to_owned());
         }
-        let value = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4]));
-        cursor += 4;
-        if value != 0 {
-            return Err(reject(field, format!("expected 0, found {value}")));
+        CatalogSourceError::Unsupported("catalog format version requires regeneration") => {
+            return reject("version", format!("expected 0, found {}", peek_u32(bytes, yyds::CATALOG_MAGIC.len()).unwrap_or(0)));
+        }
+        _ => {}
+    }
+    // A malformed count usually surfaces as a later upstream error, because the
+    // upstream parse only counts registrations after the whole body. The count is
+    // still the first legacy field to explain whenever both reserved sections are empty.
+    if let Some(count) = shard_count(bytes) {
+        if count != 1 {
+            return reject("count", format!("expected 1, found {count}"));
         }
     }
-    if bytes.len() < cursor + 4 {
-        return Err(reject("length", "truncated shard count".to_owned()));
+    match source {
+        CatalogSourceError::Corrupt("catalog shard id utf8") => reject("shard-id", "not utf8".to_owned()),
+        CatalogSourceError::Corrupt("trailing catalog bytes") => {
+            let end = catalog_end(bytes).unwrap_or(bytes.len());
+            reject(
+                "trailing",
+                format!(
+                    "expected no bytes after the shard registration, found {}",
+                    bytes.len().saturating_sub(end)
+                ),
+            )
+        }
+        CatalogSourceError::Corrupt("unexpected catalog eof") => {
+            reject("length", catalog_end(bytes).err().unwrap_or("truncated catalog").to_owned())
+        }
+        CatalogSourceError::Corrupt("invalid catalog schema presence flag") => reject("schema", "invalid presence flag".to_owned()),
+        CatalogSourceError::Corrupt("invalid catalog routing presence flag") => reject("routing", "invalid presence flag".to_owned()),
+        CatalogSourceError::Corrupt("invalid catalog routing epoch") => reject("routing", "epoch must be nonzero".to_owned()),
+        CatalogSourceError::Unsupported("catalog registers no shard") => {
+            reject("count", format!("expected 1, found {}", shard_count(bytes).unwrap_or(0)))
+        }
+        CatalogSourceError::Unsupported("catalog registers more than one shard") => {
+            reject("count", format!("expected 1, found {}", shard_count(bytes).unwrap_or(1)))
+        }
+        CatalogSourceError::InvalidShardId { value } if value.is_empty() => reject("shard-id", "empty".to_owned()),
+        CatalogSourceError::InvalidShardId { value } if value.contains(['/', '\\']) => {
+            reject("shard-id", "contains a path separator".to_owned())
+        }
+        CatalogSourceError::InvalidShardId { .. } => reject("shard-id", "not a single path segment".to_owned()),
+        other => reject("catalog", format!("{other}")),
     }
-    let count = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4]));
-    cursor += 4;
-    if count != 1 {
-        return Err(reject("count", format!("expected 1, found {count}")));
+}
+
+/// Reads the shard count of a catalog whose two reserved sections are empty.
+fn shard_count(bytes: &[u8]) -> Option<u32> {
+    let magic = yyds::CATALOG_MAGIC.len();
+    if peek_u32(bytes, magic + 4)? != 0 || peek_u32(bytes, magic + 8)? != 0 {
+        return None;
     }
-    if bytes.len() < cursor + 4 {
-        return Err(reject("length", "truncated shard id length".to_owned()));
+    peek_u32(bytes, magic + 12)
+}
+
+/// Walks the upstream catalog layout and returns where the catalog body ends.
+fn catalog_end(bytes: &[u8]) -> std::result::Result<usize, &'static str> {
+    let mut cursor = yyds::CATALOG_MAGIC.len();
+    read_u32_diagnostic(bytes, &mut cursor, "truncated version")?;
+    if read_u32_diagnostic(bytes, &mut cursor, "truncated schema flag")? == 1 {
+        read_u32_diagnostic(bytes, &mut cursor, "truncated schema section")?;
+        skip_block(bytes, &mut cursor, "truncated schema section", "truncated schema section")?;
     }
-    let id_len = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4])) as usize;
-    cursor += 4;
-    if cursor + id_len > bytes.len() {
-        return Err(reject("length", "truncated shard id".to_owned()));
+    if read_u32_diagnostic(bytes, &mut cursor, "truncated routing section")? == 1 {
+        skip(bytes, &mut cursor, 8, "truncated routing section")?;
     }
-    let id = &bytes[cursor..cursor + id_len];
-    cursor += id_len;
-    if id.is_empty() {
-        return Err(reject("shard-id", "empty".to_owned()));
+    let count = read_u32_diagnostic(bytes, &mut cursor, "truncated shard count")?;
+    for _ in 0..count {
+        skip_block(bytes, &mut cursor, "truncated shard id length", "truncated shard id")?;
     }
-    let id = std::str::from_utf8(id).map_err(|_| reject("shard-id", "not utf8".to_owned()))?;
-    if id.contains('/') || id.contains('\\') {
-        return Err(reject("shard-id", "contains a path separator".to_owned()));
+    if read_u32_diagnostic(bytes, &mut cursor, "truncated reserved fields")? == 1 {
+        skip_block(bytes, &mut cursor, "truncated resolved contract", "truncated resolved contract")?;
     }
-    let expected_len = cursor + 8;
-    if bytes.len() < expected_len {
-        return Err(reject("length", "truncated reserved fields".to_owned()));
+    let owners = read_u32_diagnostic(bytes, &mut cursor, "truncated reserved fields")?;
+    for _ in 0..owners {
+        skip_block(bytes, &mut cursor, "truncated owners", "truncated owners")?;
+        skip_block(bytes, &mut cursor, "truncated owners", "truncated owners")?;
+        skip(bytes, &mut cursor, 8, "truncated owners")?;
     }
-    if bytes.len() > expected_len {
-        return Err(reject(
-            "trailing",
-            format!("expected no bytes after the shard registration, found {}", bytes.len() - expected_len),
-        ));
+    Ok(cursor)
+}
+
+fn peek_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    Some(u32::from_le_bytes(bytes.get(offset..offset + 4)?.try_into().ok()?))
+}
+
+fn skip(bytes: &[u8], cursor: &mut usize, length: usize, detail: &'static str) -> std::result::Result<(), &'static str> {
+    if *cursor + length > bytes.len() {
+        return Err(detail);
     }
-    Ok(id.to_owned())
+    *cursor += length;
+    Ok(())
+}
+
+fn read_u32_diagnostic(bytes: &[u8], cursor: &mut usize, detail: &'static str) -> std::result::Result<u32, &'static str> {
+    skip(bytes, cursor, 4, detail)?;
+    Ok(u32::from_le_bytes(bytes[*cursor - 4..*cursor].try_into().unwrap_or([0; 4])))
+}
+
+fn skip_block(
+    bytes: &[u8],
+    cursor: &mut usize,
+    length_detail: &'static str,
+    body_detail: &'static str,
+) -> std::result::Result<(), &'static str> {
+    let length = read_u32_diagnostic(bytes, cursor, length_detail)? as usize;
+    skip(bytes, cursor, length, body_detail)
 }
 
 /// FNV-1a over the snapshot body: integrity only, not security.
