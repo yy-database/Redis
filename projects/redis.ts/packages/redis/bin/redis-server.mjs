@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 //! Composes the server loop from the package primitives.
 
-import { startServer } from '../src/server.js';
+import { startServer } from '../dist/server.js';
 
 function usage() {
     return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>]';

@@ -11,14 +11,16 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const crate = join(root, 'projects', 'redis.rs', 'redis-pyo3');
-const tests = join(root, 'projects', 'redis.py', 'packages', 'redis', 'tests');
+const project = join(root, 'projects', 'redis.py', 'packages', 'redis');
+const tests = join(project, 'tests');
 const python = process.env.PYTHON ?? 'python';
 const force = process.argv.includes('--force');
 
 function fingerprint() {
     const hash = createHash('sha256');
     const sources = [
-        join(crate, 'pyproject.toml'),
+        join(project, 'pyproject.toml'),
+        join(project, 'redis', '__init__.py'),
         join(crate, 'Cargo.toml'),
         join(crate, 'src', 'lib.rs'),
         join(root, 'projects', 'redis.rs', 'Cargo.lock'),
@@ -47,7 +49,7 @@ const marker = join(cache, 'installed.json');
 
 if (force || !existsSync(marker)) {
     mkdirSync(dist, { recursive: true });
-    run(python, ['-m', 'maturin', 'build', '--manifest-path', join(crate, 'Cargo.toml'), '--out', dist, '--profile', 'dev', '-i', python]);
+    run(python, ['-m', 'maturin', 'build', '--out', dist, '--profile', 'dev', '-i', python], { cwd: project });
     const wheel = readdirSync(dist).find(name => name.endsWith('.whl'));
     if (wheel === undefined) {
         throw new Error(`no wheel produced in ${dist}`);

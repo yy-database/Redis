@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.15,<2"]
+build-backend = "maturin"
+
+[project]
+name = "redis"
+version = "0.0.0"
+description = "Redis-compatible primitives composed over the `.yyds` and `.yykv` backends"
+license = { text = "MPL-2.0" }
+requires-python = ">=3.12"
+
+[tool.maturin]
+manifest-path = "../../../redis.rs/redis-pyo3/Cargo.toml"
+python-source = "."
+module-name = "redis._native"

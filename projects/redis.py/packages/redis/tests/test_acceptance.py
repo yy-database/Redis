@@ -13,7 +13,7 @@ import pytest
 import reference
 from redis import Store, decode_command, decode_reply, encode_command, encode_reply, parse_integer
 
-import _native
+import redis._native as _native
 
 
 def bulk(value) -> dict:

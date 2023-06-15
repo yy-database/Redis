@@ -1,10 +1,10 @@
 Redis composition for Python
 ============================
 
-The package re-exports the orthogonal primitives that the `_native` extension
-provides: the RESP encoder and decoder, the integer parser, and the `.yyds` /
-`.yykv` store. The extension itself is built with `maturin` from
-`projects/redis.rs/redis-pyo3`.
+The package re-exports the orthogonal primitives that the `redis._native`
+extension provides: the RESP encoder and decoder, the integer parser, and the
+`.yyds` / `.yykv` store. The extension itself is built with `maturin` from
+`projects/redis.rs/redis-pyo3` and is shipped inside this wheel.
 
 Limits and costs
 ----------------
@@ -65,9 +65,12 @@ created on first use and reused while the source fingerprint is unchanged; run
 borrows the host `pytest` through `--system-site-packages` so the run needs no
 network.
 
-The wheel contains the `_native` extension only. The composed `redis` package is
-this source directory and is not packaged into the wheel: the acceptance suite
-adds `projects/redis.py/packages` to `sys.path` and imports `_native` from the
-environment. The cases assert that the loaded extension lives under
-`venv/Lib/site-packages/_native/` (`.pyd` on Windows, `.so` elsewhere), so
-importing the package without that wheel must fail.
+The wheel contains the `redis` package and the compiled `redis._native`
+extension together, so an installed copy has no source-path dependency. The
+cases assert that the loaded extension lives under `site-packages/redis/`
+(`.pyd` on Windows, `.so` elsewhere), so the suite fails when the entry resolves
+to the workspace sources instead of the installed artifact.
+
+`npm run gate:install:py` is the narrower installation gate: it builds the
+wheel, installs it into a clean virtual environment with no access to the host
+site-packages, then imports the package and performs a real write and read.
