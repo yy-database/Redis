@@ -1,7 +1,7 @@
 //! `.yykv` shard ownership: one shard file holds every Redis database index as
 //! its own namespace.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -94,48 +94,78 @@ impl Node {
         &self.shard_path
     }
 
-    /// Returns the live value for `key` in database `db`.
-    pub fn get(&self, db: u8, key: &[u8]) -> Option<&Record> {
+    /// Returns the live value for `key` of one kind in database `db`.
+    pub fn get_kind(&self, db: u8, kind: &str, key: &[u8]) -> Option<&Record> {
         let now = format::now_unix_ms();
         self.records
-            .get(&(namespace(db), key.to_vec()))
+            .get(&(kind_namespace(db, kind), key.to_vec()))
             .filter(|record| !record.is_expired_at(now))
     }
 
-    /// Remaining deadline in milliseconds, `None` when the key carries no deadline.
-    pub fn deadline(&self, db: u8, key: &[u8]) -> Option<i64> {
-        self.get(db, key).and_then(|record| record.expires_at)
+    /// Remaining deadline in milliseconds for one kind, `None` when it carries none.
+    pub fn deadline_kind(&self, db: u8, kind: &str, key: &[u8]) -> Option<i64> {
+        self.get_kind(db, kind, key).and_then(|record| record.expires_at)
     }
 
-    /// Whether the key exists and is live.
-    pub fn contains(&self, db: u8, key: &[u8]) -> bool {
-        self.get(db, key).is_some()
+    /// Whether one kind of the key exists and is live.
+    pub fn contains_kind(&self, db: u8, kind: &str, key: &[u8]) -> bool {
+        self.get_kind(db, kind, key).is_some()
     }
 
-    /// Inserts or replaces a value with an optional wall-clock deadline.
-    pub fn set(&mut self, db: u8, key: &[u8], value: &[u8], expires_at: Option<i64>) -> io::Result<()> {
-        let record_key = (namespace(db), key.to_vec());
+    /// Inserts or replaces one kind of the key with an optional wall-clock deadline.
+    pub fn set_kind(&mut self, db: u8, kind: &str, key: &[u8], value: &[u8], expires_at: Option<i64>) -> io::Result<()> {
+        let record_key = (kind_namespace(db, kind), key.to_vec());
         self.commit(vec![Change::Put { key: record_key, value: value.to_vec(), expires_at }])
     }
 
-    /// Deletes one key, reporting whether a live record was removed.
-    pub fn delete(&mut self, db: u8, key: &[u8]) -> io::Result<bool> {
-        let record_key = (namespace(db), key.to_vec());
-        let existed = self.contains(db, key);
+    /// Deletes one kind of the key, reporting whether a live record was removed.
+    pub fn delete_kind(&mut self, db: u8, kind: &str, key: &[u8]) -> io::Result<bool> {
+        let record_key = (kind_namespace(db, kind), key.to_vec());
+        let existed = self.contains_kind(db, kind, key);
         if existed {
             self.commit(vec![Change::Delete { key: record_key }])?;
         }
         Ok(existed)
     }
 
-    /// Sets or clears the deadline of a live key.
-    pub fn set_deadline(&mut self, db: u8, key: &[u8], expires_at: Option<i64>) -> io::Result<bool> {
-        let Some(record) = self.get(db, key).cloned() else {
+    /// Sets or clears the deadline of a live kind of the key.
+    pub fn set_deadline_kind(&mut self, db: u8, kind: &str, key: &[u8], expires_at: Option<i64>) -> io::Result<bool> {
+        let Some(record) = self.get_kind(db, kind, key).cloned() else {
             return Ok(false);
         };
-        let record_key = (namespace(db), key.to_vec());
+        let record_key = (kind_namespace(db, kind), key.to_vec());
         self.commit(vec![Change::Put { key: record_key, value: record.value, expires_at }])?;
         Ok(true)
+    }
+
+    /// Returns the live string value for `key` in database `db`.
+    pub fn get(&self, db: u8, key: &[u8]) -> Option<&Record> {
+        self.get_kind(db, "", key)
+    }
+
+    /// Remaining deadline of the string kind, `None` when the key carries no deadline.
+    pub fn deadline(&self, db: u8, key: &[u8]) -> Option<i64> {
+        self.deadline_kind(db, "", key)
+    }
+
+    /// Whether the string kind of the key exists and is live.
+    pub fn contains(&self, db: u8, key: &[u8]) -> bool {
+        self.contains_kind(db, "", key)
+    }
+
+    /// Inserts or replaces the string kind with an optional wall-clock deadline.
+    pub fn set(&mut self, db: u8, key: &[u8], value: &[u8], expires_at: Option<i64>) -> io::Result<()> {
+        self.set_kind(db, "", key, value, expires_at)
+    }
+
+    /// Deletes the string kind, reporting whether a live record was removed.
+    pub fn delete(&mut self, db: u8, key: &[u8]) -> io::Result<bool> {
+        self.delete_kind(db, "", key)
+    }
+
+    /// Sets or clears the deadline of the string kind.
+    pub fn set_deadline(&mut self, db: u8, key: &[u8], expires_at: Option<i64>) -> io::Result<bool> {
+        self.set_deadline_kind(db, "", key, expires_at)
     }
 
     /// Moves `source` to `destination`, carrying its deadline. `if_absent` implements `RENAMENX`.
@@ -155,12 +185,12 @@ impl Node {
         Ok(RenameOutcome::Renamed)
     }
 
-    /// Drops every live record of one database.
+    /// Drops every live record of one database, across every value kind.
     pub fn flush_db(&mut self, db: u8) -> io::Result<()> {
-        let prefix = namespace(db);
+        let base = namespace(db);
         let mut changes = Vec::new();
         for (key, record) in &self.records {
-            if key.0 == prefix && !record.is_expired_at(format::now_unix_ms()) {
+            if belongs_to(&key.0, &base) && !record.is_expired_at(format::now_unix_ms()) {
                 changes.push(Change::Delete { key: key.clone() });
             }
         }
@@ -170,14 +200,9 @@ impl Node {
         self.commit(changes)
     }
 
-    /// Number of live keys in one database.
+    /// Number of live logical keys in one database, counting each key once.
     pub fn len(&self, db: u8) -> usize {
-        let prefix = namespace(db);
-        let now = format::now_unix_ms();
-        self.records
-            .iter()
-            .filter(|(key, record)| key.0 == prefix && !record.is_expired_at(now))
-            .count()
+        self.live_keys(db).len()
     }
 
     /// Whether the database holds no live key.
@@ -185,13 +210,20 @@ impl Node {
         self.len(db) == 0
     }
 
-    /// Live keys of one database in ascending byte order, backing `KEYS` and `SCAN`.
+    /// Live logical keys of one database in ascending byte order, backing `KEYS` and `SCAN`.
+    ///
+    /// A logical key lives in exactly one of the string, hash and list namespaces, so
+    /// the set both de-duplicates and sorts the result deterministically.
     pub fn keys(&self, db: u8) -> Vec<Vec<u8>> {
-        let prefix = namespace(db);
+        self.live_keys(db).into_iter().collect()
+    }
+
+    fn live_keys(&self, db: u8) -> BTreeSet<Vec<u8>> {
+        let base = namespace(db);
         let now = format::now_unix_ms();
         self.records
             .iter()
-            .filter(|(key, record)| key.0 == prefix && !record.is_expired_at(now))
+            .filter(|(key, record)| belongs_to(&key.0, &base) && !record.is_expired_at(now))
             .map(|(key, _)| key.1.clone())
             .collect()
     }
@@ -367,6 +399,28 @@ enum Change {
 /// Namespace label for one Redis database index.
 pub fn namespace(db: u8) -> String {
     format!("{NAMESPACE_PREFIX}{db}")
+}
+
+/// Namespace label for one value kind inside a database.
+///
+/// The string kind keeps the database namespace so existing data needs no
+/// migration, while `hash` and `list` add a suffix of their own. The three
+/// namespaces never overlap, so the same logical key can only be read as one
+/// kind at a time.
+pub fn kind_namespace(db: u8, kind: &str) -> String {
+    if kind.is_empty() {
+        namespace(db)
+    }
+    else {
+        format!("{}:{kind}", namespace(db))
+    }
+}
+
+/// Whether a record namespace belongs to the database named by `base`.
+///
+/// Compares the whole trailing segment, so `redis:db1` never matches `redis:db11`.
+fn belongs_to(candidate: &str, base: &str) -> bool {
+    candidate == base || candidate.strip_prefix(base).is_some_and(|rest| rest.starts_with(':'))
 }
 
 fn encode(records: &Records, revision: u64) -> io::Result<Vec<u8>> {

@@ -33,6 +33,11 @@ fn reason(error: impl ToString) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
 
+/// Rejects a value kind the shard does not name.
+fn check_kind(kind: &str) -> std::result::Result<(), napi::Error> {
+    if matches!(kind, "" | "hash" | "list") { Ok(()) } else { Err(reason(format!("unknown value kind `{kind}`"))) }
+}
+
 /// Parses one command from the front of `input`, or `null` when more bytes are needed.
 #[napi]
 pub fn decode_command(input: Buffer) -> std::result::Result<Option<DecodedCommand>, napi::Error> {
@@ -139,6 +144,52 @@ impl Store {
     #[napi]
     pub fn expire(&mut self, db: u8, key: Buffer, expires_at: Option<i64>) -> std::result::Result<bool, napi::Error> {
         self.node.set_deadline(db, &key, expires_at).map_err(reason)
+    }
+
+    /// Returns the live value of one kind (`""`, `hash` or `list`).
+    #[napi]
+    pub fn get_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<Buffer>, napi::Error> {
+        check_kind(&kind)?;
+        Ok(self.node.get_kind(db, &kind, &key).map(|record| Buffer::from(record.value.clone())))
+    }
+
+    /// Inserts or replaces one kind with an optional absolute deadline in epoch milliseconds.
+    #[napi]
+    pub fn set_kind(
+        &mut self, db: u8, kind: String, key: Buffer, value: Buffer, expires_at: Option<i64>,
+    ) -> std::result::Result<(), napi::Error> {
+        check_kind(&kind)?;
+        self.node.set_kind(db, &kind, &key, &value, expires_at).map_err(reason)
+    }
+
+    /// Deletes one kind, reporting whether a live record was removed.
+    #[napi]
+    pub fn delete_kind(&mut self, db: u8, kind: String, key: Buffer) -> std::result::Result<bool, napi::Error> {
+        check_kind(&kind)?;
+        self.node.delete_kind(db, &kind, &key).map_err(reason)
+    }
+
+    /// Whether one kind of the key exists and is live.
+    #[napi]
+    pub fn exists_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<bool, napi::Error> {
+        check_kind(&kind)?;
+        Ok(self.node.contains_kind(db, &kind, &key))
+    }
+
+    /// Absolute deadline of one kind, `null` when it carries none.
+    #[napi]
+    pub fn deadline_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<i64>, napi::Error> {
+        check_kind(&kind)?;
+        Ok(self.node.deadline_kind(db, &kind, &key))
+    }
+
+    /// Sets or clears the deadline of a live kind.
+    #[napi]
+    pub fn expire_kind(
+        &mut self, db: u8, kind: String, key: Buffer, expires_at: Option<i64>,
+    ) -> std::result::Result<bool, napi::Error> {
+        check_kind(&kind)?;
+        self.node.set_deadline_kind(db, &kind, &key, expires_at).map_err(reason)
     }
 
     /// Moves one key, carrying its deadline. `if_absent` implements `RENAMENX`.

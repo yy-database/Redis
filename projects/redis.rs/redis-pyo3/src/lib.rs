@@ -14,6 +14,11 @@ fn runtime(error: impl ToString) -> PyErr {
     PyRuntimeError::new_err(error.to_string())
 }
 
+/// Rejects a value kind the shard does not name.
+fn check_kind(kind: &str) -> PyResult<()> {
+    if matches!(kind, "" | "hash" | "list") { Ok(()) } else { Err(PyValueError::new_err(format!("unknown value kind `{kind}`"))) }
+}
+
 /// Parses one command from the front of `input`.
 ///
 /// Returns `(consumed, args)` or `None` when more bytes are needed.
@@ -111,6 +116,44 @@ impl Store {
     #[pyo3(signature = (db, key, expires_at = None))]
     fn expire(&mut self, db: u8, key: &[u8], expires_at: Option<i64>) -> PyResult<bool> {
         self.node.set_deadline(db, key, expires_at).map_err(runtime)
+    }
+
+    /// Returns the live value of one kind (`""`, `hash` or `list`).
+    fn get_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<Vec<u8>>> {
+        check_kind(kind)?;
+        Ok(self.node.get_kind(db, kind, key).map(|record| record.value.clone()))
+    }
+
+    /// Inserts or replaces one kind with an optional absolute deadline in epoch milliseconds.
+    #[pyo3(signature = (db, kind, key, value, expires_at = None))]
+    fn set_kind(&mut self, db: u8, kind: &str, key: &[u8], value: &[u8], expires_at: Option<i64>) -> PyResult<()> {
+        check_kind(kind)?;
+        self.node.set_kind(db, kind, key, value, expires_at).map_err(runtime)
+    }
+
+    /// Deletes one kind, reporting whether a live record was removed.
+    fn delete_kind(&mut self, db: u8, kind: &str, key: &[u8]) -> PyResult<bool> {
+        check_kind(kind)?;
+        self.node.delete_kind(db, kind, key).map_err(runtime)
+    }
+
+    /// Whether one kind of the key exists and is live.
+    fn exists_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<bool> {
+        check_kind(kind)?;
+        Ok(self.node.contains_kind(db, kind, key))
+    }
+
+    /// Absolute deadline in epoch milliseconds for one kind, `None` when it carries none.
+    fn deadline_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<i64>> {
+        check_kind(kind)?;
+        Ok(self.node.deadline_kind(db, kind, key))
+    }
+
+    /// Sets or clears the deadline of a live kind.
+    #[pyo3(signature = (db, kind, key, expires_at = None))]
+    fn expire_kind(&mut self, db: u8, kind: &str, key: &[u8], expires_at: Option<i64>) -> PyResult<bool> {
+        check_kind(kind)?;
+        self.node.set_deadline_kind(db, kind, key, expires_at).map_err(runtime)
     }
 
     /// Moves one key, carrying its deadline. `if_absent` implements `RENAMENX`.

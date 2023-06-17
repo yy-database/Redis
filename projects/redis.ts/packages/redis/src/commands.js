@@ -4,13 +4,109 @@
 //! reject a malformed command while queuing and replay only valid commands.
 
 import { parseInteger } from './native.js';
-import { array, bulk, error as replyError, integer, map, nullReply, simple } from './reply.js';
+import { array, bulk, error as replyError, integer, map, nullArray, nullReply, simple } from './reply.js';
 
 const DATABASES = 16;
 
 const integerError = () => replyError('ERR value is not an integer or out of range');
 const wrongArity = name => replyError(`ERR wrong number of arguments for '${name}' command`);
 const plainArity = () => replyError('ERR wrong number of arguments');
+
+/** Value kinds of one logical key, in probe order. */
+const KINDS = ['string', 'hash', 'list'];
+/** Storage namespace suffix of each value kind. */
+const SUFFIX = { string: '', hash: 'hash', list: 'list' };
+const WRONG_TYPE = 'WRONGTYPE Operation against a key holding the wrong kind of value';
+
+const wrongType = () => replyError(WRONG_TYPE);
+
+/** Kind currently holding `key`, or `null` when all three namespaces are empty. */
+function kindOf(store, db, key) {
+    for (const kind of KINDS) {
+        if (store.existsKind(db, SUFFIX[kind], key)) return kind;
+    }
+    return null;
+}
+
+const MAX_CHUNK = 0xffffffff;
+
+/**
+ * Frames a sequence of byte chunks as `u32le length + body` pairs.
+ *
+ * The shard stores one opaque value per kind, so a hash is its field/value pairs
+ * and a list its elements. `null` means the encoded length does not fit `u32`.
+ */
+function encodeChunks(chunks) {
+    let total = 0;
+    for (const chunk of chunks) {
+        if (chunk.length > MAX_CHUNK) return null;
+        total += 4 + chunk.length;
+    }
+    const body = Buffer.allocUnsafe(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        body.writeUInt32LE(chunk.length, offset);
+        offset += 4;
+        chunk.copy(body, offset);
+        offset += chunk.length;
+    }
+    return body;
+}
+
+/** Reads the chunks framed by {@link encodeChunks}, `null` when the body is malformed. */
+function decodeChunks(body) {
+    const chunks = [];
+    let offset = 0;
+    while (offset < body.length) {
+        if (offset + 4 > body.length) return null;
+        const length = body.readUInt32LE(offset);
+        offset += 4;
+        if (offset + length > body.length) return null;
+        chunks.push(body.subarray(offset, offset + length));
+        offset += length;
+    }
+    return chunks;
+}
+
+function encodeHash(fields) {
+    return encodeChunks(fields.flatMap(([field, value]) => [field, value]));
+}
+
+function decodeHash(body) {
+    const chunks = decodeChunks(body);
+    if (chunks === null || chunks.length % 2 !== 0) return null;
+    const fields = [];
+    for (let index = 0; index < chunks.length; index += 2) {
+        fields.push([chunks[index], chunks[index + 1]]);
+    }
+    return fields;
+}
+
+function encodeList(elements) {
+    return encodeChunks(elements);
+}
+
+function decodeList(body) {
+    return decodeChunks(body);
+}
+
+/** Live hash fields, `[]` when the hash is missing and `null` when the body is corrupt. */
+function readHash(store, db, key) {
+    const body = store.getKind(db, SUFFIX.hash, key);
+    return body === null || body === undefined ? [] : decodeHash(body);
+}
+
+/** Live list elements, `[]` when the list is missing and `null` when the body is corrupt. */
+function readList(store, db, key) {
+    const body = store.getKind(db, SUFFIX.list, key);
+    return body === null || body === undefined ? [] : decodeList(body);
+}
+
+/** Replaces one kind while carrying the deadline it already holds. */
+function rewriteKind(store, db, kind, key, body) {
+    const expiresAt = store.deadlineKind(db, SUFFIX[kind], key);
+    store.setKind(db, SUFFIX[kind], key, body, expiresAt ?? null);
+}
 
 function commandName(args) {
     return args[0].toString('utf8').toLowerCase();
@@ -143,7 +239,13 @@ function plan(store, session, name, args) {
 
         case 'get':
             if (args.length !== 2) return { error: wrongArity('get') };
-            return { run: () => bulk(store.get(session.db, args[1])) };
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    return bulk(store.get(session.db, args[1]));
+                },
+            };
 
         case 'set':
             return planSet(store, session, args);
@@ -152,7 +254,7 @@ function plan(store, session, name, args) {
             if (args.length !== 3) return { error: wrongArity('setnx') };
             return {
                 run: () => {
-                    if (store.exists(session.db, args[1])) return integer(0);
+                    if (kindOf(store, session.db, args[1]) !== null) return integer(0);
                     store.set(session.db, args[1], args[2], null);
                     return integer(1);
                 },
@@ -165,13 +267,22 @@ function plan(store, session, name, args) {
             if (seconds === null) return { error: integerError() };
             const offset = seconds > 0 ? secondsDeadline(seconds) : null;
             if (offset === null) return { error: replyError("ERR invalid expire time in 'setex' command") };
-            return { run: () => { store.set(session.db, args[1], args[3], Date.now() + offset); return simple('OK'); } };
+            return {
+                run: () => {
+                    store.set(session.db, args[1], args[3], Date.now() + offset);
+                    store.deleteKind(session.db, SUFFIX.hash, args[1]);
+                    store.deleteKind(session.db, SUFFIX.list, args[1]);
+                    return simple('OK');
+                },
+            };
         }
 
         case 'getset': {
             if (args.length !== 3) return { error: plainArity() };
             return {
                 run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
                     const previous = store.get(session.db, args[1]);
                     store.set(session.db, args[1], args[2], null);
                     return bulk(previous);
@@ -183,6 +294,8 @@ function plan(store, session, name, args) {
             if (args.length !== 2) return { error: wrongArity('getdel') };
             return {
                 run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
                     const previous = store.get(session.db, args[1]);
                     if (previous !== null && previous !== undefined) store.delete(session.db, args[1]);
                     return bulk(previous);
@@ -204,6 +317,8 @@ function plan(store, session, name, args) {
                 run: () => {
                     for (let index = 1; index < args.length; index += 2) {
                         store.set(session.db, args[index], args[index + 1], null);
+                        store.deleteKind(session.db, SUFFIX.hash, args[index]);
+                        store.deleteKind(session.db, SUFFIX.list, args[index]);
                     }
                     return simple('OK');
                 },
@@ -216,7 +331,11 @@ function plan(store, session, name, args) {
                 run: () => {
                     let removed = 0;
                     for (const key of args.slice(1)) {
-                        if (store.delete(session.db, key)) removed += 1;
+                        let dropped = false;
+                        for (const kind of KINDS) {
+                            if (store.deleteKind(session.db, SUFFIX[kind], key)) dropped = true;
+                        }
+                        if (dropped) removed += 1;
                     }
                     return integer(removed);
                 },
@@ -226,19 +345,21 @@ function plan(store, session, name, args) {
         case 'exists': {
             if (args.length < 2) return { error: wrongArity('exists') };
             return {
-                run: () => integer(args.slice(1).filter(key => store.exists(session.db, key)).length),
+                run: () => integer(args.slice(1).filter(key => kindOf(store, session.db, key) !== null).length),
             };
         }
 
         case 'type': {
             if (args.length !== 2) return { error: wrongArity('type') };
-            return { run: () => simple(store.exists(session.db, args[1]) ? 'string' : 'none') };
+            return { run: () => simple(kindOf(store, session.db, args[1]) ?? 'none') };
         }
 
         case 'strlen': {
             if (args.length !== 2) return { error: wrongArity('strlen') };
             return {
                 run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
                     const value = store.get(session.db, args[1]);
                     return integer(value === null || value === undefined ? 0 : value.length);
                 },
@@ -247,8 +368,27 @@ function plan(store, session, name, args) {
 
         case 'append': {
             if (args.length !== 3) return { error: wrongArity('append') };
-            return { run: () => integer(store.append(session.db, args[1], args[2])) };
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    return integer(store.append(session.db, args[1], args[2]));
+                },
+            };
         }
+
+        case 'hset':
+        case 'hget':
+        case 'hgetall':
+        case 'hdel':
+        case 'hlen':
+        case 'lpush':
+        case 'rpush':
+        case 'lrange':
+        case 'lpop':
+        case 'rpop':
+        case 'llen':
+            return planCollection(store, session, name, args);
 
         case 'incr':
             if (args.length !== 2) return { error: plainArity() };
@@ -272,8 +412,9 @@ function plan(store, session, name, args) {
             const milliseconds = name === 'pttl';
             return {
                 run: () => {
-                    if (!store.exists(session.db, args[1])) return integer(-2);
-                    const deadline = store.deadline(session.db, args[1]);
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind === null) return integer(-2);
+                    const deadline = store.deadlineKind(session.db, SUFFIX[kind], args[1]);
                     if (deadline === null || deadline === undefined) return integer(-1);
                     const remaining = deadline - Date.now();
                     if (remaining <= 0) return integer(-2);
@@ -292,8 +433,11 @@ function plan(store, session, name, args) {
             if (args.length !== 2) return { error: wrongArity('persist') };
             return {
                 run: () => {
-                    if (store.deadline(session.db, args[1]) === null) return integer(0);
-                    store.expire(session.db, args[1], null);
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind === null) return integer(0);
+                    const suffix = SUFFIX[kind];
+                    if (store.deadlineKind(session.db, suffix, args[1]) === null) return integer(0);
+                    store.expireKind(session.db, suffix, args[1], null);
                     return integer(1);
                 },
             };
@@ -494,16 +638,18 @@ function planSet(store, session, args) {
     const value = args[2];
     return {
         run: () => {
-            const exists = store.exists(session.db, key);
-            if ((ifAbsent && exists) || (ifPresent && !exists)) {
+            const kind = kindOf(store, session.db, key);
+            if ((ifAbsent && kind !== null) || (ifPresent && kind === null)) {
                 return nullReply();
             }
             const deadline = expiry !== null
                 ? expiry()
-                : keepDeadline && exists
-                    ? store.deadline(session.db, key)
+                : keepDeadline && kind !== null
+                    ? store.deadlineKind(session.db, SUFFIX[kind], key)
                     : null;
             store.set(session.db, key, value, deadline ?? null);
+            store.deleteKind(session.db, SUFFIX.hash, key);
+            store.deleteKind(session.db, SUFFIX.list, key);
             return simple('OK');
         },
     };
@@ -540,6 +686,8 @@ function planGetEx(store, session, args) {
     const key = args[1];
     return {
         run: () => {
+            const kind = kindOf(store, session.db, key);
+            if (kind !== null && kind !== 'string') return wrongType();
             const value = store.get(session.db, key);
             if (value === null || value === undefined) {
                 return nullReply();
@@ -571,13 +719,15 @@ function planExpire(store, session, name, args) {
     const key = args[1];
     return {
         run: () => {
-            if (!store.exists(session.db, key)) return integer(0);
+            const kind = kindOf(store, session.db, key);
+            if (kind === null) return integer(0);
+            const suffix = SUFFIX[kind];
             const deadline = factory();
             if (deadline <= 0 || (!absolute && amount <= 0)) {
-                store.delete(session.db, key);
+                store.deleteKind(session.db, suffix, key);
                 return integer(1);
             }
-            store.expire(session.db, key, deadline);
+            store.expireKind(session.db, suffix, key, deadline);
             return integer(1);
         },
     };
@@ -607,9 +757,230 @@ function planRename(store, session, name, args) {
 function incremental(store, session, key, delta) {
     return {
         run: () => {
+            const kind = kindOf(store, session.db, key);
+            if (kind !== null && kind !== 'string') return wrongType();
             const outcome = store.incrBy(session.db, key, delta);
             if (outcome.error) return replyError(`ERR ${outcome.error}`);
             return integer(outcome.value);
         },
     };
+}
+
+/**
+ * Plans one hash or list command.
+ *
+ * The hash and list kinds keep their fields and elements in one opaque value
+ * each, so every mutation decodes the current body, edits it and writes it back
+ * while carrying the deadline the key already holds.
+ */
+function planCollection(store, session, name, args) {
+    const db = session.db;
+    const key = args.length > 1 ? args[1] : null;
+    switch (name) {
+        case 'hset': {
+            if (args.length < 4 || (args.length - 2) % 2 !== 0) return { error: wrongArity('hset') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    let added = 0;
+                    for (let index = 2; index < args.length; index += 2) {
+                        const field = args[index];
+                        const value = args[index + 1];
+                        const position = fields.findIndex(entry => entry[0].equals(field));
+                        if (position >= 0) {
+                            fields[position] = [field, value];
+                        }
+                        else {
+                            fields.push([field, value]);
+                            added += 1;
+                        }
+                    }
+                    const body = encodeHash(fields);
+                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
+                    rewriteKind(store, db, 'hash', key, body);
+                    return integer(added);
+                },
+            };
+        }
+
+        case 'hget': {
+            if (args.length !== 3) return { error: wrongArity('hget') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    const field = fields.find(entry => entry[0].equals(args[2]));
+                    return bulk(field ? field[1] : null);
+                },
+            };
+        }
+
+        case 'hgetall': {
+            if (args.length !== 2) return { error: wrongArity('hgetall') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    return array(fields.flatMap(([field, value]) => [bulk(field), bulk(value)]));
+                },
+            };
+        }
+
+        case 'hdel': {
+            if (args.length < 3) return { error: wrongArity('hdel') };
+            const names = args.slice(2);
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'hash') return wrongType();
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    let removed = 0;
+                    const kept = [];
+                    for (const [field, value] of fields) {
+                        if (names.some(candidate => candidate.equals(field))) {
+                            removed += 1;
+                        }
+                        else {
+                            kept.push([field, value]);
+                        }
+                    }
+                    if (kept.length === 0) {
+                        store.deleteKind(db, SUFFIX.hash, key);
+                    }
+                    else {
+                        const body = encodeHash(kept);
+                        if (body === null) return replyError('ERR hash value exceeds the storage limit');
+                        rewriteKind(store, db, 'hash', key, body);
+                    }
+                    return integer(removed);
+                },
+            };
+        }
+
+        case 'hlen': {
+            if (args.length !== 2) return { error: wrongArity('hlen') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'hash') return wrongType();
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    return integer(fields.length);
+                },
+            };
+        }
+
+        case 'lpush':
+        case 'rpush': {
+            if (args.length < 3) return { error: wrongArity(name) };
+            const values = args.slice(2);
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'list') return wrongType();
+                    const elements = readList(store, db, key);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    if (name === 'lpush') {
+                        for (const value of values) elements.unshift(value);
+                    }
+                    else {
+                        elements.push(...values);
+                    }
+                    const body = encodeList(elements);
+                    if (body === null) return replyError('ERR list value exceeds the storage limit');
+                    rewriteKind(store, db, 'list', key, body);
+                    return integer(elements.length);
+                },
+            };
+        }
+
+        case 'lrange': {
+            if (args.length !== 4) return { error: wrongArity('lrange') };
+            const start = parseInteger(args[2]);
+            const stop = parseInteger(args[3]);
+            if (start === null || stop === null) return { error: integerError() };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return array([]);
+                    if (kind !== 'list') return wrongType();
+                    const elements = readList(store, db, key);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    let begin = start < 0 ? elements.length + start : start;
+                    let end = stop < 0 ? elements.length + stop : stop;
+                    if (begin < 0) begin = 0;
+                    if (end >= elements.length) end = elements.length - 1;
+                    if (begin > end || begin >= elements.length || end < 0) return array([]);
+                    return array(elements.slice(begin, end + 1).map(value => bulk(value)));
+                },
+            };
+        }
+
+        case 'lpop':
+        case 'rpop': {
+            if (args.length !== 2 && args.length !== 3) return { error: wrongArity(name) };
+            let count = null;
+            if (args.length === 3) {
+                count = parseInteger(args[2]);
+                if (count === null) return { error: integerError() };
+                if (count <= 0) return { error: replyError('ERR value is out of range, must be positive') };
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return count === null ? nullReply() : nullArray();
+                    if (kind !== 'list') return wrongType();
+                    const elements = readList(store, db, key);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    const take = Math.min(count ?? 1, elements.length);
+                    let popped;
+                    let kept;
+                    if (name === 'lpop') {
+                        popped = elements.slice(0, take);
+                        kept = elements.slice(take);
+                    }
+                    else {
+                        popped = elements.slice(elements.length - take).reverse();
+                        kept = elements.slice(0, elements.length - take);
+                    }
+                    if (kept.length === 0) {
+                        store.deleteKind(db, SUFFIX.list, key);
+                    }
+                    else {
+                        const body = encodeList(kept);
+                        if (body === null) return replyError('ERR list value exceeds the storage limit');
+                        rewriteKind(store, db, 'list', key, body);
+                    }
+                    return count === null ? bulk(popped[0]) : array(popped.map(value => bulk(value)));
+                },
+            };
+        }
+
+        case 'llen': {
+            if (args.length !== 2) return { error: wrongArity('llen') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'list') return wrongType();
+                    const elements = readList(store, db, key);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    return integer(elements.length);
+                },
+            };
+        }
+
+        default:
+            return { error: replyError('ERR unsupported command') };
+    }
 }

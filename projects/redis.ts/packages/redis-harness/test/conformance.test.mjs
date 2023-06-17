@@ -145,6 +145,18 @@ function perform(store, entry) {
             return store.deadline(entry.db, bytes(entry.keyHex)) !== null;
         case 'expire':
             return store.expire(entry.db, bytes(entry.keyHex), entry.expiresAt ?? null);
+        case 'get_kind':
+            return store.getKind(entry.db, entry.kind, bytes(entry.keyHex));
+        case 'set_kind':
+            return store.setKind(entry.db, entry.kind, bytes(entry.keyHex), bytes(entry.valueHex), entry.expiresAt ?? null);
+        case 'delete_kind':
+            return store.deleteKind(entry.db, entry.kind, bytes(entry.keyHex));
+        case 'exists_kind':
+            return store.existsKind(entry.db, entry.kind, bytes(entry.keyHex));
+        case 'deadline_kind':
+            return store.deadlineKind(entry.db, entry.kind, bytes(entry.keyHex));
+        case 'expire_kind':
+            return store.expireKind(entry.db, entry.kind, bytes(entry.keyHex), entry.expiresAt ?? null);
         case 'rename':
             return store.rename(entry.db, bytes(entry.sourceHex), bytes(entry.destinationHex), entry.ifAbsent === true);
         case 'append':

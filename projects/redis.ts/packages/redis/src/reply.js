@@ -4,6 +4,7 @@ export const simple = value => ({ type: 'simple', value });
 export const error = value => ({ type: 'error', value });
 export const integer = value => ({ type: 'int', value });
 export const nullReply = () => ({ type: 'null' });
+export const nullArray = () => ({ type: 'null-array' });
 export const array = values => ({ type: 'array', value: values });
 
 export function bulk(value) {

@@ -1,0 +1,883 @@
+{
+  "format": "redis.case/v1",
+  "table": "collections",
+  "cases": [
+    {
+      "id": "collections.store.hash-namespace",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "exists_kind", "db": 0, "kind": "", "keyHex": "68", "expect": { "bool": false } },
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": true } },
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "collections.store.list-namespace",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" },
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "6c", "expect": { "bool": false } },
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bytes": "01000000610100000062" } }
+      ]
+    },
+    {
+      "id": "collections.store.kinds-do-not-collide",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set", "db": 0, "keyHex": "68", "valueHex": "76" },
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "get", "db": 0, "keyHex": "68", "expect": { "bytes": "76" } },
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "collections.store.delete-kind-keeps-other",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" },
+        { "call": "delete_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": true } },
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } },
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bytes": "01000000610100000062" } }
+      ]
+    },
+    {
+      "id": "collections.store.expired-kind-disappears",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076", "expiresAt": 1 },
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } },
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": null }
+      ]
+    },
+    {
+      "id": "collections.store.reopen-keeps-kinds",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" },
+        { "call": "reopen" },
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } },
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bytes": "01000000610100000062" } },
+        { "call": "keys", "db": 0, "expect": { "hexList": ["68", "6c"] } }
+      ]
+    },
+    {
+      "id": "collections.store.size-counts-kinds-once",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" },
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" },
+        { "call": "size", "db": 0, "expect": { "int": 3 } },
+        { "call": "keys", "db": 0, "expect": { "hexList": ["68", "6b", "6c"] } }
+      ]
+    },
+    {
+      "id": "collections.store.flush-db-clears-kinds",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" },
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" },
+        { "call": "flush_db", "db": 0 },
+        { "call": "size", "db": 0, "expect": { "int": 0 } },
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "collections.store.expire-kind-elapsed",
+      "face": "store",
+      "op": "store",
+      "steps": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" },
+        { "call": "expire_kind", "db": 0, "kind": "list", "keyHex": "6c", "expiresAt": 1 },
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.hset.new",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSET", "h", "f", "v"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "command.hset.update",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSET", "h", "f", "w"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000077" } }
+      ]
+    },
+    {
+      "id": "command.hset.pairs",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSET", "h", "f1", "v1", "f2", "v2"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "expect": { "bytes": "020000006631020000007631020000006632020000007632" }
+        }
+      ]
+    },
+    {
+      "id": "command.hset.keeps-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSET", "h", "f", "w"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "valueHex": "01000000660100000076",
+          "expiresAt": 4102444800000
+        }
+      ],
+      "effect": [
+        { "call": "deadline_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "int": 4102444800000 } }
+      ]
+    },
+    {
+      "id": "command.hget.present",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HGET", "h", "f"],
+      "reply": { "type": "bulk", "bytes": [118] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hget.missing-field",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HGET", "h", "z"],
+      "reply": { "type": "null" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hget.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HGET", "h", "f"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hgetall.pairs",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HGETALL", "h"],
+      "reply": {
+        "type": "array",
+        "value": [
+          { "type": "bulk", "bytes": [102, 49] },
+          { "type": "bulk", "bytes": [118, 49] },
+          { "type": "bulk", "bytes": [102, 50] },
+          { "type": "bulk", "bytes": [118, 50] }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "valueHex": "020000006631020000007631020000006632020000007632"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hgetall.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HGETALL", "h"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hlen.pairs",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HLEN", "h"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "valueHex": "020000006631020000007631020000006632020000007632"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hlen.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HLEN", "h"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hdel.one",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HDEL", "h", "f1"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "valueHex": "020000006631020000007631020000006632020000007632"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "expect": { "bytes": "020000006632020000007632" }
+        }
+      ]
+    },
+    {
+      "id": "command.hdel.last-field-removes-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HDEL", "h", "f"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.hdel.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HDEL", "h", "f"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hset.wrongtype-string",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSET", "h", "f", "v"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [{ "call": "set", "db": 0, "keyHex": "68", "valueHex": "76" }],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "68", "expect": { "bytes": "76" } },
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.hset.wrongtype-list",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSET", "h", "f", "v"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "68", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hget.wrongtype-list",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HGET", "h", "f"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "68", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpush.new",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPUSH", "l", "a", "b", "c"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "expect": { "bytes": "010000006301000000620100000061" }
+        }
+      ]
+    },
+    {
+      "id": "command.lpush.keeps-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPUSH", "l", "c"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "01000000610100000062",
+          "expiresAt": 4102444800000
+        }
+      ],
+      "effect": [
+        { "call": "deadline_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "int": 4102444800000 } },
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "expect": { "bytes": "010000006301000000610100000062" }
+        }
+      ]
+    },
+    {
+      "id": "command.rpush.new",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RPUSH", "l", "a", "b"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "expect": { "bytes": "01000000610100000062" }
+        }
+      ]
+    },
+    {
+      "id": "command.lrange.window",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l", "1", "-2"],
+      "reply": {
+        "type": "array",
+        "value": [
+          { "type": "bulk", "bytes": [98] },
+          { "type": "bulk", "bytes": [99] }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "0100000061010000006201000000630100000064"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.out-of-range",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l", "-10", "-5"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l", "0", "-1"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.wrongtype-string",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l", "0", "-1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [{ "call": "set", "db": 0, "keyHex": "6c", "valueHex": "76" }],
+      "effect": []
+    },
+    {
+      "id": "command.lpop.single",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOP", "l"],
+      "reply": { "type": "bulk", "bytes": [97] },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "010000006101000000620100000063"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "expect": { "bytes": "01000000620100000063" }
+        }
+      ]
+    },
+    {
+      "id": "command.rpop.single",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RPOP", "l"],
+      "reply": { "type": "bulk", "bytes": [99] },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "010000006101000000620100000063"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "expect": { "bytes": "01000000610100000062" }
+        }
+      ]
+    },
+    {
+      "id": "command.lpop.count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOP", "l", "2"],
+      "reply": {
+        "type": "array",
+        "value": [
+          { "type": "bulk", "bytes": [97] },
+          { "type": "bulk", "bytes": [98] }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "010000006101000000620100000063"
+        }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bytes": "0100000063" } }
+      ]
+    },
+    {
+      "id": "command.rpop.count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RPOP", "l", "2"],
+      "reply": {
+        "type": "array",
+        "value": [
+          { "type": "bulk", "bytes": [99] },
+          { "type": "bulk", "bytes": [98] }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "010000006101000000620100000063"
+        }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.lpop.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOP", "l"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpop.count-missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOP", "l", "2"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpop.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOP", "l", "0"],
+      "reply": { "type": "error", "value": "ERR value is out of range, must be positive" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.llen.present",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LLEN", "l"],
+      "reply": { "type": "int", "value": 4 },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c",
+          "valueHex": "0100000061010000006201000000630100000064"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.llen.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LLEN", "l"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpush.wrongtype-string",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPUSH", "l", "a"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [{ "call": "set", "db": 0, "keyHex": "6c", "valueHex": "76" }],
+      "effect": []
+    },
+    {
+      "id": "command.lpush.wrongtype-hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPUSH", "l", "a"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6c", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.get.wrongtype-hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["GET", "h"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.incr.wrongtype-hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["INCR", "h"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "command.setnx.wrongtype-hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SETNX", "h", "v"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "command.del.cross-kinds",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["DEL", "k", "h", "l"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" },
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [{ "call": "size", "db": 0, "expect": { "int": 0 } }]
+    },
+    {
+      "id": "command.ttl.hash-no-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["TTL", "h"],
+      "reply": { "type": "int", "value": -1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.pexpire.hash-zero-deletes",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PEXPIRE", "h", "0"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.type.hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["TYPE", "h"],
+      "reply": { "type": "simple", "value": "hash" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.list",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["TYPE", "l"],
+      "reply": { "type": "simple", "value": "list" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.set.clears-hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SET", "h", "v"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } },
+        { "call": "get", "db": 0, "keyHex": "68", "expect": { "bytes": "76" } }
+      ]
+    },
+    {
+      "id": "command.set.clears-list",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SET", "l", "v"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.set.nx-on-hash-keeps-kind",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SET", "h", "v", "NX"],
+      "reply": { "type": "null" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "command.set.xx-on-hash-overwrites",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SET", "h", "v", "XX"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "68", "expect": { "bool": false } },
+        { "call": "get", "db": 0, "keyHex": "68", "expect": { "bytes": "76" } }
+      ]
+    },
+    {
+      "id": "command.set.keepttl-inherits-hash-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SET", "h", "v", "KEEPTTL"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "68",
+          "valueHex": "01000000660100000076",
+          "expiresAt": 4102444800000
+        }
+      ],
+      "effect": [
+        { "call": "deadline", "db": 0, "keyHex": "68", "expect": { "int": 4102444800000 } }
+      ]
+    },
+    {
+      "id": "command.exists.hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["EXISTS", "h"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.dbsize.counts-kinds",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["DBSIZE"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.flushdb.clears-kinds",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHDB"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [{ "call": "size", "db": 0, "expect": { "int": 0 } }]
+    }
+  ]
+    }

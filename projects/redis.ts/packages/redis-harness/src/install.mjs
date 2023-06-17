@@ -64,6 +64,11 @@ function run(entry, args, cwd) {
     execFileSync(process.execPath, [entry, ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
+/** Installs extra runtime packages into a prepared scratch project. */
+export function installPackages(scratch, packages) {
+    run(npmEntry(), ['install', '--no-audit', '--no-fund', ...packages], scratch);
+}
+
 /**
  * Prepares one scratch installation and returns the handles the checks use.
  *

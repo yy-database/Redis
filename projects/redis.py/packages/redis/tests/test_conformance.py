@@ -119,6 +119,24 @@ def perform(store, entry):
         return store.deadline(entry["db"], raw(entry["keyHex"])) is not None
     if call == "expire":
         return store.expire(entry["db"], raw(entry["keyHex"]), entry.get("expiresAt"))
+    if call == "get_kind":
+        return store.get_kind(entry["db"], entry["kind"], raw(entry["keyHex"]))
+    if call == "set_kind":
+        return store.set_kind(
+            entry["db"],
+            entry["kind"],
+            raw(entry["keyHex"]),
+            raw(entry["valueHex"]),
+            entry.get("expiresAt"),
+        )
+    if call == "delete_kind":
+        return store.delete_kind(entry["db"], entry["kind"], raw(entry["keyHex"]))
+    if call == "exists_kind":
+        return store.exists_kind(entry["db"], entry["kind"], raw(entry["keyHex"]))
+    if call == "deadline_kind":
+        return store.deadline_kind(entry["db"], entry["kind"], raw(entry["keyHex"]))
+    if call == "expire_kind":
+        return store.expire_kind(entry["db"], entry["kind"], raw(entry["keyHex"]), entry.get("expiresAt"))
     if call == "rename":
         return store.rename(
             entry["db"],

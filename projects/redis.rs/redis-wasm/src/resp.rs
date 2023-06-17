@@ -30,6 +30,8 @@ pub enum Reply {
     Bulk(Vec<u8>),
     /// Null bulk (`$-1` on RESP2, `_` on RESP3).
     Null,
+    /// Null array (`*-1` on RESP2, `_` on RESP3).
+    NullArray,
     /// Ordered array.
     Array(Vec<Reply>),
     /// Ordered map (`%` on RESP3, a flattened array on RESP2).
@@ -58,6 +60,9 @@ impl Reply {
             }
             Self::Null => {
                 out.extend_from_slice(if protocol >= 3 { b"_\r\n" } else { b"$-1\r\n" });
+            }
+            Self::NullArray => {
+                out.extend_from_slice(if protocol >= 3 { b"_\r\n" } else { b"*-1\r\n" });
             }
             Self::Array(values) => {
                 out.extend_from_slice(format!("*{}\r\n", values.len()).as_bytes());
@@ -88,6 +93,7 @@ impl Reply {
             Self::Integer(value) => serde_json::json!({ "type": "int", "value": value }),
             Self::Bulk(value) => serde_json::json!({ "type": "bulk", "bytes": value }),
             Self::Null => serde_json::json!({ "type": "null" }),
+            Self::NullArray => serde_json::json!({ "type": "null-array" }),
             Self::Array(values) => {
                 serde_json::json!({ "type": "array", "value": values.iter().map(Self::to_spec).collect::<Vec<_>>() })
             }
@@ -121,6 +127,7 @@ impl Reply {
                 Ok(Self::Bulk(bytes))
             }
             "null" => Ok(Self::Null),
+            "null-array" => Ok(Self::NullArray),
             "array" => {
                 let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `array` needs a `value` list")?;
                 let mut replies = Vec::with_capacity(values.len());
@@ -267,7 +274,7 @@ fn parse_reply(
         b'*' | b'%' => {
             let count = parse_count(header).ok_or("reply aggregate length is not canonical")?;
             if count < 0 {
-                return Ok(Some((Reply::Null, next)));
+                return Ok(Some((Reply::NullArray, next)));
             }
             let mut offset = next;
             let mut values = Vec::new();
