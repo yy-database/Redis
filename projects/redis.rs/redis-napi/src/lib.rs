@@ -35,7 +35,7 @@ fn reason(error: impl ToString) -> napi::Error {
 
 /// Rejects a value kind the shard does not name.
 fn check_kind(kind: &str) -> std::result::Result<(), napi::Error> {
-    if matches!(kind, "" | "hash" | "list") { Ok(()) } else { Err(reason(format!("unknown value kind `{kind}`"))) }
+    if redis_wasm::store::KINDS.contains(&kind) { Ok(()) } else { Err(reason(format!("unknown value kind `{kind}`"))) }
 }
 
 /// Parses one command from the front of `input`, or `null` when more bytes are needed.
@@ -146,7 +146,7 @@ impl Store {
         self.node.set_deadline(db, &key, expires_at).map_err(reason)
     }
 
-    /// Returns the live value of one kind (`""`, `hash` or `list`).
+    /// Returns the live value of one kind (`""`, `hash`, `list`, `set` or `zset`).
     #[napi]
     pub fn get_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<Buffer>, napi::Error> {
         check_kind(&kind)?;

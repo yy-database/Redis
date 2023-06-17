@@ -16,6 +16,12 @@ pub const SHARD_FILE: &str = "local-0.yykv";
 pub const CATALOG_FILE: &str = "local-0.yyds";
 /// Namespace prefix carrying the logical database index.
 pub const NAMESPACE_PREFIX: &str = "redis:db";
+/// Value kinds of one logical key, in probe order.
+///
+/// The string kind keeps the database namespace so existing data needs no
+/// migration, while every other kind adds a suffix of its own. The namespaces
+/// never overlap, so the same logical key can only be read as one kind at a time.
+pub const KINDS: [&str; 5] = ["", "hash", "list", "set", "zset"];
 
 /// One `.yyds` catalog plus one `.yykv` shard on disk.
 ///
@@ -168,20 +174,43 @@ impl Node {
         self.set_deadline_kind(db, "", key, expires_at)
     }
 
-    /// Moves `source` to `destination`, carrying its deadline. `if_absent` implements `RENAMENX`.
+    /// Kind currently holding `key`, or `None` when every kind namespace is empty.
+    ///
+    /// Only one representation of a logical key is ever live, so the first hit
+    /// in [`KINDS`] probe order is the whole answer.
+    pub fn find_kind(&self, db: u8, key: &[u8]) -> Option<&'static str> {
+        KINDS.into_iter().find(|kind| self.contains_kind(db, *kind, key))
+    }
+
+    /// Moves `source` to `destination`, carrying its value kind and deadline.
+    ///
+    /// Any other kind already stored under `destination` is dropped first, so
+    /// the destination ends up with exactly one representation. `if_absent`
+    /// implements `RENAMENX`.
     pub fn rename(&mut self, db: u8, source: &[u8], destination: &[u8], if_absent: bool) -> io::Result<RenameOutcome> {
-        let Some(record) = self.get(db, source).cloned() else {
+        let Some(source_kind) = self.find_kind(db, source) else {
             return Ok(RenameOutcome::Missing);
         };
-        if if_absent && self.contains(db, destination) {
+        if source == destination {
+            return Ok(if if_absent { RenameOutcome::DestinationPresent } else { RenameOutcome::Renamed });
+        }
+        if if_absent && self.find_kind(db, destination).is_some() {
             return Ok(RenameOutcome::DestinationPresent);
         }
-        let source_key = (namespace(db), source.to_vec());
-        let destination_key = (namespace(db), destination.to_vec());
-        self.commit(vec![
-            Change::Delete { key: source_key },
-            Change::Put { key: destination_key, value: record.value, expires_at: record.expires_at },
-        ])?;
+        let Some(record) = self.get_kind(db, source_kind, source).cloned() else {
+            return Ok(RenameOutcome::Missing);
+        };
+        let mut changes = KINDS
+            .into_iter()
+            .map(|kind| Change::Delete { key: (kind_namespace(db, kind), destination.to_vec()) })
+            .collect::<Vec<_>>();
+        changes.push(Change::Delete { key: (kind_namespace(db, source_kind), source.to_vec()) });
+        changes.push(Change::Put {
+            key: (kind_namespace(db, source_kind), destination.to_vec()),
+            value: record.value,
+            expires_at: record.expires_at,
+        });
+        self.commit(changes)?;
         Ok(RenameOutcome::Renamed)
     }
 
@@ -212,8 +241,8 @@ impl Node {
 
     /// Live logical keys of one database in ascending byte order, backing `KEYS` and `SCAN`.
     ///
-    /// A logical key lives in exactly one of the string, hash and list namespaces, so
-    /// the set both de-duplicates and sorts the result deterministically.
+    /// A logical key lives in exactly one of the five kind namespaces, so the
+    /// set both de-duplicates and sorts the result deterministically.
     pub fn keys(&self, db: u8) -> Vec<Vec<u8>> {
         self.live_keys(db).into_iter().collect()
     }
@@ -404,9 +433,9 @@ pub fn namespace(db: u8) -> String {
 /// Namespace label for one value kind inside a database.
 ///
 /// The string kind keeps the database namespace so existing data needs no
-/// migration, while `hash` and `list` add a suffix of their own. The three
-/// namespaces never overlap, so the same logical key can only be read as one
-/// kind at a time.
+/// migration, while `hash`, `list`, `set` and `zset` add a suffix of their own.
+/// The five namespaces never overlap, so the same logical key can only be read
+/// as one kind at a time.
 pub fn kind_namespace(db: u8, kind: &str) -> String {
     if kind.is_empty() {
         namespace(db)

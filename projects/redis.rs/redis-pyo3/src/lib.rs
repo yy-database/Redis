@@ -16,7 +16,7 @@ fn runtime(error: impl ToString) -> PyErr {
 
 /// Rejects a value kind the shard does not name.
 fn check_kind(kind: &str) -> PyResult<()> {
-    if matches!(kind, "" | "hash" | "list") { Ok(()) } else { Err(PyValueError::new_err(format!("unknown value kind `{kind}`"))) }
+    if redis_wasm::store::KINDS.contains(&kind) { Ok(()) } else { Err(PyValueError::new_err(format!("unknown value kind `{kind}`"))) }
 }
 
 /// Parses one command from the front of `input`.
@@ -118,7 +118,7 @@ impl Store {
         self.node.set_deadline(db, key, expires_at).map_err(runtime)
     }
 
-    /// Returns the live value of one kind (`""`, `hash` or `list`).
+    /// Returns the live value of one kind (`""`, `hash`, `list`, `set` or `zset`).
     fn get_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<Vec<u8>>> {
         check_kind(kind)?;
         Ok(self.node.get_kind(db, kind, key).map(|record| record.value.clone()))

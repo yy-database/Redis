@@ -13,14 +13,14 @@ const wrongArity = name => replyError(`ERR wrong number of arguments for '${name
 const plainArity = () => replyError('ERR wrong number of arguments');
 
 /** Value kinds of one logical key, in probe order. */
-const KINDS = ['string', 'hash', 'list'];
+const KINDS = ['string', 'hash', 'list', 'set', 'zset'];
 /** Storage namespace suffix of each value kind. */
-const SUFFIX = { string: '', hash: 'hash', list: 'list' };
+const SUFFIX = { string: '', hash: 'hash', list: 'list', set: 'set', zset: 'zset' };
 const WRONG_TYPE = 'WRONGTYPE Operation against a key holding the wrong kind of value';
 
 const wrongType = () => replyError(WRONG_TYPE);
 
-/** Kind currently holding `key`, or `null` when all three namespaces are empty. */
+/** Kind currently holding `key`, or `null` when every kind namespace is empty. */
 function kindOf(store, db, key) {
     for (const kind of KINDS) {
         if (store.existsKind(db, SUFFIX[kind], key)) return kind;
@@ -90,6 +90,88 @@ function decodeList(body) {
     return decodeChunks(body);
 }
 
+/** Set members share the list framing and keep insertion order. */
+function encodeSet(members) {
+    return encodeChunks(members);
+}
+
+function decodeSet(body) {
+    return decodeChunks(body);
+}
+
+/**
+ * Frames a sorted set as `u32 count` plus one `u32 length + member + f64 LE score` per entry.
+ *
+ * `null` means one member or the score array does not fit the storage layout.
+ */
+function encodeZSet(entries) {
+    let total = 4;
+    for (const [member] of entries) {
+        if (member.length > MAX_CHUNK) return null;
+        total += 4 + member.length + 8;
+    }
+    const body = Buffer.allocUnsafe(total);
+    body.writeUInt32LE(entries.length, 0);
+    let offset = 4;
+    for (const [member, score] of entries) {
+        body.writeUInt32LE(member.length, offset);
+        offset += 4;
+        member.copy(body, offset);
+        offset += member.length;
+        body.writeDoubleLE(score, offset);
+        offset += 8;
+    }
+    return body;
+}
+
+function decodeZSet(body) {
+    if (body.length < 4) {
+        return null;
+    }
+    const count = body.readUInt32LE(0);
+    const entries = [];
+    let offset = 4;
+    for (let index = 0; index < count; index += 1) {
+        if (offset + 4 > body.length) return null;
+        const length = body.readUInt32LE(offset);
+        offset += 4;
+        if (offset + length + 8 > body.length) return null;
+        const member = body.subarray(offset, offset + length);
+        offset += length;
+        entries.push([member, body.readDoubleLE(offset)]);
+        offset += 8;
+    }
+    return offset === body.length ? entries : null;
+}
+
+/**
+ * Parses one ZADD score the way the gateway does.
+ *
+ * A decimal literal (optional sign, fraction and exponent) or an infinity word
+ * is accepted. `NaN` and anything else is rejected, so a bad score never
+ * reaches the shard.
+ */
+function parseScore(raw) {
+    const value = text(raw).trim();
+    if (/^[+-]?inf(?:inity)?$/i.test(value)) {
+        return value.startsWith('-') ? -Infinity : Infinity;
+    }
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value)) {
+        return null;
+    }
+    return Number(value);
+}
+
+/** Ascending score order, ties broken by member bytes. */
+function sortZSet(entries) {
+    entries.sort((left, right) => (left[1] - right[1]) || Buffer.compare(left[0], right[0]));
+}
+
+/** Score text as the gateway writes it: the shortest decimal form, no trailing `.0`. */
+function scoreText(score) {
+    return String(score);
+}
+
 /** Live hash fields, `[]` when the hash is missing and `null` when the body is corrupt. */
 function readHash(store, db, key) {
     const body = store.getKind(db, SUFFIX.hash, key);
@@ -102,10 +184,29 @@ function readList(store, db, key) {
     return body === null || body === undefined ? [] : decodeList(body);
 }
 
+/** Live set members, `[]` when the set is missing and `null` when the body is corrupt. */
+function readSet(store, db, key) {
+    const body = store.getKind(db, SUFFIX.set, key);
+    return body === null || body === undefined ? [] : decodeSet(body);
+}
+
+/** Live sorted-set entries, `[]` when the key is missing and `null` when the body is corrupt. */
+function readZSet(store, db, key) {
+    const body = store.getKind(db, SUFFIX.zset, key);
+    return body === null || body === undefined ? [] : decodeZSet(body);
+}
+
 /** Replaces one kind while carrying the deadline it already holds. */
 function rewriteKind(store, db, kind, key, body) {
     const expiresAt = store.deadlineKind(db, SUFFIX[kind], key);
     store.setKind(db, SUFFIX[kind], key, body, expiresAt ?? null);
+}
+
+/** Drops every non-string representation, keeping one logical key per name. */
+function dropOtherKinds(store, db, key) {
+    for (const kind of KINDS) {
+        if (kind !== 'string') store.deleteKind(db, SUFFIX[kind], key);
+    }
 }
 
 function commandName(args) {
@@ -270,8 +371,7 @@ function plan(store, session, name, args) {
             return {
                 run: () => {
                     store.set(session.db, args[1], args[3], Date.now() + offset);
-                    store.deleteKind(session.db, SUFFIX.hash, args[1]);
-                    store.deleteKind(session.db, SUFFIX.list, args[1]);
+                    dropOtherKinds(store, session.db, args[1]);
                     return simple('OK');
                 },
             };
@@ -317,8 +417,7 @@ function plan(store, session, name, args) {
                 run: () => {
                     for (let index = 1; index < args.length; index += 2) {
                         store.set(session.db, args[index], args[index + 1], null);
-                        store.deleteKind(session.db, SUFFIX.hash, args[index]);
-                        store.deleteKind(session.db, SUFFIX.list, args[index]);
+                        dropOtherKinds(store, session.db, args[index]);
                     }
                     return simple('OK');
                 },
@@ -382,12 +481,24 @@ function plan(store, session, name, args) {
         case 'hgetall':
         case 'hdel':
         case 'hlen':
+        case 'hincrby':
         case 'lpush':
         case 'rpush':
         case 'lrange':
+        case 'lindex':
         case 'lpop':
         case 'rpop':
         case 'llen':
+        case 'sadd':
+        case 'srem':
+        case 'smembers':
+        case 'scard':
+        case 'sismember':
+        case 'zadd':
+        case 'zscore':
+        case 'zrem':
+        case 'zcard':
+        case 'zrange':
             return planCollection(store, session, name, args);
 
         case 'incr':
@@ -523,8 +634,12 @@ function planScan(store, session, args) {
     if (args.length < 2) {
         return { error: wrongArity('scan') };
     }
-    const cursor = parseInteger(args[1]);
-    if (cursor === null || cursor < 0) {
+    const cursorText = text(args[1]);
+    if (!/^\d+$/.test(cursorText)) {
+        return { error: replyError('ERR invalid cursor') };
+    }
+    const cursor = Number(cursorText);
+    if (!Number.isFinite(cursor)) {
         return { error: replyError('ERR invalid cursor') };
     }
     let pattern = null;
@@ -552,12 +667,17 @@ function planScan(store, session, args) {
     const database = session.db;
     return {
         run: () => {
-            const keys = store.keys(database).filter(key => pattern === null || globMatch(pattern, key));
+            const keys = store.keys(database);
             const start = Math.min(cursor, keys.length);
-            const page = keys.slice(start, start + count);
-            const next = start + page.length;
-            const position = next >= keys.length ? '0' : String(next);
-            return array([bulk(position), array(page.map(key => bulk(key)))]);
+            if (start >= keys.length) {
+                return array([bulk('0'), array([])]);
+            }
+            const end = Math.min(start + count, keys.length);
+            const next = end >= keys.length ? '0' : String(end);
+            const page = keys
+                .slice(start, end)
+                .filter(key => pattern === null || globMatch(pattern, key));
+            return array([bulk(next), array(page.map(key => bulk(key)))]);
         },
     };
 }
@@ -648,8 +768,7 @@ function planSet(store, session, args) {
                     ? store.deadlineKind(session.db, SUFFIX[kind], key)
                     : null;
             store.set(session.db, key, value, deadline ?? null);
-            store.deleteKind(session.db, SUFFIX.hash, key);
-            store.deleteKind(session.db, SUFFIX.list, key);
+            dropOtherKinds(store, session.db, key);
             return simple('OK');
         },
     };
@@ -743,7 +862,7 @@ function planRename(store, session, name, args) {
     return {
         run: () => {
             if (source.equals(destination)) {
-                if (!store.exists(session.db, source)) return replyError('ERR no such key');
+                if (kindOf(store, session.db, source) === null) return replyError('ERR no such key');
                 return ifAbsent ? integer(0) : simple('OK');
             }
             const outcome = store.rename(session.db, source, destination, ifAbsent);
@@ -880,6 +999,42 @@ function planCollection(store, session, name, args) {
             };
         }
 
+        case 'hincrby': {
+            if (args.length !== 4) return { error: wrongArity('hincrby') };
+            const delta = parseInteger(args[3]);
+            if (delta === null) return { error: integerError() };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    const position = fields.findIndex(entry => entry[0].equals(args[2]));
+                    let current = 0;
+                    if (position >= 0) {
+                        const parsed = parseInteger(fields[position][1]);
+                        if (parsed === null) return replyError('ERR hash value is not an integer');
+                        current = parsed;
+                    }
+                    const updated = current + delta;
+                    if (!Number.isSafeInteger(updated)) {
+                        return replyError('ERR increment or decrement would overflow');
+                    }
+                    const encoded = Buffer.from(String(updated));
+                    if (position >= 0) {
+                        fields[position] = [args[2], encoded];
+                    }
+                    else {
+                        fields.push([args[2], encoded]);
+                    }
+                    const body = encodeHash(fields);
+                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
+                    rewriteKind(store, db, 'hash', key, body);
+                    return integer(updated);
+                },
+            };
+        }
+
         case 'lpush':
         case 'rpush': {
             if (args.length < 3) return { error: wrongArity(name) };
@@ -922,6 +1077,24 @@ function planCollection(store, session, name, args) {
                     if (end >= elements.length) end = elements.length - 1;
                     if (begin > end || begin >= elements.length || end < 0) return array([]);
                     return array(elements.slice(begin, end + 1).map(value => bulk(value)));
+                },
+            };
+        }
+
+        case 'lindex': {
+            if (args.length !== 3) return { error: wrongArity('lindex') };
+            const index = parseInteger(args[2]);
+            if (index === null) return { error: integerError() };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return nullReply();
+                    if (kind !== 'list') return wrongType();
+                    const elements = readList(store, db, key);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    const position = index < 0 ? elements.length + index : index;
+                    if (position < 0 || position >= elements.length) return nullReply();
+                    return bulk(elements[position]);
                 },
             };
         }
@@ -976,6 +1149,219 @@ function planCollection(store, session, name, args) {
                     const elements = readList(store, db, key);
                     if (elements === null) return replyError('ERR stored list value is corrupt');
                     return integer(elements.length);
+                },
+            };
+        }
+
+        case 'sadd': {
+            if (args.length < 3) return { error: wrongArity('sadd') };
+            const incoming = args.slice(2);
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'set') return wrongType();
+                    const members = readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    let added = 0;
+                    for (const member of incoming) {
+                        if (!members.some(existing => existing.equals(member))) {
+                            members.push(member);
+                            added += 1;
+                        }
+                    }
+                    if (added > 0) {
+                        const body = encodeSet(members);
+                        if (body === null) return replyError('ERR set value exceeds the storage limit');
+                        rewriteKind(store, db, 'set', key, body);
+                    }
+                    return integer(added);
+                },
+            };
+        }
+
+        case 'srem': {
+            if (args.length < 3) return { error: wrongArity('srem') };
+            const dropping = args.slice(2);
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'set') return wrongType();
+                    const members = readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    const kept = members.filter(existing => !dropping.some(candidate => candidate.equals(existing)));
+                    const removed = members.length - kept.length;
+                    if (kept.length === 0) {
+                        store.deleteKind(db, SUFFIX.set, key);
+                    }
+                    else if (removed > 0) {
+                        const body = encodeSet(kept);
+                        if (body === null) return replyError('ERR set value exceeds the storage limit');
+                        rewriteKind(store, db, 'set', key, body);
+                    }
+                    return integer(removed);
+                },
+            };
+        }
+
+        case 'smembers': {
+            if (args.length !== 2) return { error: wrongArity('smembers') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return array([]);
+                    if (kind !== 'set') return wrongType();
+                    const members = readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    return array(members.map(member => bulk(member)));
+                },
+            };
+        }
+
+        case 'scard': {
+            if (args.length !== 2) return { error: wrongArity('scard') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'set') return wrongType();
+                    const members = readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    return integer(members.length);
+                },
+            };
+        }
+
+        case 'sismember': {
+            if (args.length !== 3) return { error: wrongArity('sismember') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'set') return wrongType();
+                    const members = readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    return integer(members.some(member => member.equals(args[2])) ? 1 : 0);
+                },
+            };
+        }
+
+        case 'zadd': {
+            if (args.length < 4 || (args.length - 2) % 2 !== 0) return { error: wrongArity('zadd') };
+            const incoming = [];
+            for (let index = 2; index < args.length; index += 2) {
+                const score = parseScore(args[index]);
+                if (score === null) return { error: replyError('ERR value is not a valid float') };
+                incoming.push([args[index + 1], score]);
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'zset') return wrongType();
+                    const entries = readZSet(store, db, key);
+                    if (entries === null) return replyError('ERR stored zset value is corrupt');
+                    let added = 0;
+                    for (const [member, score] of incoming) {
+                        const position = entries.findIndex(entry => entry[0].equals(member));
+                        if (position >= 0) {
+                            entries[position] = [member, score];
+                        }
+                        else {
+                            entries.push([member, score]);
+                            added += 1;
+                        }
+                    }
+                    const body = encodeZSet(entries);
+                    if (body === null) return replyError('ERR zset value exceeds the storage limit');
+                    rewriteKind(store, db, 'zset', key, body);
+                    return integer(added);
+                },
+            };
+        }
+
+        case 'zscore': {
+            if (args.length !== 3) return { error: wrongArity('zscore') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return nullReply();
+                    if (kind !== 'zset') return wrongType();
+                    const entries = readZSet(store, db, key);
+                    if (entries === null) return replyError('ERR stored zset value is corrupt');
+                    const entry = entries.find(candidate => candidate[0].equals(args[2]));
+                    return entry ? bulk(scoreText(entry[1])) : nullReply();
+                },
+            };
+        }
+
+        case 'zrem': {
+            if (args.length < 3) return { error: wrongArity('zrem') };
+            const dropping = args.slice(2);
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'zset') return wrongType();
+                    const entries = readZSet(store, db, key);
+                    if (entries === null) return replyError('ERR stored zset value is corrupt');
+                    const kept = entries.filter(([member]) => !dropping.some(candidate => candidate.equals(member)));
+                    const removed = entries.length - kept.length;
+                    if (kept.length === 0) {
+                        store.deleteKind(db, SUFFIX.zset, key);
+                    }
+                    else if (removed > 0) {
+                        const body = encodeZSet(kept);
+                        if (body === null) return replyError('ERR zset value exceeds the storage limit');
+                        rewriteKind(store, db, 'zset', key, body);
+                    }
+                    return integer(removed);
+                },
+            };
+        }
+
+        case 'zcard': {
+            if (args.length !== 2) return { error: wrongArity('zcard') };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return integer(0);
+                    if (kind !== 'zset') return wrongType();
+                    const entries = readZSet(store, db, key);
+                    if (entries === null) return replyError('ERR stored zset value is corrupt');
+                    return integer(entries.length);
+                },
+            };
+        }
+
+        case 'zrange': {
+            let withScores = false;
+            if (args.length === 5) {
+                if (text(args[4]).toLowerCase() !== 'withscores') return { error: replyError('ERR syntax error') };
+                withScores = true;
+            }
+            else if (args.length !== 4) {
+                return { error: wrongArity('zrange') };
+            }
+            const start = parseInteger(args[2]);
+            const stop = parseInteger(args[3]);
+            if (start === null || stop === null) return { error: integerError() };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind === null) return array([]);
+                    if (kind !== 'zset') return wrongType();
+                    const entries = readZSet(store, db, key);
+                    if (entries === null) return replyError('ERR stored zset value is corrupt');
+                    sortZSet(entries);
+                    let begin = start < 0 ? entries.length + start : start;
+                    let end = stop < 0 ? entries.length + stop : stop;
+                    if (begin < 0) begin = 0;
+                    if (end >= entries.length) end = entries.length - 1;
+                    if (begin > end || begin >= entries.length || end < 0) return array([]);
+                    const slice = entries.slice(begin, end + 1);
+                    return array(slice.flatMap(([member, score]) => (
+                        withScores ? [bulk(member), bulk(scoreText(score))] : [bulk(member)]
+                    )));
                 },
             };
         }

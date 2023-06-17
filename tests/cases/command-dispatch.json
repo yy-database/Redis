@@ -491,7 +491,7 @@
       "steps": [
         {
           "argsText": [
-            "SADD",
+            "SINTER",
             "k",
             "v"
           ],

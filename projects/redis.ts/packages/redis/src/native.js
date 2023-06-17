@@ -74,7 +74,7 @@ export class Store {
         return this.native.expire(db, bytes(key), expiresAt);
     }
 
-    /** Reads one kind (`""`, `hash` or `list`) as raw bytes. */
+    /** Reads one kind (`""`, `hash`, `list`, `set` or `zset`) as raw bytes. */
     getKind(db, kind, key) {
         const value = this.native.getKind(db, kind, bytes(key));
         return value === null ? null : Buffer.from(value);
