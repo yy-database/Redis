@@ -3,38 +3,33 @@
 
 import { spawnSync } from 'node:child_process';
 
+// Minimum executed cases per side, held a few cases below the current count so
+// a small refactor does not trip the gate while a real regression still does.
+const FLOORS = { ts: 536, py: 374 };
+
 function usage() {
-    return 'usage: node scripts/check-test-floor.mjs --kind ts|py --floor <n> -- <command...>';
+    return 'usage: node scripts/check-test-floor.mjs --kind ts|py -- <command...>';
 }
 
 function parseArguments(argv) {
     let kind = null;
-    let floor = null;
     for (let index = 0; index < argv.length; index += 1) {
         const argument = argv[index];
         if (argument === '--') {
             const command = argv.slice(index + 1);
-            if (kind === null || floor === null) {
-                throw new Error('`--kind` and `--floor` are required before `--`');
+            if (kind === null) {
+                throw new Error('`--kind` is required before `--`');
             }
             if (command.length === 0) {
                 throw new Error('missing command after `--`');
             }
-            return { kind, floor, command };
+            return { kind, floor: FLOORS[kind], command };
         }
         if (argument === '--kind') {
             index += 1;
             kind = argv[index];
             if (kind !== 'ts' && kind !== 'py') {
                 throw new Error('`--kind` must be `ts` or `py`');
-            }
-            continue;
-        }
-        if (argument === '--floor') {
-            index += 1;
-            floor = Number.parseInt(argv[index] ?? '', 10);
-            if (!Number.isInteger(floor) || floor <= 0) {
-                throw new Error('`--floor` needs a positive integer');
             }
             continue;
         }

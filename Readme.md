@@ -167,8 +167,8 @@ Tests and gates:
 | `pnpm test` | Rust tests for the `redis.rs` workspace |
 | `pnpm test:ts` | Installed-state TypeScript acceptance |
 | `pnpm test:py` | Builds the wheel, installs it in a scratch environment, runs pytest |
-| `pnpm gate:test-count:ts` | The TypeScript suite with the 436-case floor |
-| `pnpm gate:test-count:py` | The Python suite with the 361-case floor |
+| `pnpm gate:test-count:ts` | The TypeScript suite with the 536-case floor |
+| `pnpm gate:test-count:py` | The Python suite with the 374-case floor |
 | `pnpm gate:install:ts` | Packs the tarballs, installs them in a scratch directory, imports the entry from a plain `node` process and performs a real write and read |
 | `pnpm gate:install:py` | Builds the wheel, installs it in a clean virtual environment and performs a real write and read |
 | `pnpm gate:oracle` | Independent recomputation of the wire and layout bytes |

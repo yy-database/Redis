@@ -10,8 +10,8 @@
     "gate:drivers": "node scripts/gate-drivers.mjs",
     "gate:install:ts": "node scripts/gate-install-ts.mjs",
     "gate:install:py": "node scripts/gate-install-py.mjs",
-    "gate:test-count:ts": "node scripts/check-test-floor.mjs --kind ts --floor 436 -- pnpm --filter @yydb/redis-harness test",
-    "gate:test-count:py": "node scripts/check-test-floor.mjs --kind py --floor 361 -- node scripts/run-python-tests.mjs",
+    "gate:test-count:ts": "node scripts/check-test-floor.mjs --kind ts -- pnpm --filter @yydb/redis-harness test",
+    "gate:test-count:py": "node scripts/check-test-floor.mjs --kind py -- node scripts/run-python-tests.mjs",
     "gate:conformance:compare": "node scripts/compare-conformance.mjs",
     "gate:oracle": "node projects/redis.ts/packages/redis-harness/bin/oracle.mjs"
   },

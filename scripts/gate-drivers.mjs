@@ -5,7 +5,7 @@
 //! decode a reply, fails the gate.
 
 import { execFile } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { installPackages, prepareInstall } from '../projects/redis.ts/packages/redis-harness/src/install.mjs';
@@ -488,10 +488,289 @@ async function pythonDriverScript(interpreter) {
 }
 
 const install = await prepareInstall();
+
+/** Decodes the shard chunk framing used by hash, list and set bodies. */
+function decodeChunks(body) {
+    const chunks = [];
+    let offset = 0;
+    while (offset < body.length) {
+        const length = body.readUInt32LE(offset);
+        offset += 4;
+        chunks.push(body.subarray(offset, offset + length));
+        offset += length;
+    }
+    return chunks;
+}
+
+/** Decodes the zset framing: `u32 count` plus `u32 length + member + f64 LE score` per entry. */
+function decodeZSet(body) {
+    const count = body.readUInt32LE(0);
+    const entries = [];
+    let offset = 4;
+    for (let index = 0; index < count; index += 1) {
+        const length = body.readUInt32LE(offset);
+        offset += 4;
+        const member = body.subarray(offset, offset + length);
+        offset += length;
+        entries.push([member, body.readDoubleLE(offset)]);
+        offset += 8;
+    }
+    return entries;
+}
+
+function textOf(hex) {
+    return Buffer.from(hex, 'hex').toString('utf8');
+}
+
+/** Replays one raw setup step with the real commands a client would issue. */
+function setupCommands(step) {
+    const key = textOf(step.keyHex);
+    if (step.call === 'set') {
+        return [['SET', key, textOf(step.valueHex)]];
+    }
+    if (step.call !== 'set_kind') {
+        throw new Error(`unsupported setup step ${step.call}`);
+    }
+    const body = Buffer.from(step.valueHex, 'hex');
+    if (step.kind === '') return [['SET', key, body.toString('utf8')]];
+    if (step.kind === 'hash') {
+        const chunks = decodeChunks(body);
+        const command = ['HSET', key];
+        for (let index = 0; index < chunks.length; index += 2) {
+            command.push(chunks[index].toString(), chunks[index + 1].toString());
+        }
+        return [command];
+    }
+    if (step.kind === 'list') {
+        return [['RPUSH', key, ...decodeChunks(body).map(item => item.toString())]];
+    }
+    if (step.kind === 'set') {
+        return [['SADD', key, ...decodeChunks(body).map(item => item.toString())]];
+    }
+    if (step.kind === 'zset') {
+        const command = ['ZADD', key];
+        for (const [member, score] of decodeZSet(body)) {
+            command.push(String(score), member.toString());
+        }
+        return [command];
+    }
+    throw new Error(`unsupported setup kind ${step.kind}`);
+}
+
+function replyNative(reply) {
+    if (reply.type === 'bulk') return Buffer.from(reply.bytes).toString('utf8');
+    if (reply.type === 'simple') return reply.value;
+    if (reply.type === 'int') return reply.value;
+    if (reply.type === 'null') return null;
+    if (reply.type === 'array') return reply.value.map(replyNative);
+    throw new Error(`unsupported reply spec ${reply.type}`);
+}
+
+/** Expected reply as redis-py reads it: values are native and `ERR ` is stripped. */
+function replyExpected(reply) {
+    if (reply.type === 'error') {
+        return { kind: 'error', value: reply.value.startsWith('ERR ') ? reply.value.slice(4) : reply.value };
+    }
+    if (reply.type === 'array') {
+        return { kind: 'list', value: reply.value.map(replyNative) };
+    }
+    if (reply.type === 'null') {
+        return { kind: 'null', value: null };
+    }
+    if (reply.type === 'int') {
+        return { kind: 'int', value: reply.value };
+    }
+    return { kind: 'text', value: replyNative(reply) };
+}
+
+/** Translates one post-state step into a real read and its expected value. */
+function effectExpected(step) {
+    if (step.call === 'size') {
+        return { kind: 'dbsize', expect: step.expect.int };
+    }
+    const key = textOf(step.keyHex);
+    if (step.call === 'get') {
+        return { kind: 'get', key, expect: step.expect === null ? null : textOf(step.expect.bytes) };
+    }
+    if (step.call === 'exists_kind') {
+        const name = step.kind === '' ? 'string' : step.kind;
+        return { kind: 'type', key, expect: step.expect.bool ? name : 'none' };
+    }
+    if (step.call !== 'get_kind') {
+        throw new Error(`unsupported effect step ${step.call}`);
+    }
+    if (step.expect === null) {
+        return { kind: 'zset', key, expect: null };
+    }
+    const body = Buffer.from(step.expect.bytes, 'hex');
+    if (step.kind === '') {
+        return { kind: 'get', key, expect: body.toString('utf8') };
+    }
+    if (step.kind === 'hash') {
+        const chunks = decodeChunks(body);
+        const expect = {};
+        for (let index = 0; index < chunks.length; index += 2) {
+            expect[chunks[index].toString()] = chunks[index + 1].toString();
+        }
+        return { kind: 'hash', key, expect };
+    }
+    if (step.kind === 'set') {
+        return { kind: 'members', key, expect: decodeChunks(body).map(item => item.toString()).sort() };
+    }
+    if (step.kind === 'zset') {
+        const expect = decodeZSet(body).map(([member, score]) => [member.toString(), score]);
+        expect.sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0));
+        return { kind: 'zset', key, expect };
+    }
+    throw new Error(`unsupported effect kind ${step.kind}`);
+}
+
+/**
+ * Re-expresses the wire reply as redis-py hands it to a caller.
+ *
+ * redis-py runs per-command response callbacks, so `SET` and `RENAME` come back
+ * as a boolean, `SCAN` promotes the cursor to an integer, and `SMEMBERS` yields
+ * a set. These are driver-side type changes, not gateway differences.
+ */
+function pythonReplyExpected(id, reply) {
+    if (reply.kind === 'text' && reply.value === 'OK' && (id.startsWith('command.rename.') || id === 'command.set.clears-zset')) {
+        return { kind: 'int', value: 1 };
+    }
+    if (id.startsWith('command.scan.') && reply.kind === 'list') {
+        return { kind: 'list', value: [Number(reply.value[0]), reply.value[1]] };
+    }
+    return reply;
+}
+
+/** Turns the TS-only command cases into a plan the redis-py case driver can replay. */
+function buildCasePlan(root) {
+    const payload = JSON.parse(readFileSync(join(root, 'tests', 'cases', 'five-kinds.json'), 'utf8'));
+    return payload.cases
+        .filter(entry => entry.op === 'command')
+        .map(entry => ({
+            id: entry.id,
+            db: 7,
+            setup: entry.setup.flatMap(setupCommands),
+            command: entry.argsText,
+            reply: pythonReplyExpected(entry.id, replyExpected(entry.reply)),
+            effects: entry.effect.map(effectExpected),
+        }));
+}
+
+function assertCaseResults(actual, plan) {
+    const problems = [];
+    const byId = new Map(actual.map(item => [item.id, item]));
+    for (const entry of plan) {
+        const read = byId.get(entry.id);
+        if (read === undefined) {
+            problems.push(`${entry.id}: missing from the driver output`);
+            continue;
+        }
+        if (JSON.stringify(read.reply) !== JSON.stringify(entry.reply)) {
+            problems.push(`${entry.id}: reply expected ${JSON.stringify(entry.reply)}, read ${JSON.stringify(read.reply)}`);
+        }
+        const expectedEffects = entry.effects.map(effect => effect.expect);
+        if (JSON.stringify(read.effects) !== JSON.stringify(expectedEffects)) {
+            problems.push(`${entry.id}: effects expected ${JSON.stringify(expectedEffects)}, read ${JSON.stringify(read.effects)}`);
+        }
+    }
+    if (actual.length !== plan.length) {
+        problems.push(`driver returned ${actual.length} cases, expected ${plan.length}`);
+    }
+    if (problems.length > 0) {
+        throw new Error(`redis-py case driver disagreed on ${problems.length} check(s):\n  ${problems.join('\n  ')}`);
+    }
+    return plan.length;
+}
+
+const CASE_DRIVER = `
+import json
+import os
+import sys
+
+import redis
+
+plan = json.load(open(sys.argv[1], encoding="utf-8"))
+client = redis.Redis(
+    host=os.environ["REDIS_HOST"],
+    port=int(os.environ["REDIS_PORT"]),
+    decode_responses=True,
+    protocol=2,
+)
+
+
+def plain(value):
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else value
+    if isinstance(value, (set, frozenset)):
+        return sorted(value)
+    if isinstance(value, (list, tuple)):
+        return [plain(item) for item in value]
+    return value
+
+
+def wrapped(value):
+    if isinstance(value, (set, frozenset)):
+        value = sorted(value)
+    if isinstance(value, (list, tuple)):
+        return {"kind": "list", "value": [plain(item) for item in value]}
+    if value is None:
+        return {"kind": "null", "value": None}
+    if isinstance(value, bool):
+        return {"kind": "int", "value": int(value)}
+    if isinstance(value, int):
+        return {"kind": "int", "value": value}
+    return {"kind": "text", "value": str(plain(value))}
+
+
+results = []
+for case in plan:
+    client.execute_command("SELECT", case["db"])
+    client.flushdb()
+    for command in case["setup"]:
+        client.execute_command(*command)
+    try:
+        reply = wrapped(client.execute_command(*case["command"]))
+    except redis.ResponseError as error:
+        reply = {"kind": "error", "value": str(error)}
+    effects = []
+    for effect in case["effects"]:
+        kind = effect["kind"]
+        key = effect.get("key")
+        if kind == "get":
+            value = client.get(key)
+        elif kind == "type":
+            value = client.type(key)
+        elif kind == "hash":
+            value = dict(client.hgetall(key))
+        elif kind == "members":
+            value = sorted(client.smembers(key))
+        elif kind == "zset":
+            if client.type(key) != "zset":
+                value = None
+            else:
+                entries = sorted(client.zrange(key, 0, -1, withscores=True), key=lambda item: item[0])
+                value = [[member, plain(score)] for member, score in entries]
+        elif kind == "dbsize":
+            value = client.dbsize()
+        else:
+            raise SystemExit("unknown effect kind " + kind)
+        effects.append(plain(value))
+    results.append({"id": case["id"], "reply": reply, "effects": effects})
+
+client.close()
+print(json.dumps(results))
+`;
+
 try {
     installPackages(install.scratch, ['redis@4.7.1']);
     writeFileSync(join(install.scratch, 'driver-node.mjs'), NODE_DRIVER);
     writeFileSync(join(install.scratch, 'driver-py.py'), PYTHON_DRIVER);
+    const casePlan = buildCasePlan(install.root);
+    writeFileSync(join(install.scratch, 'driver-cases.json'), JSON.stringify(casePlan, null, 2));
+    writeFileSync(join(install.scratch, 'driver-cases.py'), CASE_DRIVER);
 
     const entry = await install.load();
     const server = await entry.startServer({ dataDir: join(install.scratch, 'data') });
@@ -516,7 +795,14 @@ try {
         });
         const pythonRead = assertSame('redis-py', JSON.parse(pythonOutput));
 
-        process.stdout.write(`drivers: node-redis ${nodeRead} assertions, redis-py ${pythonVersion} ${pythonRead} assertions, 0 mismatches\n`);
+        const { stdout: caseOutput } = await run(
+            interpreter,
+            [join(install.scratch, 'driver-cases.py'), join(install.scratch, 'driver-cases.json')],
+            { cwd: install.scratch, env: environment, encoding: 'utf8', timeout: 120000 },
+        );
+        const caseRead = assertCaseResults(JSON.parse(caseOutput), casePlan);
+
+        process.stdout.write(`drivers: node-redis ${nodeRead} assertions, redis-py ${pythonVersion} ${pythonRead} assertions, ${caseRead} TS-only command cases replayed through redis-py, 0 mismatches\n`);
     }
     finally {
         await server.close();
