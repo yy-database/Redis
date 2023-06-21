@@ -132,7 +132,7 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 [[package]]
 name = "database-formats"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6645172ca54371860ed62ac9b549641b3e74950d#6645172ca54371860ed62ac9b549641b3e74950d"
+source = "git+https://github.com/oovm/database.rs.git?rev=0491c7cbf5e0456526771d086f5c1eca648bc78b#0491c7cbf5e0456526771d086f5c1eca648bc78b"
 dependencies = [
  "blake3",
  "database-types",
@@ -142,7 +142,7 @@ dependencies = [
 [[package]]
 name = "database-types"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6645172ca54371860ed62ac9b549641b3e74950d#6645172ca54371860ed62ac9b549641b3e74950d"
+source = "git+https://github.com/oovm/database.rs.git?rev=0491c7cbf5e0456526771d086f5c1eca648bc78b#0491c7cbf5e0456526771d086f5c1eca648bc78b"
 dependencies = [
  "serde",
  "serde_json",

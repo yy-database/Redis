@@ -107,6 +107,95 @@ const EXPECTED = {
     zscore_after_overwrite: { error: WRONG_TYPE },
     renamenx_present: 0,
     renamenx_moved: 1,
+    getrange_full: 'This is a string',
+    getrange_negative: 'ing',
+    getrange_clip: 'string',
+    getrange_before_start: 'Thi',
+    getrange_missing: '',
+    getrange_integer_error: { error: 'value is not an integer or out of range' },
+    setrange_zero_fill: 5,
+    get_zero_fill: '\u0000\u0000\u0000xy',
+    setrange_overwrite: 3,
+    get_overwrite: 'aZc',
+    setrange_empty_missing: 0,
+    exists_empty_missing: 0,
+    setrange_empty_present: 4,
+    get_after_empty_present: 'abcd',
+    setrange_negative: { error: 'offset is out of range' },
+    setrange_integer_error: { error: 'value is not an integer or out of range' },
+    exists_after_setrange_error: 0,
+    setrange_ttl_reply: 3,
+    ttl_after_setrange: true,
+    get_after_setrange_ttl: 'aZc',
+    incrbyfloat_missing: 0.5,
+    get_incrbyfloat_missing: '0.5',
+    incrbyfloat_integer: 11,
+    get_incrbyfloat_integer: '11',
+    incrbyfloat_fraction: 1.75,
+    get_incrbyfloat_fraction: '1.75',
+    incrbyfloat_nan: { error: 'value is not a valid float' },
+    exists_after_nan: 0,
+    incrbyfloat_positive_inf: { error: 'increment would produce NaN or Infinity' },
+    incrbyfloat_negative_inf: { error: 'increment would produce NaN or Infinity' },
+    incrbyfloat_invalid_value: { error: 'value is not a valid float' },
+    get_after_invalid_value: 'abc',
+    incrbyfloat_ttl_reply: 2,
+    ttl_after_incrbyfloat: true,
+    get_after_incrbyfloat_ttl: '2',
+    setbit_create: 0,
+    getbit_created: 1,
+    getbit_before: 0,
+    bitcount_created: 1,
+    type_setbit: 'string',
+    exists_setbit: 1,
+    setbit_previous: 1,
+    get_after_setbit_previous: 'a',
+    setbit_clear: 0,
+    get_after_setbit_clear: 'a',
+    setbit_bad_bit: { error: 'bit is not an integer or out of range' },
+    setbit_negative_offset: { error: 'bit offset is not an integer or out of range' },
+    exists_after_setbit_error: 0,
+    getbit_present_one: 1,
+    getbit_present_zero: 0,
+    getbit_past_end: 0,
+    getbit_missing: 0,
+    bitcount_all: 26,
+    bitcount_byte_range: 4,
+    bitcount_negative_range: 10,
+    bitcount_bit_range: 17,
+    bitcount_bad_unit: { error: 'syntax error' },
+    bitcount_missing: 0,
+    bitpos_missing_zero: 0,
+    bitpos_missing_one: -1,
+    bitpos_first_zero: 0,
+    bitpos_first_one: 1,
+    bitpos_range: 9,
+    bitpos_range_exhausted: -1,
+    bitpos_padding: 8,
+    bitpos_negative_empty_range: -1,
+    bitpos_negative_index: 15,
+    bitpos_bad_bit: { error: 'The bit argument must be 1 or 0' },
+    append_ttl_reply: 6,
+    get_after_append: 'abcdef',
+    ttl_after_append: true,
+    append_missing: 1,
+    exists_append_missing: 1,
+    strlen_ttl: 6,
+    strlen_missing: 0,
+    exists_after_setrange: 1,
+    type_after_setrange: 'string',
+    del_after_setrange: 1,
+    exists_after_del: 0,
+    getrange_wrongtype: { error: WRONG_TYPE },
+    setrange_wrongtype: { error: WRONG_TYPE },
+    incrbyfloat_wrongtype: { error: WRONG_TYPE },
+    setbit_wrongtype: { error: WRONG_TYPE },
+    getbit_wrongtype: { error: WRONG_TYPE },
+    bitcount_wrongtype: { error: WRONG_TYPE },
+    bitpos_wrongtype: { error: WRONG_TYPE },
+    append_wrongtype: { error: WRONG_TYPE },
+    strlen_wrongtype: { error: WRONG_TYPE },
+    type_wrongtype: 'hash',
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -128,6 +217,14 @@ const capture = async (name, action) => {
     }
 };
 const plain = value => Object.fromEntries(Object.entries(value));
+const captureError = async (name, action) => {
+    try {
+        out[name] = await action();
+    }
+    catch (error) {
+        out[name] = { error: error.message.replace(/^ERR /, '') };
+    }
+};
 
 await capture('hset', () => client.hSet(k('h1'), { f1: 'v1', f2: 'v2' }));
 out.hget = await client.hGet(k('h1'), 'f1');
@@ -276,6 +373,127 @@ out.renamenx_present = Number(await client.renameNX('s2', 'd2'));
 await client.set('s3', 'v');
 out.renamenx_moved = Number(await client.renameNX('s3', 'z9'));
 
+await client.select(8);
+await client.flushDb();
+
+await client.set(k('gr'), 'This is a string');
+out.getrange_full = await client.getRange(k('gr'), 0, -1);
+out.getrange_negative = await client.getRange(k('gr'), -3, -1);
+out.getrange_clip = await client.getRange(k('gr'), 10, 100);
+out.getrange_before_start = await client.getRange(k('gr'), -100, 2);
+out.getrange_missing = await client.getRange(k('gr2'), 0, -1);
+await captureError('getrange_integer_error', () => client.getRange(k('gr'), 0, '1.5'));
+
+out.setrange_zero_fill = await client.setRange(k('sr'), 3, 'xy');
+out.get_zero_fill = await client.get(k('sr'));
+await client.set(k('sr2'), 'abc');
+out.setrange_overwrite = await client.setRange(k('sr2'), 1, 'Z');
+out.get_overwrite = await client.get(k('sr2'));
+out.setrange_empty_missing = await client.setRange(k('sr3'), 5, '');
+out.exists_empty_missing = await client.exists(k('sr3'));
+await client.set(k('sr4'), 'abcd');
+out.setrange_empty_present = await client.setRange(k('sr4'), 10, '');
+out.get_after_empty_present = await client.get(k('sr4'));
+await captureError('setrange_negative', () => client.setRange(k('sr5'), -1, 'x'));
+await captureError('setrange_integer_error', () => client.setRange(k('sr5'), '1.5', 'x'));
+out.exists_after_setrange_error = await client.exists(k('sr5'));
+await client.set(k('sr6'), 'abc');
+await client.expire(k('sr6'), 100);
+out.setrange_ttl_reply = await client.setRange(k('sr6'), 1, 'Z');
+out.ttl_after_setrange = (ttl => ttl > 0 && ttl <= 100)(await client.ttl(k('sr6')));
+out.get_after_setrange_ttl = await client.get(k('sr6'));
+
+out.incrbyfloat_missing = Number(await client.incrByFloat(k('if1'), 0.5));
+out.get_incrbyfloat_missing = await client.get(k('if1'));
+await client.set(k('if2'), '10.5');
+out.incrbyfloat_integer = Number(await client.incrByFloat(k('if2'), 0.5));
+out.get_incrbyfloat_integer = await client.get(k('if2'));
+await client.set(k('if3'), '1.5');
+out.incrbyfloat_fraction = Number(await client.incrByFloat(k('if3'), 0.25));
+out.get_incrbyfloat_fraction = await client.get(k('if3'));
+await captureError('incrbyfloat_nan', () => client.incrByFloat(k('if4'), 'nan'));
+out.exists_after_nan = await client.exists(k('if4'));
+await captureError('incrbyfloat_positive_inf', () => client.incrByFloat(k('if4'), '+inf'));
+await captureError('incrbyfloat_negative_inf', () => client.incrByFloat(k('if4'), '-inf'));
+await client.set(k('if5'), 'abc');
+await captureError('incrbyfloat_invalid_value', () => client.incrByFloat(k('if5'), 1));
+out.get_after_invalid_value = await client.get(k('if5'));
+await client.set(k('if6'), '1');
+await client.expire(k('if6'), 100);
+out.incrbyfloat_ttl_reply = Number(await client.incrByFloat(k('if6'), 1));
+out.ttl_after_incrbyfloat = (ttl => ttl > 0 && ttl <= 100)(await client.ttl(k('if6')));
+out.get_after_incrbyfloat_ttl = await client.get(k('if6'));
+
+out.setbit_create = await client.setBit(k('sb1'), 7, 1);
+out.getbit_created = Number(await client.getBit(k('sb1'), 7));
+out.getbit_before = Number(await client.getBit(k('sb1'), 6));
+out.bitcount_created = await client.sendCommand(['BITCOUNT', k('sb1')]);
+out.type_setbit = await client.type(k('sb1'));
+out.exists_setbit = await client.exists(k('sb1'));
+await client.set(k('sb2'), 'a');
+out.setbit_previous = await client.setBit(k('sb2'), 1, 1);
+out.get_after_setbit_previous = await client.get(k('sb2'));
+out.setbit_clear = await client.setBit(k('sb2'), 0, 0);
+out.get_after_setbit_clear = await client.get(k('sb2'));
+await captureError('setbit_bad_bit', () => client.setBit(k('sb3'), 1, 2));
+await captureError('setbit_negative_offset', () => client.setBit(k('sb3'), -1, 1));
+out.exists_after_setbit_error = await client.exists(k('sb3'));
+await client.set(k('sb4'), 'a');
+out.getbit_present_one = Number(await client.getBit(k('sb4'), 1));
+out.getbit_present_zero = Number(await client.getBit(k('sb4'), 0));
+out.getbit_past_end = Number(await client.getBit(k('sb4'), 100));
+out.getbit_missing = Number(await client.getBit(k('sb5'), 0));
+
+await client.set(k('bc'), 'foobar');
+out.bitcount_all = await client.sendCommand(['BITCOUNT', k('bc')]);
+out.bitcount_byte_range = await client.sendCommand(['BITCOUNT', k('bc'), '0', '0']);
+out.bitcount_negative_range = await client.sendCommand(['BITCOUNT', k('bc'), '0', '-5']);
+out.bitcount_bit_range = await client.sendCommand(['BITCOUNT', k('bc'), '5', '30', 'BIT']);
+await captureError('bitcount_bad_unit', () => client.sendCommand(['BITCOUNT', k('bc'), '0', '1', 'WORD']));
+out.bitcount_missing = await client.sendCommand(['BITCOUNT', k('bc2')]);
+
+out.bitpos_missing_zero = await client.sendCommand(['BITPOS', k('bp0'), '0']);
+out.bitpos_missing_one = await client.sendCommand(['BITPOS', k('bp1'), '1']);
+await client.set(k('bp'), 'abc');
+out.bitpos_first_zero = await client.sendCommand(['BITPOS', k('bp'), '0']);
+out.bitpos_first_one = await client.sendCommand(['BITPOS', k('bp'), '1']);
+out.bitpos_range = await client.sendCommand(['BITPOS', k('bp'), '1', '1', '1']);
+await client.set(k('bpx'), Buffer.from('ff', 'hex'));
+out.bitpos_range_exhausted = await client.sendCommand(['BITPOS', k('bpx'), '0', '0', '0']);
+out.bitpos_padding = await client.sendCommand(['BITPOS', k('bpx'), '0', '0']);
+out.bitpos_negative_empty_range = await client.sendCommand(['BITPOS', k('bpx'), '0', '-1', '-2']);
+await client.set(k('bpn'), Buffer.from('0001', 'hex'));
+out.bitpos_negative_index = await client.sendCommand(['BITPOS', k('bpn'), '1', '-1']);
+await captureError('bitpos_bad_bit', () => client.sendCommand(['BITPOS', k('bp2'), '2']));
+
+await client.set(k('ap1'), 'abc');
+await client.expire(k('ap1'), 100);
+out.append_ttl_reply = await client.append(k('ap1'), 'def');
+out.get_after_append = await client.get(k('ap1'));
+out.ttl_after_append = (ttl => ttl > 0 && ttl <= 100)(await client.ttl(k('ap1')));
+out.append_missing = await client.append(k('ap2'), 'x');
+out.exists_append_missing = await client.exists(k('ap2'));
+out.strlen_ttl = await client.strLen(k('ap1'));
+out.strlen_missing = await client.strLen(k('ap3'));
+
+await client.setRange(k('dl'), 2, 'ab');
+out.exists_after_setrange = await client.exists(k('dl'));
+out.type_after_setrange = await client.type(k('dl'));
+out.del_after_setrange = await client.del(k('dl'));
+out.exists_after_del = await client.exists(k('dl'));
+
+await client.hSet(k('wt'), 'f', 'v');
+await capture('getrange_wrongtype', () => client.getRange(k('wt'), 0, -1));
+await capture('setrange_wrongtype', () => client.setRange(k('wt'), 0, 'x'));
+await capture('incrbyfloat_wrongtype', () => client.incrByFloat(k('wt'), 1));
+await capture('setbit_wrongtype', () => client.setBit(k('wt'), 0, 1));
+await capture('getbit_wrongtype', () => client.getBit(k('wt'), 0));
+await capture('bitcount_wrongtype', () => client.sendCommand(['BITCOUNT', k('wt')]));
+await capture('bitpos_wrongtype', () => client.sendCommand(['BITPOS', k('wt'), '0']));
+await capture('append_wrongtype', () => client.append(k('wt'), 'x'));
+await capture('strlen_wrongtype', () => client.strLen(k('wt')));
+out.type_wrongtype = await client.type(k('wt'));
+
 await client.quit();
 process.stdout.write(JSON.stringify(out));
 `;
@@ -303,6 +521,13 @@ def capture(name, action):
 
 def k(name):
     return 'p:' + name
+
+
+def capture_error(name, action):
+    try:
+        out[name] = action()
+    except redis.ResponseError as error:
+        out[name] = {'error': str(error).removeprefix('ERR ')}
 
 
 out['hset'] = client.hset(k('h1'), mapping={'f1': 'v1', 'f2': 'v2'})
@@ -451,6 +676,127 @@ client.zadd('d2', {'a': 1})
 out['renamenx_present'] = int(client.renamenx('s2', 'd2'))
 client.set('s3', 'v')
 out['renamenx_moved'] = int(client.renamenx('s3', 'z9'))
+
+client.execute_command('SELECT', 8)
+client.flushdb()
+
+client.set(k('gr'), 'This is a string')
+out['getrange_full'] = client.getrange(k('gr'), 0, -1)
+out['getrange_negative'] = client.getrange(k('gr'), -3, -1)
+out['getrange_clip'] = client.getrange(k('gr'), 10, 100)
+out['getrange_before_start'] = client.getrange(k('gr'), -100, 2)
+out['getrange_missing'] = client.getrange(k('gr2'), 0, -1)
+capture_error('getrange_integer_error', lambda: client.getrange(k('gr'), 0, '1.5'))
+
+out['setrange_zero_fill'] = client.setrange(k('sr'), 3, 'xy')
+out['get_zero_fill'] = client.get(k('sr'))
+client.set(k('sr2'), 'abc')
+out['setrange_overwrite'] = client.setrange(k('sr2'), 1, 'Z')
+out['get_overwrite'] = client.get(k('sr2'))
+out['setrange_empty_missing'] = client.setrange(k('sr3'), 5, '')
+out['exists_empty_missing'] = client.exists(k('sr3'))
+client.set(k('sr4'), 'abcd')
+out['setrange_empty_present'] = client.setrange(k('sr4'), 10, '')
+out['get_after_empty_present'] = client.get(k('sr4'))
+capture_error('setrange_negative', lambda: client.setrange(k('sr5'), -1, 'x'))
+capture_error('setrange_integer_error', lambda: client.setrange(k('sr5'), '1.5', 'x'))
+out['exists_after_setrange_error'] = client.exists(k('sr5'))
+client.set(k('sr6'), 'abc')
+client.expire(k('sr6'), 100)
+out['setrange_ttl_reply'] = client.setrange(k('sr6'), 1, 'Z')
+out['ttl_after_setrange'] = 0 < client.ttl(k('sr6')) <= 100
+out['get_after_setrange_ttl'] = client.get(k('sr6'))
+
+out['incrbyfloat_missing'] = client.incrbyfloat(k('if1'), 0.5)
+out['get_incrbyfloat_missing'] = client.get(k('if1'))
+client.set(k('if2'), '10.5')
+out['incrbyfloat_integer'] = client.incrbyfloat(k('if2'), 0.5)
+out['get_incrbyfloat_integer'] = client.get(k('if2'))
+client.set(k('if3'), '1.5')
+out['incrbyfloat_fraction'] = client.incrbyfloat(k('if3'), 0.25)
+out['get_incrbyfloat_fraction'] = client.get(k('if3'))
+capture_error('incrbyfloat_nan', lambda: client.incrbyfloat(k('if4'), 'nan'))
+out['exists_after_nan'] = client.exists(k('if4'))
+capture_error('incrbyfloat_positive_inf', lambda: client.incrbyfloat(k('if4'), '+inf'))
+capture_error('incrbyfloat_negative_inf', lambda: client.incrbyfloat(k('if4'), '-inf'))
+client.set(k('if5'), 'abc')
+capture_error('incrbyfloat_invalid_value', lambda: client.incrbyfloat(k('if5'), 1))
+out['get_after_invalid_value'] = client.get(k('if5'))
+client.set(k('if6'), '1')
+client.expire(k('if6'), 100)
+out['incrbyfloat_ttl_reply'] = client.incrbyfloat(k('if6'), 1)
+out['ttl_after_incrbyfloat'] = 0 < client.ttl(k('if6')) <= 100
+out['get_after_incrbyfloat_ttl'] = client.get(k('if6'))
+
+out['setbit_create'] = client.setbit(k('sb1'), 7, 1)
+out['getbit_created'] = int(client.getbit(k('sb1'), 7))
+out['getbit_before'] = int(client.getbit(k('sb1'), 6))
+out['bitcount_created'] = client.execute_command('BITCOUNT', k('sb1'))
+out['type_setbit'] = client.type(k('sb1'))
+out['exists_setbit'] = client.exists(k('sb1'))
+client.set(k('sb2'), 'a')
+out['setbit_previous'] = client.setbit(k('sb2'), 1, 1)
+out['get_after_setbit_previous'] = client.get(k('sb2'))
+out['setbit_clear'] = client.setbit(k('sb2'), 0, 0)
+out['get_after_setbit_clear'] = client.get(k('sb2'))
+capture_error('setbit_bad_bit', lambda: client.execute_command('SETBIT', k('sb3'), 1, 2))
+capture_error('setbit_negative_offset', lambda: client.setbit(k('sb3'), -1, 1))
+out['exists_after_setbit_error'] = client.exists(k('sb3'))
+client.set(k('sb4'), 'a')
+out['getbit_present_one'] = int(client.getbit(k('sb4'), 1))
+out['getbit_present_zero'] = int(client.getbit(k('sb4'), 0))
+out['getbit_past_end'] = int(client.getbit(k('sb4'), 100))
+out['getbit_missing'] = int(client.getbit(k('sb5'), 0))
+
+client.set(k('bc'), 'foobar')
+out['bitcount_all'] = client.execute_command('BITCOUNT', k('bc'))
+out['bitcount_byte_range'] = client.execute_command('BITCOUNT', k('bc'), 0, 0)
+out['bitcount_negative_range'] = client.execute_command('BITCOUNT', k('bc'), 0, -5)
+out['bitcount_bit_range'] = client.execute_command('BITCOUNT', k('bc'), 5, 30, 'BIT')
+capture_error('bitcount_bad_unit', lambda: client.execute_command('BITCOUNT', k('bc'), 0, 1, 'WORD'))
+out['bitcount_missing'] = client.execute_command('BITCOUNT', k('bc2'))
+
+out['bitpos_missing_zero'] = client.execute_command('BITPOS', k('bp0'), '0')
+out['bitpos_missing_one'] = client.execute_command('BITPOS', k('bp1'), '1')
+client.set(k('bp'), 'abc')
+out['bitpos_first_zero'] = client.execute_command('BITPOS', k('bp'), '0')
+out['bitpos_first_one'] = client.execute_command('BITPOS', k('bp'), '1')
+out['bitpos_range'] = client.execute_command('BITPOS', k('bp'), '1', '1', '1')
+client.set(k('bpx'), bytes([255]))
+out['bitpos_range_exhausted'] = client.execute_command('BITPOS', k('bpx'), '0', '0', '0')
+out['bitpos_padding'] = client.execute_command('BITPOS', k('bpx'), '0', '0')
+out['bitpos_negative_empty_range'] = client.execute_command('BITPOS', k('bpx'), '0', '-1', '-2')
+client.set(k('bpn'), bytes([0, 1]))
+out['bitpos_negative_index'] = client.execute_command('BITPOS', k('bpn'), '1', '-1')
+capture_error('bitpos_bad_bit', lambda: client.execute_command('BITPOS', k('bp2'), '2'))
+
+client.set(k('ap1'), 'abc')
+client.expire(k('ap1'), 100)
+out['append_ttl_reply'] = client.append(k('ap1'), 'def')
+out['get_after_append'] = client.get(k('ap1'))
+out['ttl_after_append'] = 0 < client.ttl(k('ap1')) <= 100
+out['append_missing'] = client.append(k('ap2'), 'x')
+out['exists_append_missing'] = client.exists(k('ap2'))
+out['strlen_ttl'] = client.strlen(k('ap1'))
+out['strlen_missing'] = client.strlen(k('ap3'))
+
+client.setrange(k('dl'), 2, 'ab')
+out['exists_after_setrange'] = client.exists(k('dl'))
+out['type_after_setrange'] = client.type(k('dl'))
+out['del_after_setrange'] = client.delete(k('dl'))
+out['exists_after_del'] = client.exists(k('dl'))
+
+client.hset(k('wt'), 'f', 'v')
+capture('getrange_wrongtype', lambda: client.getrange(k('wt'), 0, -1))
+capture('setrange_wrongtype', lambda: client.setrange(k('wt'), 0, 'x'))
+capture('incrbyfloat_wrongtype', lambda: client.incrbyfloat(k('wt'), 1))
+capture('setbit_wrongtype', lambda: client.setbit(k('wt'), 0, 1))
+capture('getbit_wrongtype', lambda: client.getbit(k('wt'), 0))
+capture('bitcount_wrongtype', lambda: client.execute_command('BITCOUNT', k('wt')))
+capture('bitpos_wrongtype', lambda: client.execute_command('BITPOS', k('wt'), '0'))
+capture('append_wrongtype', lambda: client.append(k('wt'), 'x'))
+capture('strlen_wrongtype', lambda: client.strlen(k('wt')))
+out['type_wrongtype'] = client.type(k('wt'))
 
 client.close()
 print(json.dumps(out))

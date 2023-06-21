@@ -172,6 +172,75 @@ function scoreText(score) {
     return String(score);
 }
 
+/** Live string bytes, `null` when the key is missing. */
+function readString(store, db, key) {
+    const body = store.getKind(db, SUFFIX.string, key);
+    return body === null || body === undefined ? null : body;
+}
+
+/** Replaces the string bytes while carrying the deadline the key already holds. */
+function rewriteString(store, db, key, body) {
+    const expiresAt = store.deadlineKind(db, SUFFIX.string, key);
+    store.setKind(db, SUFFIX.string, key, body, expiresAt ?? null);
+}
+
+/** Inclusive byte range clamped to `length`, `null` when it selects nothing. */
+function byteRange(start, stop, length) {
+    const begin = start < 0 ? Math.max(0, length + start) : start;
+    const end = stop < 0 ? length + stop : Math.min(stop, length - 1);
+    if (begin > end || begin >= length || end < 0) return null;
+    return [begin, end];
+}
+
+/** Clamps one byte or bit index into the units the value holds. */
+function clampIndex(index, units) {
+    const normalized = index < 0 ? units + index : index;
+    return Math.min(Math.max(normalized, 0), Math.max(units - 1, 0));
+}
+
+/** Reads one bit of `body`, MSB first, answering `0` past the end of the value. */
+function bitAt(body, offset) {
+    const index = Math.floor(offset / 8);
+    if (index >= body.length) return 0;
+    return (body[index] >> (7 - (offset % 8))) & 1;
+}
+
+/** Counts the set bits of an inclusive bit range. */
+function countBitRange(body, begin, end) {
+    let total = 0;
+    for (let offset = begin; offset <= end; offset += 1) {
+        total += bitAt(body, offset);
+    }
+    return total;
+}
+
+const MAX_BIT_OFFSET = 0xffffffff;
+const MAX_STRING = 512 * 1024 * 1024;
+
+/** Parses a canonical bit index in `0..2^32-1`, `null` otherwise. */
+function parseBitOffset(raw) {
+    const value = parseInteger(raw);
+    return value !== null && value >= 0 && value <= MAX_BIT_OFFSET ? value : null;
+}
+
+/**
+ * Parses one float the way `INCRBYFLOAT` reads it.
+ *
+ * Decimal literals and the infinity words are accepted, `NaN` is returned as a
+ * number so the caller can reject it, and anything else answers `null`.
+ */
+function parseFloatText(raw) {
+    const value = text(raw);
+    if (/^[+-]?(?:inf(?:inity)?|nan)$/i.test(value)) {
+        if (/nan/i.test(value)) return NaN;
+        return value.startsWith('-') ? -Infinity : Infinity;
+    }
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value)) {
+        return null;
+    }
+    return Number(value);
+}
+
 /** Live hash fields, `[]` when the hash is missing and `null` when the body is corrupt. */
 function readHash(store, db, key) {
     const body = store.getKind(db, SUFFIX.hash, key);
@@ -472,6 +541,214 @@ function plan(store, session, name, args) {
                     const kind = kindOf(store, session.db, args[1]);
                     if (kind !== null && kind !== 'string') return wrongType();
                     return integer(store.append(session.db, args[1], args[2]));
+                },
+            };
+        }
+
+        case 'getrange': {
+            if (args.length !== 4) return { error: wrongArity('getrange') };
+            const start = parseInteger(args[2]);
+            const stop = parseInteger(args[3]);
+            if (start === null || stop === null) return { error: integerError() };
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const body = readString(store, session.db, args[1]);
+                    if (body === null) return bulk('');
+                    const range = byteRange(start, stop, body.length);
+                    if (range === null) return bulk('');
+                    return bulk(body.subarray(range[0], range[1] + 1));
+                },
+            };
+        }
+
+        case 'setrange': {
+            if (args.length !== 4) return { error: wrongArity('setrange') };
+            const offset = parseInteger(args[2]);
+            if (offset === null) return { error: integerError() };
+            if (offset < 0) return { error: replyError('ERR offset is out of range') };
+            const replacement = args[3];
+            const end = offset + replacement.length;
+            if (end > MAX_STRING) {
+                return { error: replyError('ERR string exceeds maximum allowed size (proto-max-bulk-len)') };
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const current = readString(store, session.db, args[1]);
+                    if (replacement.length === 0) return integer(current === null ? 0 : current.length);
+                    const length = Math.max(current === null ? 0 : current.length, end);
+                    const body = Buffer.alloc(length);
+                    if (current !== null) current.copy(body, 0);
+                    replacement.copy(body, offset);
+                    rewriteString(store, session.db, args[1], body);
+                    return integer(length);
+                },
+            };
+        }
+
+        case 'incrbyfloat': {
+            if (args.length !== 3) return { error: wrongArity('incrbyfloat') };
+            const increment = parseFloatText(args[2]);
+            if (increment === null || Number.isNaN(increment)) {
+                return { error: replyError('ERR value is not a valid float') };
+            }
+            const key = args[1];
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, key);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const current = readString(store, session.db, key);
+                    let value = 0;
+                    if (current !== null) {
+                        const parsed = parseFloatText(current);
+                        if (parsed === null || Number.isNaN(parsed)) {
+                            return replyError('ERR value is not a valid float');
+                        }
+                        value = parsed;
+                    }
+                    const updated = value + increment;
+                    if (!Number.isFinite(updated)) {
+                        return replyError('ERR increment would produce NaN or Infinity');
+                    }
+                    const result = scoreText(updated);
+                    rewriteString(store, session.db, key, Buffer.from(result));
+                    return bulk(result);
+                },
+            };
+        }
+
+        case 'setbit': {
+            if (args.length !== 4) return { error: wrongArity('setbit') };
+            const offset = parseBitOffset(args[2]);
+            if (offset === null) {
+                return { error: replyError('ERR bit offset is not an integer or out of range') };
+            }
+            const bitText = text(args[3]);
+            if (bitText !== '0' && bitText !== '1') {
+                return { error: replyError('ERR bit is not an integer or out of range') };
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const current = readString(store, session.db, args[1]);
+                    const index = Math.floor(offset / 8);
+                    const length = Math.max(current === null ? 0 : current.length, index + 1);
+                    const body = Buffer.alloc(length);
+                    if (current !== null) current.copy(body, 0);
+                    const mask = 1 << (7 - (offset % 8));
+                    const previous = (body[index] & mask) === 0 ? 0 : 1;
+                    if (bitText === '1') {
+                        body[index] |= mask;
+                    }
+                    else {
+                        body[index] &= ~mask;
+                    }
+                    rewriteString(store, session.db, args[1], body);
+                    return integer(previous);
+                },
+            };
+        }
+
+        case 'getbit': {
+            if (args.length !== 3) return { error: wrongArity('getbit') };
+            const offset = parseBitOffset(args[2]);
+            if (offset === null) {
+                return { error: replyError('ERR bit offset is not an integer or out of range') };
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const body = readString(store, session.db, args[1]);
+                    return integer(body === null ? 0 : bitAt(body, offset));
+                },
+            };
+        }
+
+        case 'bitcount': {
+            if (args.length !== 2 && args.length !== 4 && args.length !== 5) {
+                return { error: wrongArity('bitcount') };
+            }
+            let bitUnit = false;
+            if (args.length === 5) {
+                const unitText = text(args[4]).toLowerCase();
+                if (unitText !== 'byte' && unitText !== 'bit') {
+                    return { error: replyError('ERR syntax error') };
+                }
+                bitUnit = unitText === 'bit';
+            }
+            let start = null;
+            let stop = null;
+            if (args.length >= 4) {
+                start = parseInteger(args[2]);
+                stop = parseInteger(args[3]);
+                if (start === null || stop === null) return { error: integerError() };
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const body = readString(store, session.db, args[1]);
+                    if (body === null) return integer(0);
+                    if (start === null) return integer(countBitRange(body, 0, body.length * 8 - 1));
+                    const units = bitUnit ? body.length * 8 : body.length;
+                    const range = byteRange(start, stop, units);
+                    if (range === null) return integer(0);
+                    if (bitUnit) return integer(countBitRange(body, range[0], range[1]));
+                    return integer(countBitRange(body, range[0] * 8, range[1] * 8 + 7));
+                },
+            };
+        }
+
+        case 'bitpos': {
+            if (args.length < 3 || args.length > 6) return { error: wrongArity('bitpos') };
+            const target = text(args[2]);
+            if (target !== '0' && target !== '1') {
+                return { error: replyError('ERR The bit argument must be 1 or 0') };
+            }
+            let bitUnit = false;
+            if (args.length === 6) {
+                const unitText = text(args[5]).toLowerCase();
+                if (unitText !== 'byte' && unitText !== 'bit') {
+                    return { error: replyError('ERR syntax error') };
+                }
+                bitUnit = unitText === 'bit';
+            }
+            let start = null;
+            let stop = null;
+            if (args.length >= 4) {
+                start = parseInteger(args[3]);
+                if (start === null) return { error: integerError() };
+            }
+            if (args.length >= 5) {
+                stop = parseInteger(args[4]);
+                if (stop === null) return { error: integerError() };
+            }
+            const wanted = target === '1' ? 1 : 0;
+            const endGiven = stop !== null;
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind !== null && kind !== 'string') return wrongType();
+                    const body = readString(store, session.db, args[1]);
+                    if (body === null) return integer(wanted === 0 ? 0 : -1);
+                    if (start !== null && stop !== null && start < 0 && stop < 0 && start > stop) {
+                        return integer(-1);
+                    }
+                    const units = bitUnit ? body.length * 8 : body.length;
+                    const begin = start === null ? 0 : clampIndex(start, units);
+                    const end = stop === null ? units - 1 : clampIndex(stop, units);
+                    if (begin > end) return integer(-1);
+                    const first = bitUnit ? begin : begin * 8;
+                    const last = bitUnit ? end : end * 8 + 7;
+                    for (let offset = first; offset <= last; offset += 1) {
+                        if (bitAt(body, offset) === wanted) return integer(offset);
+                    }
+                    return integer(wanted === 0 && !endGiven ? body.length * 8 : -1);
                 },
             };
         }

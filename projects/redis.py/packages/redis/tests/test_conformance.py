@@ -181,6 +181,27 @@ def run_steps(store, steps, directory):
     return seen
 
 
+def _canonical_int(text):
+    try:
+        return int(text)
+    except (ValueError, TypeError):
+        return None
+
+
+def _string_body(store, db, key):
+    value = store.get(db, key)
+    return b"" if value is None else value
+
+
+def _write_string(store, db, key, value):
+    """Rewrites the string bytes while carrying the deadline the key already holds."""
+    store.set(db, key, value, store.deadline(db, key))
+
+
+def _wrong_type(store, db, key):
+    return any(store.exists_kind(db, kind, key) for kind in ("hash", "list", "set", "zset"))
+
+
 def py_command(store, db, args):
     """Drives the documented command semantics through the exported primitives.
 
@@ -189,6 +210,7 @@ def py_command(store, db, args):
     same literal post-state expectations the TypeScript dispatcher is checked
     against.
     """
+    import math
     import time
 
     name = args[0].decode().upper()
@@ -210,7 +232,50 @@ def py_command(store, db, args):
     elif name == "GETDEL" and len(rest) == 1:
         store.delete(db, rest[0])
     elif name == "APPEND" and len(rest) == 2:
-        store.append(db, rest[0], rest[1])
+        if not _wrong_type(store, db, rest[0]):
+            store.append(db, rest[0], rest[1])
+    elif name == "SETRANGE" and len(rest) == 3:
+        offset = _canonical_int(rest[1].decode())
+        if offset is not None and offset >= 0 and not _wrong_type(store, db, rest[0]):
+            replacement = rest[2]
+            if replacement:
+                body = bytearray(_string_body(store, db, rest[0]))
+                if len(body) < offset:
+                    body.extend(bytes(offset - len(body)))
+                body[offset:offset + len(replacement)] = replacement
+                _write_string(store, db, rest[0], bytes(body))
+    elif name == "INCRBYFLOAT" and len(rest) == 2:
+        if not _wrong_type(store, db, rest[0]):
+            try:
+                increment = float(rest[1].decode())
+            except (ValueError, TypeError):
+                increment = None
+            if increment is not None and math.isfinite(increment):
+                try:
+                    current = float(_string_body(store, db, rest[0]).decode()) if store.exists(db, rest[0]) else 0.0
+                except ValueError:
+                    current = None
+                if current is not None and math.isfinite(current):
+                    result = current + increment
+                    if math.isfinite(result):
+                        text = repr(result)
+                        if text.endswith(".0"):
+                            text = text[:-2]
+                        _write_string(store, db, rest[0], text.encode())
+    elif name == "SETBIT" and len(rest) == 3:
+        offset = _canonical_int(rest[1].decode())
+        bit = rest[2].decode()
+        if offset is not None and 0 <= offset <= 0xffffffff and bit in ("0", "1") and not _wrong_type(store, db, rest[0]):
+            body = bytearray(_string_body(store, db, rest[0]))
+            index = offset // 8
+            if len(body) <= index:
+                body.extend(bytes(index + 1 - len(body)))
+            shift = 7 - offset % 8
+            if bit == "1":
+                body[index] |= 1 << shift
+            else:
+                body[index] &= ~(1 << shift) & 0xff
+            _write_string(store, db, rest[0], bytes(body))
     elif name == "DEL":
         for key in rest:
             store.delete(db, key)

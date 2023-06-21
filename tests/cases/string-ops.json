@@ -1,0 +1,1839 @@
+{
+  "table": "string-ops",
+  "cases": [
+    {
+      "id": "command.getrange.full",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "0",
+        "-1"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          84,
+          104,
+          105,
+          115,
+          32,
+          105,
+          115,
+          32,
+          97,
+          32,
+          115,
+          116,
+          114,
+          105,
+          110,
+          103
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "54686973206973206120737472696e67"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "54686973206973206120737472696e67"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getrange.negative",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "-3",
+        "-1"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          105,
+          110,
+          103
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "54686973206973206120737472696e67"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "54686973206973206120737472696e67"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getrange.clip",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "10",
+        "100"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          115,
+          116,
+          114,
+          105,
+          110,
+          103
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "54686973206973206120737472696e67"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "54686973206973206120737472696e67"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getrange.before-start",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "-100",
+        "2"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          84,
+          104,
+          105
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "54686973206973206120737472696e67"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "54686973206973206120737472696e67"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getrange.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "0",
+        "-1"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": []
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getrange.integer-error",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "0",
+        "1.5"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.zero-fill",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "3",
+        "xy"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 5
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "0000007879"
+          }
+        },
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.overwrite",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "1",
+        "Z"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "615a63"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.empty-missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "5",
+        ""
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.empty-present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "10",
+        ""
+      ],
+      "reply": {
+        "type": "int",
+        "value": 4
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61626364"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "61626364"
+          }
+        },
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.negative",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "-1",
+        "x"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR offset is out of range"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.integer-error",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "1.5",
+        "x"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.ttl",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "1",
+        "Z"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "615a63"
+          }
+        },
+        {
+          "call": "deadline_set",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "0.5"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          48,
+          46,
+          53
+        ]
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "302e35"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.integer-result",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "0.5"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          49,
+          49
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "31302e35"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "3131"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.fraction",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "0.25"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          49,
+          46,
+          55,
+          53
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "312e35"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "312e3735"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.nan",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "nan"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not a valid float"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.positive-inf",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "+inf"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR increment would produce NaN or Infinity"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.negative-inf",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "-inf"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR increment would produce NaN or Infinity"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.invalid-value",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not a valid float"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.ttl",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "1"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          50
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "31",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "32"
+          }
+        },
+        {
+          "call": "deadline_set",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setbit.create",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETBIT",
+        "k",
+        "7",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "01"
+          }
+        },
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setbit.previous",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETBIT",
+        "k",
+        "1",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "61"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setbit.clear",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETBIT",
+        "k",
+        "0",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "61"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setbit.bad-bit",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETBIT",
+        "k",
+        "1",
+        "2"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR bit is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setbit.negative-offset",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETBIT",
+        "k",
+        "-1",
+        "1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR bit offset is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getbit.present-one",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETBIT",
+        "k",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "61"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getbit.present-zero",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETBIT",
+        "k",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "61"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getbit.past-end",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETBIT",
+        "k",
+        "100"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "61"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getbit.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETBIT",
+        "k",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.all",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 26
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "666f6f626172"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "666f6f626172"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.byte-range",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k",
+        "0",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 4
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "666f6f626172"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "666f6f626172"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.negative-range",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k",
+        "0",
+        "-5"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 10
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "666f6f626172"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "666f6f626172"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.bit-range",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k",
+        "5",
+        "30",
+        "BIT"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 17
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "666f6f626172"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "666f6f626172"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.syntax",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k",
+        "0",
+        "1",
+        "WORD"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.missing-zero",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.missing-one",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -1
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.first-zero",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.first-one",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.range",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "1",
+        "1",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 9
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.range-exhausted",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "0",
+        "0",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -1
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "ff"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "ff"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.padding",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "0",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 8
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "ff"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "ff"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.negative-empty-range",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "0",
+        "-1",
+        "-2"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -1
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "fff0"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "fff0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.negative-index",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "1",
+        "-1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 15
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "0001"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "0001"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.bad-bit",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "2"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR The bit argument must be 1 or 0"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.append.ttl",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "APPEND",
+        "k",
+        "def"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 6
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263646566"
+          }
+        },
+        {
+          "call": "deadline_set",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.strlen.present-ttl",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "STRLEN",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "deadline_set",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.strlen.empty",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "STRLEN",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": ""
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists",
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setrange.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETRANGE",
+        "k",
+        "0",
+        "x"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.getrange.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETRANGE",
+        "k",
+        "0",
+        "-1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.incrbyfloat.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBYFLOAT",
+        "k",
+        "1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.setbit.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETBIT",
+        "k",
+        "0",
+        "1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitcount.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITCOUNT",
+        "k"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.bitpos.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "BITPOS",
+        "k",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.append.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "APPEND",
+        "k",
+        "x"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.strlen.wrongtype",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "STRLEN",
+        "k"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "00"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    }
+  ]
+}
