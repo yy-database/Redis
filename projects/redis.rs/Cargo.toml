@@ -18,8 +18,8 @@ repository = "https://github.com/yy-database/Redis"
 # Upstream byte layouts for the `.yyds` catalog and the `.yykv` shard, pinned to
 # the `dev` tip that carries all five Redis value kinds, `SCAN`, `RENAME` and the
 # string range, float and bit command family.
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "0491c7cbf5e0456526771d086f5c1eca648bc78b", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "0491c7cbf5e0456526771d086f5c1eca648bc78b", package = "database-types" }
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "cb0cfeb4d7c6cf5f2ced93b7baa817f823e343ec", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "cb0cfeb4d7c6cf5f2ced93b7baa817f823e343ec", package = "database-types" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"
