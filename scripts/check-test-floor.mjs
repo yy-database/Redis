@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 // Minimum executed cases per side, held a few cases below the current count so
 // a small refactor does not trip the gate while a real regression still does.
-const FLOORS = { ts: 593, py: 431 };
+const FLOORS = { ts: 620, py: 431 };
 
 function usage() {
     return 'usage: node scripts/check-test-floor.mjs --kind ts|py -- <command...>';

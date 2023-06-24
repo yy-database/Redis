@@ -491,7 +491,7 @@
       "steps": [
         {
           "argsText": [
-            "SINTER",
+            "LPOS",
             "k",
             "v"
           ],

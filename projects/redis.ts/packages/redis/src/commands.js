@@ -771,12 +771,24 @@ function plan(store, session, name, args) {
         case 'smembers':
         case 'scard':
         case 'sismember':
+        case 'smove':
+        case 'srandmember':
+        case 'sscan':
         case 'zadd':
         case 'zscore':
         case 'zrem':
         case 'zcard':
         case 'zrange':
             return planCollection(store, session, name, args);
+
+        case 'sinter':
+        case 'sintercard':
+        case 'sunion':
+        case 'sdiff':
+        case 'sinterstore':
+        case 'sunionstore':
+        case 'sdiffstore':
+            return planSetAggregate(store, session, name, args);
 
         case 'incr':
             if (args.length !== 2) return { error: plainArity() };
@@ -1163,6 +1175,191 @@ function incremental(store, session, key, delta) {
 }
 
 /**
+ * Plans one set aggregate: intersection, union or difference, optionally stored.
+ *
+ * The `*STORE` forms read the sources first, so a wrong type aborts before the
+ * destination is touched, then drop every representation of the destination
+ * because a store resets its value and its deadline.
+ */
+function planSetAggregate(store, session, name, args) {
+    if (name === 'sintercard') return planSInterCard(store, session, args);
+    const keeps = name.endsWith('store');
+    if (keeps ? args.length < 3 : args.length < 2) {
+        return { error: wrongArity(name) };
+    }
+    const destination = keeps ? args[1] : null;
+    const keys = keeps ? args.slice(2) : args.slice(1);
+    const db = session.db;
+    return {
+        run: () => {
+            const sets = readSetsForAggregate(store, db, keys);
+            if (sets === null) return wrongType();
+            let result;
+            if (name.startsWith('sinter')) {
+                result = intersectMembers(sets);
+            }
+            else if (name.startsWith('sunion')) {
+                result = uniqueMembers(sets.flat());
+            }
+            else {
+                result = differenceMembers(sets);
+            }
+            if (!keeps) return array(result.map(member => bulk(member)));
+            dropEveryKind(store, db, destination);
+            if (result.length === 0) return integer(0);
+            const body = encodeSet(result);
+            if (body === null) return replyError('ERR set value exceeds the storage limit');
+            store.setKind(db, 'set', destination, body, null);
+            return integer(result.length);
+        },
+    };
+}
+
+/** Reads every named set, `null` when one of them holds another kind or a corrupt body. */
+function readSetsForAggregate(store, db, keys) {
+    const sets = [];
+    for (const key of keys) {
+        const kind = kindOf(store, db, key);
+        if (kind === null) {
+            sets.push([]);
+            continue;
+        }
+        if (kind !== 'set') return null;
+        const members = readSet(store, db, key);
+        if (members === null) return null;
+        sets.push(members);
+    }
+    return sets;
+}
+
+function uniqueMembers(members) {
+    const seen = [];
+    for (const member of members) {
+        if (!seen.some(existing => existing.equals(member))) seen.push(member);
+    }
+    return seen;
+}
+
+function intersectMembers(sets) {
+    if (sets.length === 0) return [];
+    return uniqueMembers(sets[0]).filter(member => sets.every(set => set.some(entry => entry.equals(member))));
+}
+
+function differenceMembers(sets) {
+    if (sets.length === 0) return [];
+    return uniqueMembers(sets[0]).filter(member => !sets.slice(1).some(set => set.some(entry => entry.equals(member))));
+}
+
+/** Plans `SINTERCARD`, whose keys are counted from a leading length and may carry `LIMIT`. */
+function planSInterCard(store, session, args) {
+    if (args.length < 3) return { error: wrongArity('sintercard') };
+    const count = parseInteger(args[1]);
+    if (count === null || count <= 0) {
+        return { error: replyError('ERR numkeys should be greater than 0') };
+    }
+    if (count > args.length - 2) {
+        return { error: replyError("ERR Number of keys can't be greater than number of args") };
+    }
+    let limit = 0;
+    const index = 2 + count;
+    if (index < args.length) {
+        if (text(args[index]).toLowerCase() !== 'limit' || index + 2 !== args.length) {
+            return { error: replyError('ERR syntax error') };
+        }
+        limit = parseInteger(args[index + 1]);
+        if (limit === null || limit < 0) return { error: replyError("ERR LIMIT can't be negative") };
+    }
+    const keys = args.slice(2, 2 + count);
+    const db = session.db;
+    return {
+        run: () => {
+            const sets = readSetsForAggregate(store, db, keys);
+            if (sets === null) return wrongType();
+            const found = intersectMembers(sets).length;
+            return integer(limit > 0 ? Math.min(found, limit) : found);
+        },
+    };
+}
+
+/** Removes every representation of one logical key, whatever kind currently holds it. */
+function dropEveryKind(store, db, key) {
+    for (const kind of KINDS) {
+        store.deleteKind(db, SUFFIX[kind], key);
+    }
+}
+
+/** Parses one `SSCAN`-style cursor in canonical decimal form, `null` when it is not. */
+function parseScanCursor(raw) {
+    const cursorText = text(raw);
+    if (!/^\d+$/.test(cursorText)) return null;
+    const cursor = Number(cursorText);
+    return Number.isFinite(cursor) ? cursor : null;
+}
+
+/** Parses `MATCH` and `COUNT` options shared by the collection scans. */
+function parseScanOptions(args, from) {
+    let pattern = null;
+    let count = 10;
+    for (let index = from; index < args.length; index += 2) {
+        const option = text(args[index]).toLowerCase();
+        const raw = args[index + 1];
+        if (raw === undefined) return { error: replyError('ERR syntax error') };
+        if (option === 'match') {
+            pattern = raw;
+            continue;
+        }
+        if (option === 'count') {
+            const amount = parseInteger(raw);
+            if (amount === null || amount <= 0) return { error: replyError('ERR syntax error') };
+            count = amount;
+            continue;
+        }
+        return { error: replyError('ERR syntax error') };
+    }
+    return { pattern, count };
+}
+
+/** Pages one collection scan by cursor, filtering and rendering each selected entry. */
+function scanReply(entries, cursor, count, pattern, subject, render) {
+    const start = Math.min(cursor, entries.length);
+    if (start >= entries.length) return array([bulk('0'), array([])]);
+    const end = Math.min(start + count, entries.length);
+    const next = end >= entries.length ? '0' : String(end);
+    const page = [];
+    for (let index = start; index < end; index += 1) {
+        const entry = entries[index];
+        if (pattern !== null && !globMatch(pattern, subject(entry))) continue;
+        page.push(...render(entry));
+    }
+    return array([bulk(next), array(page)]);
+}
+
+/** Picks one random member, `null` when the collection is empty. */
+function randomMember(members) {
+    if (members.length === 0) return null;
+    return members[Math.floor(Math.random() * members.length)];
+}
+
+/** Samples `count` members: positive counts are unique, negative counts allow repeats. */
+function sampleMembers(members, count) {
+    if (count === 0 || members.length === 0) return [];
+    if (count < 0) {
+        const picks = [];
+        for (let index = 0; index < -count; index += 1) picks.push(randomMember(members));
+        return picks;
+    }
+    const pool = members.slice();
+    const take = Math.min(count, pool.length);
+    for (let index = 0; index < take; index += 1) {
+        const swap = index + Math.floor(Math.random() * (pool.length - index));
+        const held = pool[index];
+        pool[index] = pool[swap];
+        pool[swap] = held;
+    }
+    return pool.slice(0, take);
+}
+
+/**
  * Plans one hash or list command.
  *
  * The hash and list kinds keep their fields and elements in one opaque value
@@ -1519,6 +1716,81 @@ function planCollection(store, session, name, args) {
                     const members = readSet(store, db, key);
                     if (members === null) return replyError('ERR stored set value is corrupt');
                     return integer(members.some(member => member.equals(args[2])) ? 1 : 0);
+                },
+            };
+        }
+
+        case 'smove': {
+            if (args.length !== 4) return { error: wrongArity('smove') };
+            const source = args[1];
+            const destination = args[2];
+            const member = args[3];
+            return {
+                run: () => {
+                    const sourceKind = kindOf(store, db, source);
+                    const destinationKind = kindOf(store, db, destination);
+                    if ((sourceKind !== null && sourceKind !== 'set')
+                        || (destinationKind !== null && destinationKind !== 'set')) {
+                        return wrongType();
+                    }
+                    if (sourceKind === null) return integer(0);
+                    const sourceMembers = readSet(store, db, source);
+                    if (sourceMembers === null) return replyError('ERR stored set value is corrupt');
+                    const position = sourceMembers.findIndex(entry => entry.equals(member));
+                    if (position < 0) return integer(0);
+                    if (source.equals(destination)) return integer(1);
+                    const kept = sourceMembers.filter((entry, index) => index !== position);
+                    if (kept.length === 0) {
+                        store.deleteKind(db, SUFFIX.set, source);
+                    }
+                    else {
+                        const body = encodeSet(kept);
+                        if (body === null) return replyError('ERR set value exceeds the storage limit');
+                        rewriteKind(store, db, 'set', source, body);
+                    }
+                    const destinationMembers = destinationKind === null ? [] : readSet(store, db, destination);
+                    if (destinationMembers === null) return replyError('ERR stored set value is corrupt');
+                    if (!destinationMembers.some(entry => entry.equals(member))) destinationMembers.push(member);
+                    const body = encodeSet(destinationMembers);
+                    if (body === null) return replyError('ERR set value exceeds the storage limit');
+                    rewriteKind(store, db, 'set', destination, body);
+                    return integer(1);
+                },
+            };
+        }
+
+        case 'srandmember': {
+            if (args.length !== 2 && args.length !== 3) return { error: wrongArity('srandmember') };
+            let count = null;
+            if (args.length === 3) {
+                count = parseInteger(args[2]);
+                if (count === null) return { error: integerError() };
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'set') return wrongType();
+                    const members = kind === null ? [] : readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    if (count === null) return members.length === 0 ? nullReply() : bulk(randomMember(members));
+                    return array(sampleMembers(members, count).map(member => bulk(member)));
+                },
+            };
+        }
+
+        case 'sscan': {
+            if (args.length < 3) return { error: wrongArity('sscan') };
+            const cursor = parseScanCursor(args[2]);
+            if (cursor === null) return { error: replyError('ERR invalid cursor') };
+            const options = parseScanOptions(args, 3);
+            if (options.error !== undefined) return { error: options.error };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'set') return wrongType();
+                    const members = kind === null ? [] : readSet(store, db, key);
+                    if (members === null) return replyError('ERR stored set value is corrupt');
+                    return scanReply(members, cursor, options.count, options.pattern, member => member, member => [bulk(member)]);
                 },
             };
         }

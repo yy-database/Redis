@@ -196,6 +196,38 @@ const EXPECTED = {
     append_wrongtype: { error: WRONG_TYPE },
     strlen_wrongtype: { error: WRONG_TYPE },
     type_wrongtype: 'hash',
+    s_inter: ['b', 'c'],
+    s_inter_missing: [],
+    s_inter_wrongtype: { error: WRONG_TYPE },
+    s_intercard: 2,
+    s_intercard_limit: 1,
+    s_intercard_zero: { error: 'numkeys should be greater than 0' },
+    s_intercard_bad_keys: { error: "Number of keys can't be greater than number of args" },
+    s_intercard_bad_limit: { error: "LIMIT can't be negative" },
+    s_union: ['a', 'b', 'c', 'd'],
+    s_diff: ['a'],
+    s_interstore: 2,
+    s_interstore_members: ['b', 'c'],
+    s_interstore_ttl: true,
+    s_sunionstore: 4,
+    s_sunionstore_members: ['a', 'b', 'c', 'd'],
+    s_sdiffstore: 1,
+    s_sdiffstore_members: ['a'],
+    s_store_type: 'set',
+    s_move: 1,
+    s_move_src: ['a'],
+    s_move_dst_has: 1,
+    s_move_missing: 0,
+    s_move_wrongtype: { error: WRONG_TYPE },
+    s_rand_single: 'a',
+    s_rand_missing: null,
+    s_rand_count: ['a'],
+    s_rand_negative: ['a', 'a', 'a'],
+    s_rand_wrongtype: { error: WRONG_TYPE },
+    s_scan: ['2', ['a', 'b']],
+    s_scan_match: ['2', ['a']],
+    s_scan_missing: ['0', []],
+    s_scan_wrongtype: { error: WRONG_TYPE },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -493,6 +525,58 @@ await capture('bitpos_wrongtype', () => client.sendCommand(['BITPOS', k('wt'), '
 await capture('append_wrongtype', () => client.append(k('wt'), 'x'));
 await capture('strlen_wrongtype', () => client.strLen(k('wt')));
 out.type_wrongtype = await client.type(k('wt'));
+
+await client.select(9);
+await client.flushDb();
+await client.sAdd(k('sa'), ['a', 'b', 'c']);
+await client.sAdd(k('sb'), ['b', 'c', 'd']);
+out.s_inter = await client.sInter([k('sa'), k('sb')]);
+out.s_inter_missing = await client.sInter([k('sa'), k('sc')]);
+await client.set(k('swt'), 'v');
+await capture('s_inter_wrongtype', () => client.sInter([k('sa'), k('swt')]));
+out.s_intercard = await client.sendCommand(['SINTERCARD', '2', k('sa'), k('sb')]);
+out.s_intercard_limit = await client.sendCommand(['SINTERCARD', '2', k('sa'), k('sb'), 'LIMIT', '1']);
+await captureError('s_intercard_zero', () => client.sendCommand(['SINTERCARD', '0', k('sa')]));
+await captureError('s_intercard_bad_keys', () => client.sendCommand(['SINTERCARD', '3', k('sa'), k('sb')]));
+await captureError('s_intercard_bad_limit', () => client.sendCommand(['SINTERCARD', '1', k('sa'), 'LIMIT', '-1']));
+out.s_union = await client.sUnion([k('sa'), k('sb')]);
+out.s_diff = await client.sDiff([k('sa'), k('sb')]);
+await client.sAdd(k('sd'), ['x']);
+await client.expire(k('sd'), 100);
+out.s_interstore = await client.sInterStore(k('sd'), [k('sa'), k('sb')]);
+out.s_interstore_members = (await client.sMembers(k('sd'))).sort();
+out.s_interstore_ttl = (await client.ttl(k('sd')) === -1);
+out.s_sunionstore = await client.sUnionStore(k('su'), [k('sa'), k('sb')]);
+out.s_sunionstore_members = (await client.sMembers(k('su'))).sort();
+out.s_sdiffstore = await client.sDiffStore(k('sf'), [k('sa'), k('sb')]);
+out.s_sdiffstore_members = (await client.sMembers(k('sf'))).sort();
+out.s_store_type = await client.type(k('sd'));
+
+await client.sAdd(k('ms'), ['a', 'b']);
+await client.sAdd(k('md'), ['c']);
+out.s_move = Number(await client.sMove(k('ms'), k('md'), 'b'));
+out.s_move_src = await client.sMembers(k('ms'));
+out.s_move_dst_has = Number(await client.sIsMember(k('md'), 'b'));
+out.s_move_missing = Number(await client.sMove(k('me'), k('md'), 'x'));
+await client.set(k('smt'), 'v');
+await capture('s_move_wrongtype', () => client.sMove(k('ms'), k('smt'), 'a'));
+
+await client.sAdd(k('sra'), ['a']);
+out.s_rand_single = await client.sRandMember(k('sra'));
+out.s_rand_missing = await client.sRandMember(k('srn'));
+out.s_rand_count = await client.sendCommand(['SRANDMEMBER', k('sra'), '2']);
+out.s_rand_negative = await client.sendCommand(['SRANDMEMBER', k('sra'), '-3']);
+await client.set(k('srw'), 'v');
+await capture('s_rand_wrongtype', () => client.sRandMember(k('srw'), 1));
+
+await client.sAdd(k('sc1'), ['a', 'b', 'c']);
+const sscan = await client.sScan(k('sc1'), 0, { COUNT: 2 });
+out.s_scan = [String(sscan.cursor), sscan.members];
+const sscanMatch = await client.sScan(k('sc1'), 0, { MATCH: 'a*', COUNT: 2 });
+out.s_scan_match = [String(sscanMatch.cursor), sscanMatch.members];
+const sscanMissing = await client.sScan(k('sc9'), 0);
+out.s_scan_missing = [String(sscanMissing.cursor), sscanMissing.members];
+await capture('s_scan_wrongtype', () => client.sScan(k('smt'), 0));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -797,6 +881,58 @@ capture('bitpos_wrongtype', lambda: client.execute_command('BITPOS', k('wt'), '0
 capture('append_wrongtype', lambda: client.append(k('wt'), 'x'))
 capture('strlen_wrongtype', lambda: client.strlen(k('wt')))
 out['type_wrongtype'] = client.type(k('wt'))
+
+client.execute_command('SELECT', 9)
+client.flushdb()
+client.sadd(k('sa'), 'a', 'b', 'c')
+client.sadd(k('sb'), 'b', 'c', 'd')
+out['s_inter'] = sorted(client.sinter(k('sa'), k('sb')))
+out['s_inter_missing'] = sorted(client.sinter(k('sa'), k('sc')))
+client.set(k('swt'), 'v')
+capture('s_inter_wrongtype', lambda: client.sinter(k('sa'), k('swt')))
+out['s_intercard'] = client.execute_command('SINTERCARD', 2, k('sa'), k('sb'))
+out['s_intercard_limit'] = client.execute_command('SINTERCARD', 2, k('sa'), k('sb'), 'LIMIT', 1)
+capture_error('s_intercard_zero', lambda: client.execute_command('SINTERCARD', 0, k('sa')))
+capture_error('s_intercard_bad_keys', lambda: client.execute_command('SINTERCARD', 3, k('sa'), k('sb')))
+capture_error('s_intercard_bad_limit', lambda: client.execute_command('SINTERCARD', 1, k('sa'), 'LIMIT', -1))
+out['s_union'] = sorted(client.sunion(k('sa'), k('sb')))
+out['s_diff'] = sorted(client.sdiff(k('sa'), k('sb')))
+client.sadd(k('sd'), 'x')
+client.expire(k('sd'), 100)
+out['s_interstore'] = client.sinterstore(k('sd'), (k('sa'), k('sb')))
+out['s_interstore_members'] = sorted(client.smembers(k('sd')))
+out['s_interstore_ttl'] = client.ttl(k('sd')) == -1
+out['s_sunionstore'] = client.sunionstore(k('su'), (k('sa'), k('sb')))
+out['s_sunionstore_members'] = sorted(client.smembers(k('su')))
+out['s_sdiffstore'] = client.sdiffstore(k('sf'), (k('sa'), k('sb')))
+out['s_sdiffstore_members'] = sorted(client.smembers(k('sf')))
+out['s_store_type'] = client.type(k('sd'))
+
+client.sadd(k('ms'), 'a', 'b')
+client.sadd(k('md'), 'c')
+out['s_move'] = int(client.smove(k('ms'), k('md'), 'b'))
+out['s_move_src'] = sorted(client.smembers(k('ms')))
+out['s_move_dst_has'] = int(client.sismember(k('md'), 'b'))
+out['s_move_missing'] = int(client.smove(k('me'), k('md'), 'x'))
+client.set(k('smt'), 'v')
+capture('s_move_wrongtype', lambda: client.smove(k('ms'), k('smt'), 'a'))
+
+client.sadd(k('sra'), 'a')
+out['s_rand_single'] = client.srandmember(k('sra'))
+out['s_rand_missing'] = client.srandmember(k('srn'))
+out['s_rand_count'] = client.execute_command('SRANDMEMBER', k('sra'), 2)
+out['s_rand_negative'] = client.execute_command('SRANDMEMBER', k('sra'), -3)
+client.set(k('srw'), 'v')
+capture('s_rand_wrongtype', lambda: client.srandmember(k('srw'), 1))
+
+client.sadd(k('sc1'), 'a', 'b', 'c')
+cursor, members = client.sscan(k('sc1'), 0, count=2)
+out['s_scan'] = [str(cursor), members]
+cursor, members = client.sscan(k('sc1'), 0, match='a*', count=2)
+out['s_scan_match'] = [str(cursor), members]
+cursor, members = client.sscan(k('sc9'), 0)
+out['s_scan_missing'] = [str(cursor), members]
+capture('s_scan_wrongtype', lambda: client.sscan(k('smt'), 0))
 
 client.close()
 print(json.dumps(out))

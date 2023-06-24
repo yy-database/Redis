@@ -1,0 +1,509 @@
+{
+  "format": "redis.case/v1",
+  "table": "set-algebra",
+  "cases": [
+    {
+      "id": "command.sinter.basic",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTER", "a1", "a2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [99] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sinter.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTER", "a1", "a9"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sinter.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTER", "a1", "a2"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set", "db": 0, "keyHex": "6132", "valueHex": "76" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.sintercard.counts",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "2", "a1", "a2"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sintercard.limit",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "2", "a1", "a2", "LIMIT", "1"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sintercard.limit-zero",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "2", "a1", "a2", "LIMIT", "0"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sintercard.zero-numkeys",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "0", "a1"],
+      "reply": { "type": "error", "value": "ERR numkeys should be greater than 0" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.sintercard.too-many-keys",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "3", "a1", "a2"],
+      "reply": { "type": "error", "value": "ERR Number of keys can't be greater than number of args" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.sintercard.negative-limit",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "1", "a1", "LIMIT", "-1"],
+      "reply": { "type": "error", "value": "ERR LIMIT can't be negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.sintercard.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERCARD", "1", "a1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6131", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sunion.dedup",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SUNION", "a1", "a2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [99] }, { "type": "bulk", "bytes": [100] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sunion.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SUNION", "a1", "a9"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sunion.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SUNION", "a1", "a2"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6132", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sdiff.basic",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SDIFF", "a1", "a2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sdiff.missing-first",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SDIFF", "a9", "a1"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sdiff.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SDIFF", "a1", "a2"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set", "db": 0, "keyHex": "6132", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sinterstore.writes-destination",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERSTORE", "d1", "a1", "a2"],
+      "reply": { "type": "int", "value": 2 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "010000006201000000630100000064" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6431", "expect": { "bytes": "01000000620100000063" } },
+        { "call": "exists_kind", "db": 0, "kind": "", "keyHex": "6431", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.sinterstore.empty-drops-destination",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERSTORE", "d1", "a1", "a2"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6431", "valueHex": "0100000078" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "0100000062" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "set", "keyHex": "6431", "expect": { "bool": false } },
+        { "call": "size", "db": 0, "expect": { "int": 2 } }
+      ]
+    },
+    {
+      "id": "command.sinterstore.overwrites-other-kind",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERSTORE", "d1", "a1", "a2"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6431", "valueHex": "76" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "", "keyHex": "6431", "expect": { "bool": false } },
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6431", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.sinterstore.keeps-destination-on-wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SINTERSTORE", "d1", "a1", "a2"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6431", "valueHex": "0100000078" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "zset", "keyHex": "6132", "valueHex": "010000000100000061000000000000f03f" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6431", "expect": { "bytes": "0100000078" } }
+      ]
+    },
+    {
+      "id": "command.sunionstore.writes-destination",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SUNIONSTORE", "d1", "a1", "a2"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "01000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6431", "expect": { "bytes": "010000006101000000620100000063" } }
+      ]
+    },
+    {
+      "id": "command.sdiffstore.writes-destination",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SDIFFSTORE", "d1", "a1", "a2"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "01000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6431", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.smove.moves-member",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMOVE", "a1", "a2", "b"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "0100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bytes": "0100000061" } },
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6132", "expect": { "bytes": "01000000630100000062" } }
+      ]
+    },
+    {
+      "id": "command.smove.member-absent",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMOVE", "a1", "a2", "z"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "0100000062" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6132", "expect": { "bytes": "0100000062" } }
+      ]
+    },
+    {
+      "id": "command.smove.missing-source",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMOVE", "a9", "a2", "a"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6132", "valueHex": "0100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.smove.same-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMOVE", "a1", "a1", "a"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bytes": "01000000610100000062" } }
+      ]
+    },
+    {
+      "id": "command.smove.wrong-type-destination",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMOVE", "a1", "a2", "a"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" },
+        { "call": "set", "db": 0, "keyHex": "6132", "valueHex": "76" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.srandmember.single",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SRANDMEMBER", "a1"],
+      "reply": { "type": "bulk", "bytes": [97] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.srandmember.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SRANDMEMBER", "a9"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.srandmember.positive-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SRANDMEMBER", "a1", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.srandmember.negative-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SRANDMEMBER", "a1", "-3"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.srandmember.zero-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SRANDMEMBER", "a1", "0"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.srandmember.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SRANDMEMBER", "a1", "1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6131", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sscan.full-page",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SSCAN", "a1", "0", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [48] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sscan.second-page",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SSCAN", "a1", "1", "COUNT", "1"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [48] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [98] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sscan.match",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SSCAN", "a1", "0", "MATCH", "a*", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [50] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sscan.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SSCAN", "a9", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [48] }, { "type": "array", "value": [] }] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.sscan.invalid-cursor",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SSCAN", "a1", "abc"],
+      "reply": { "type": "error", "value": "ERR invalid cursor" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.sscan.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SSCAN", "a1", "0"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6131", "valueHex": "76" }
+      ],
+      "effect": []
+    }
+  ]
+}
