@@ -228,6 +228,50 @@ const EXPECTED = {
     s_scan_match: ['2', ['a']],
     s_scan_missing: ['0', []],
     s_scan_wrongtype: { error: WRONG_TYPE },
+    zrb_score_all: ['a', 'b', 'c', 'd'],
+    zrb_score_exclusive: ['b', 'c', 'd'],
+    zrb_score_withscores: ['a', '1', 'b', '2'],
+    zrb_score_limit: ['b', 'c'],
+    zrb_score_limit_open: ['c', 'd'],
+    zrb_score_missing: [],
+    zrb_score_bad_bound: { error: 'min or max is not a float' },
+    zrb_score_bad_limit: { error: 'value is not an integer or out of range' },
+    zrb_score_bad_option: { error: 'syntax error' },
+    zrb_score_wrongtype: { error: WRONG_TYPE },
+    zrev_score_all: ['d', 'c', 'b', 'a'],
+    zrev_score_bounds: ['c', 'b'],
+    zrev_score_limit_scores: ['d', '4', 'c', '3'],
+    zrb_lex_all: ['a', 'b', 'c', 'd'],
+    zrb_lex_open: ['b', 'c'],
+    zrb_lex_bad_bound: { error: 'min or max not valid string range item' },
+    zrb_lex_withscores: { error: 'syntax error' },
+    zrev_lex_all: ['d', 'c', 'b', 'a'],
+    zrev_lex_bounds: ['c', 'b', 'a'],
+    zrev_lex_limit: ['c', 'b'],
+    zrem_rank: 2,
+    zrem_rank_rest: ['c', 'd', 'e'],
+    zrem_rank_negative: 1,
+    zrem_rank_rest2: ['c', 'd'],
+    zrem_score: 1,
+    zrem_score_rest: ['c'],
+    zrem_score_all: 1,
+    zrem_score_exists: 0,
+    zrem_rank_missing: 0,
+    zrem_rank_bad_index: { error: 'value is not an integer or out of range' },
+    zrem_lex: 2,
+    zrem_lex_rest: ['a', 'd'],
+    zrem_lex_bad_bound: { error: 'min or max not valid string range item' },
+    zrand_single: 'm',
+    zrand_missing: null,
+    zrand_count: ['m'],
+    zrand_negative: ['m', 'm'],
+    zrand_scores: ['m', '1'],
+    zrand_wrongtype: { error: WRONG_TYPE },
+    zscan_pairs: ['2', ['a', '1', 'b', '2']],
+    zscan_match: ['0', ['b', '2']],
+    zscan_missing: ['0', []],
+    zscan_bad_cursor: { error: 'invalid cursor' },
+    zscan_wrongtype: { error: WRONG_TYPE },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -577,6 +621,65 @@ out.s_scan_match = [String(sscanMatch.cursor), sscanMatch.members];
 const sscanMissing = await client.sScan(k('sc9'), 0);
 out.s_scan_missing = [String(sscanMissing.cursor), sscanMissing.members];
 await capture('s_scan_wrongtype', () => client.sScan(k('smt'), 0));
+
+await client.select(10);
+await client.flushDb();
+await client.zAdd(k('za'), [{ score: 1, value: 'a' }, { score: 2, value: 'b' }, { score: 3, value: 'c' }, { score: 4, value: 'd' }]);
+out.zrb_score_all = await client.sendCommand(['ZRANGEBYSCORE', k('za'), '-inf', '+inf']);
+out.zrb_score_exclusive = await client.sendCommand(['ZRANGEBYSCORE', k('za'), '(1', '+inf']);
+out.zrb_score_withscores = await client.sendCommand(['ZRANGEBYSCORE', k('za'), '-inf', '(3', 'WITHSCORES']);
+out.zrb_score_limit = await client.sendCommand(['ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'LIMIT', '1', '2']);
+out.zrb_score_limit_open = await client.sendCommand(['ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'LIMIT', '2', '-1']);
+out.zrb_score_missing = await client.sendCommand(['ZRANGEBYSCORE', k('z9'), '-inf', '+inf']);
+await captureError('zrb_score_bad_bound', () => client.sendCommand(['ZRANGEBYSCORE', k('za'), 'bad', '+inf']));
+await captureError('zrb_score_bad_limit', () => client.sendCommand(['ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'LIMIT', 'x', '1']));
+await captureError('zrb_score_bad_option', () => client.sendCommand(['ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'BOGUS']));
+out.zrev_score_all = await client.sendCommand(['ZREVRANGEBYSCORE', k('za'), '+inf', '-inf']);
+out.zrev_score_bounds = await client.sendCommand(['ZREVRANGEBYSCORE', k('za'), '3', '(1']);
+out.zrev_score_limit_scores = await client.sendCommand(['ZREVRANGEBYSCORE', k('za'), '+inf', '-inf', 'LIMIT', '0', '2', 'WITHSCORES']);
+await client.set(k('zw'), 'v');
+await capture('zrb_score_wrongtype', () => client.sendCommand(['ZRANGEBYSCORE', k('zw'), '-inf', '+inf']));
+
+await client.zAdd(k('zl'), [{ score: 0, value: 'a' }, { score: 0, value: 'b' }, { score: 0, value: 'c' }, { score: 0, value: 'd' }]);
+out.zrb_lex_all = await client.sendCommand(['ZRANGEBYLEX', k('zl'), '-', '+']);
+out.zrb_lex_open = await client.sendCommand(['ZRANGEBYLEX', k('zl'), '[b', '(d']);
+await captureError('zrb_lex_bad_bound', () => client.sendCommand(['ZRANGEBYLEX', k('zl'), 'a', '+']));
+await captureError('zrb_lex_withscores', () => client.sendCommand(['ZRANGEBYLEX', k('zl'), '-', '+', 'WITHSCORES']));
+out.zrev_lex_all = await client.sendCommand(['ZREVRANGEBYLEX', k('zl'), '+', '-']);
+out.zrev_lex_bounds = await client.sendCommand(['ZREVRANGEBYLEX', k('zl'), '(d', '[a']);
+out.zrev_lex_limit = await client.sendCommand(['ZREVRANGEBYLEX', k('zl'), '+', '-', 'LIMIT', '1', '2']);
+
+await client.zAdd(k('zr'), [{ score: 1, value: 'a' }, { score: 2, value: 'b' }, { score: 3, value: 'c' }, { score: 4, value: 'd' }, { score: 5, value: 'e' }]);
+out.zrem_rank = Number(await client.sendCommand(['ZREMRANGEBYRANK', k('zr'), '0', '1']));
+out.zrem_rank_rest = await client.sendCommand(['ZRANGE', k('zr'), '0', '-1']);
+out.zrem_rank_negative = Number(await client.sendCommand(['ZREMRANGEBYRANK', k('zr'), '-1', '-1']));
+out.zrem_rank_rest2 = await client.sendCommand(['ZRANGE', k('zr'), '0', '-1']);
+out.zrem_score = Number(await client.sendCommand(['ZREMRANGEBYSCORE', k('zr'), '(3', '4']));
+out.zrem_score_rest = await client.sendCommand(['ZRANGE', k('zr'), '0', '-1']);
+out.zrem_score_all = Number(await client.sendCommand(['ZREMRANGEBYSCORE', k('zr'), '-inf', '+inf']));
+out.zrem_score_exists = await client.exists(k('zr'));
+out.zrem_rank_missing = Number(await client.sendCommand(['ZREMRANGEBYRANK', k('z9'), '0', '-1']));
+await captureError('zrem_rank_bad_index', () => client.sendCommand(['ZREMRANGEBYRANK', k('zl'), 'x', '0']));
+
+await client.zAdd(k('zlex'), [{ score: 0, value: 'a' }, { score: 0, value: 'b' }, { score: 0, value: 'c' }, { score: 0, value: 'd' }]);
+out.zrem_lex = Number(await client.sendCommand(['ZREMRANGEBYLEX', k('zlex'), '(a', '[c']));
+out.zrem_lex_rest = await client.sendCommand(['ZRANGE', k('zlex'), '0', '-1']);
+await captureError('zrem_lex_bad_bound', () => client.sendCommand(['ZREMRANGEBYLEX', k('zlex'), 'a', '+']));
+
+await client.zAdd(k('zs'), [{ score: 1, value: 'm' }]);
+out.zrand_single = await client.sendCommand(['ZRANDMEMBER', k('zs')]);
+out.zrand_missing = await client.sendCommand(['ZRANDMEMBER', k('zm')]);
+out.zrand_count = await client.sendCommand(['ZRANDMEMBER', k('zs'), '3']);
+out.zrand_negative = await client.sendCommand(['ZRANDMEMBER', k('zs'), '-2']);
+out.zrand_scores = await client.sendCommand(['ZRANDMEMBER', k('zs'), '1', 'WITHSCORES']);
+await capture('zrand_wrongtype', () => client.sendCommand(['ZRANDMEMBER', k('zw'), '1']));
+
+const zscan = await client.sendCommand(['ZSCAN', k('za'), '0', 'COUNT', '2']);
+out.zscan_pairs = [String(zscan[0]), zscan[1]];
+out.zscan_match = await client.sendCommand(['ZSCAN', k('za'), '0', 'MATCH', 'b*', 'COUNT', '100']);
+out.zscan_missing = await client.sendCommand(['ZSCAN', k('zm'), '0']);
+await captureError('zscan_bad_cursor', () => client.sendCommand(['ZSCAN', k('za'), 'not-a-cursor']));
+await capture('zscan_wrongtype', () => client.sendCommand(['ZSCAN', k('zw'), '0']));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -933,6 +1036,67 @@ out['s_scan_match'] = [str(cursor), members]
 cursor, members = client.sscan(k('sc9'), 0)
 out['s_scan_missing'] = [str(cursor), members]
 capture('s_scan_wrongtype', lambda: client.sscan(k('smt'), 0))
+
+client.execute_command('SELECT', 10)
+client.flushdb()
+client.zadd(k('za'), {'a': 1, 'b': 2, 'c': 3, 'd': 4})
+out['zrb_score_all'] = client.execute_command('ZRANGEBYSCORE', k('za'), '-inf', '+inf')
+out['zrb_score_exclusive'] = client.execute_command('ZRANGEBYSCORE', k('za'), '(1', '+inf')
+out['zrb_score_withscores'] = client.execute_command('ZRANGEBYSCORE', k('za'), '-inf', '(3', 'WITHSCORES')
+out['zrb_score_limit'] = client.execute_command('ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'LIMIT', 1, 2)
+out['zrb_score_limit_open'] = client.execute_command('ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'LIMIT', 2, -1)
+out['zrb_score_missing'] = client.execute_command('ZRANGEBYSCORE', k('z9'), '-inf', '+inf')
+capture_error('zrb_score_bad_bound', lambda: client.execute_command('ZRANGEBYSCORE', k('za'), 'bad', '+inf'))
+capture_error('zrb_score_bad_limit', lambda: client.execute_command('ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'LIMIT', 'x', 1))
+capture_error('zrb_score_bad_option', lambda: client.execute_command('ZRANGEBYSCORE', k('za'), '-inf', '+inf', 'BOGUS'))
+out['zrev_score_all'] = client.execute_command('ZREVRANGEBYSCORE', k('za'), '+inf', '-inf')
+out['zrev_score_bounds'] = client.execute_command('ZREVRANGEBYSCORE', k('za'), 3, '(1')
+out['zrev_score_limit_scores'] = client.execute_command('ZREVRANGEBYSCORE', k('za'), '+inf', '-inf', 'LIMIT', 0, 2, 'WITHSCORES')
+client.set(k('zw'), 'v')
+capture('zrb_score_wrongtype', lambda: client.execute_command('ZRANGEBYSCORE', k('zw'), '-inf', '+inf'))
+
+client.zadd(k('zl'), {'a': 0, 'b': 0, 'c': 0, 'd': 0})
+out['zrb_lex_all'] = client.execute_command('ZRANGEBYLEX', k('zl'), '-', '+')
+out['zrb_lex_open'] = client.execute_command('ZRANGEBYLEX', k('zl'), '[b', '(d')
+capture_error('zrb_lex_bad_bound', lambda: client.execute_command('ZRANGEBYLEX', k('zl'), 'a', '+'))
+capture_error('zrb_lex_withscores', lambda: client.execute_command('ZRANGEBYLEX', k('zl'), '-', '+', 'WITHSCORES'))
+out['zrev_lex_all'] = client.execute_command('ZREVRANGEBYLEX', k('zl'), '+', '-')
+out['zrev_lex_bounds'] = client.execute_command('ZREVRANGEBYLEX', k('zl'), '(d', '[a')
+out['zrev_lex_limit'] = client.execute_command('ZREVRANGEBYLEX', k('zl'), '+', '-', 'LIMIT', 1, 2)
+
+client.zadd(k('zr'), {'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5})
+out['zrem_rank'] = client.execute_command('ZREMRANGEBYRANK', k('zr'), 0, 1)
+out['zrem_rank_rest'] = client.execute_command('ZRANGE', k('zr'), 0, -1)
+out['zrem_rank_negative'] = client.execute_command('ZREMRANGEBYRANK', k('zr'), -1, -1)
+out['zrem_rank_rest2'] = client.execute_command('ZRANGE', k('zr'), 0, -1)
+out['zrem_score'] = client.execute_command('ZREMRANGEBYSCORE', k('zr'), '(3', 4)
+out['zrem_score_rest'] = client.execute_command('ZRANGE', k('zr'), 0, -1)
+out['zrem_score_all'] = client.execute_command('ZREMRANGEBYSCORE', k('zr'), '-inf', '+inf')
+out['zrem_score_exists'] = client.exists(k('zr'))
+out['zrem_rank_missing'] = client.execute_command('ZREMRANGEBYRANK', k('z9'), 0, -1)
+capture_error('zrem_rank_bad_index', lambda: client.execute_command('ZREMRANGEBYRANK', k('zl'), 'x', 0))
+
+client.zadd(k('zlex'), {'a': 0, 'b': 0, 'c': 0, 'd': 0})
+out['zrem_lex'] = client.execute_command('ZREMRANGEBYLEX', k('zlex'), '(a', '[c')
+out['zrem_lex_rest'] = client.execute_command('ZRANGE', k('zlex'), 0, -1)
+capture_error('zrem_lex_bad_bound', lambda: client.execute_command('ZREMRANGEBYLEX', k('zlex'), 'a', '+'))
+
+client.zadd(k('zs'), {'m': 1})
+out['zrand_single'] = client.execute_command('ZRANDMEMBER', k('zs'))
+out['zrand_missing'] = client.execute_command('ZRANDMEMBER', k('zm'))
+out['zrand_count'] = client.execute_command('ZRANDMEMBER', k('zs'), 3)
+out['zrand_negative'] = client.execute_command('ZRANDMEMBER', k('zs'), -2)
+out['zrand_scores'] = client.execute_command('ZRANDMEMBER', k('zs'), 1, 'WITHSCORES')
+capture('zrand_wrongtype', lambda: client.execute_command('ZRANDMEMBER', k('zw'), 1))
+
+zscan = client.execute_command('ZSCAN', k('za'), 0, 'COUNT', 2)
+out['zscan_pairs'] = [str(zscan[0]), [item for pair in zscan[1] for item in (str(pair[0]), '%g' % float(pair[1]))]]
+zscan = client.execute_command('ZSCAN', k('za'), 0, 'MATCH', 'b*', 'COUNT', 100)
+out['zscan_match'] = [str(zscan[0]), [item for pair in zscan[1] for item in (str(pair[0]), '%g' % float(pair[1]))]]
+zscan = client.execute_command('ZSCAN', k('zm'), 0)
+out['zscan_missing'] = [str(zscan[0]), [item for pair in zscan[1] for item in (str(pair[0]), '%g' % float(pair[1]))]]
+capture_error('zscan_bad_cursor', lambda: client.execute_command('ZSCAN', k('za'), 'not-a-cursor'))
+capture('zscan_wrongtype', lambda: client.execute_command('ZSCAN', k('zw'), 0))
 
 client.close()
 print(json.dumps(out))
