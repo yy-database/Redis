@@ -1,0 +1,496 @@
+{
+  "format": "redis.case/v1",
+  "table": "keyspace-ops",
+  "cases": [
+    {
+      "id": "command.dbsize.empty-database",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["DBSIZE"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.dbsize.counts-every-kind",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["DBSIZE"],
+      "reply": { "type": "int", "value": 5 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "7331", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000660100000076" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "zset", "keyHex": "7a31", "valueHex": "010000000100000061000000000000f03f" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 5 } }
+      ]
+    },
+    {
+      "id": "command.randomkey.empty-database",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RANDOMKEY"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.randomkey.single-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RANDOMKEY"],
+      "reply": { "type": "bulk", "bytes": [111, 110, 108, 121] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6f6e6c79", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.randomkey.non-string-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RANDOMKEY"],
+      "reply": { "type": "bulk", "bytes": [115, 49] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "7331", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.randomkey.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["RANDOMKEY", "extra"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'randomkey' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.flushdb.async",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHDB", "ASYNC"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 0 } }
+      ]
+    },
+    {
+      "id": "command.flushdb.sync-option",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHDB", "SYNC"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 0 } }
+      ]
+    },
+    {
+      "id": "command.flushdb.bogus-option",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHDB", "BOGUS"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.flushall.async",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHALL", "ASYNC"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "61", "valueHex": "31" },
+        { "call": "set", "db": 1, "keyHex": "62", "valueHex": "32" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 0 } },
+        { "call": "size", "db": 1, "expect": { "int": 0 } }
+      ]
+    },
+    {
+      "id": "command.flushall.bogus-option",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHALL", "BOGUS"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persist.present",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PERSIST", "k"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "deadline", "db": 0, "keyHex": "6b", "expect": null }
+      ]
+    },
+    {
+      "id": "command.persist.no-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PERSIST", "k"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.persist.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PERSIST", "gone"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persist.non-string",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PERSIST", "s1"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "7331", "valueHex": "0100000061", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "deadline_kind", "db": 0, "kind": "set", "keyHex": "7331", "expect": null }
+      ]
+    },
+    {
+      "id": "command.copy.string",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "dst"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "647374", "expect": { "bytes": "76616c7565" } },
+        { "call": "deadline", "db": 0, "keyHex": "647374", "expect": null }
+      ]
+    },
+    {
+      "id": "command.copy.ttl",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "dst"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "deadline", "db": 0, "keyHex": "647374", "expect": { "int": 4000000000000 } }
+      ]
+    },
+    {
+      "id": "command.copy.destination-exists",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "dst"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565" },
+        { "call": "set", "db": 0, "keyHex": "647374", "valueHex": "6f74686572" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "647374", "expect": { "bytes": "6f74686572" } }
+      ]
+    },
+    {
+      "id": "command.copy.replace",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "dst", "REPLACE"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565" },
+        { "call": "set", "db": 0, "keyHex": "647374", "valueHex": "6f74686572", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "647374", "expect": { "bytes": "76616c7565" } },
+        { "call": "deadline", "db": 0, "keyHex": "647374", "expect": null }
+      ]
+    },
+    {
+      "id": "command.copy.missing-source",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "missing", "elsewhere"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": [
+        { "call": "exists", "db": 0, "keyHex": "656c73657768657265", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.copy.same-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "src"],
+      "reply": { "type": "error", "value": "ERR source and destination objects are the same" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.copy.db-out-of-range",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "other", "DB", "99"],
+      "reply": { "type": "error", "value": "ERR DB index is out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.copy.db-negative",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "other", "DB", "-1"],
+      "reply": { "type": "error", "value": "ERR DB index is out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.copy.db-not-integer",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "other", "DB", "nope"],
+      "reply": { "type": "error", "value": "ERR DB index is out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.copy.bogus-option",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "other", "BOGUS"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.copy.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'copy' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.copy.cross-db",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "remote", "DB", "2"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "get", "db": 2, "keyHex": "72656d6f7465", "expect": { "bytes": "76616c7565" } },
+        { "call": "deadline", "db": 2, "keyHex": "72656d6f7465", "expect": { "int": 4000000000000 } }
+      ]
+    },
+    {
+      "id": "command.copy.cross-db-existing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "remote", "DB", "2"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565" },
+        { "call": "set", "db": 2, "keyHex": "72656d6f7465", "valueHex": "6b656570" }
+      ],
+      "effect": [
+        { "call": "get", "db": 2, "keyHex": "72656d6f7465", "expect": { "bytes": "6b656570" } }
+      ]
+    },
+    {
+      "id": "command.copy.set",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "s1", "s2"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "7331", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "7332", "expect": { "bytes": "01000000610100000062" } }
+      ]
+    },
+    {
+      "id": "command.copy.zset-replaces-set",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "z1", "target", "REPLACE"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "zset", "keyHex": "7a31", "valueHex": "01000000010000006d000000000000f03f" },
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "746172676574", "valueHex": "0100000078" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "zset", "keyHex": "746172676574", "expect": { "bytes": "01000000010000006d000000000000f03f" } },
+        { "call": "exists_kind", "db": 0, "kind": "set", "keyHex": "746172676574", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.copy.string-replaces-hash",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "src", "h1", "REPLACE"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "737263", "valueHex": "76616c7565" },
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000660100000076" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6831", "expect": { "bytes": "76616c7565" } },
+        { "call": "exists_kind", "db": 0, "kind": "hash", "keyHex": "6831", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.copy.non-string-ttl",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["COPY", "s1", "s2"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "7331", "valueHex": "0100000061", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "deadline_kind", "db": 0, "kind": "set", "keyHex": "7332", "expect": { "int": 4000000000000 } }
+      ]
+    },
+    {
+      "id": "command.pexpiretime.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PEXPIRETIME", "missing"],
+      "reply": { "type": "int", "value": -2 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.pexpiretime.no-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PEXPIRETIME", "k"],
+      "reply": { "type": "int", "value": -1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.pexpiretime.deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PEXPIRETIME", "k"],
+      "reply": { "type": "int", "value": 4000000000000 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76", "expiresAt": 4000000000000 }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.expiretime.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["EXPIRETIME", "missing"],
+      "reply": { "type": "int", "value": -2 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.expiretime.no-deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["EXPIRETIME", "k"],
+      "reply": { "type": "int", "value": -1 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.expiretime.deadline",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["EXPIRETIME", "k"],
+      "reply": { "type": "int", "value": 4000000000 },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b", "valueHex": "76", "expiresAt": 4000000000000 }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.expiretime.non-string",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["EXPIRETIME", "s1"],
+      "reply": { "type": "int", "value": 4000000000 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "7331", "valueHex": "0100000061", "expiresAt": 4000000000000 }
+      ],
+      "effect": []
+    }
+  ]
+}

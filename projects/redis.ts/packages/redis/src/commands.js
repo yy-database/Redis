@@ -871,16 +871,24 @@ function plan(store, session, name, args) {
         case 'renamenx':
             return planRename(store, session, name, args);
 
-        case 'flushdb': {
-            if (args.length !== 1) return { error: wrongArity('flushdb') };
-            return { run: () => { store.flushDb(session.db); return simple('OK'); } };
-        }
-
+        case 'flushdb':
         case 'flushall': {
-            if (args.length !== 1) return { error: wrongArity('flushall') };
+            if (args.length > 2) return { error: replyError('ERR syntax error') };
+            if (args.length === 2) {
+                const option = text(args[1]).toLowerCase();
+                if (option !== 'async' && option !== 'sync') {
+                    return { error: replyError('ERR syntax error') };
+                }
+            }
+            const everyDatabase = name === 'flushall';
             return {
                 run: () => {
-                    for (let index = 0; index < DATABASES; index += 1) store.flushDb(index);
+                    if (everyDatabase) {
+                        for (let index = 0; index < DATABASES; index += 1) store.flushDb(index);
+                    }
+                    else {
+                        store.flushDb(session.db);
+                    }
                     return simple('OK');
                 },
             };
@@ -889,6 +897,34 @@ function plan(store, session, name, args) {
         case 'dbsize': {
             if (args.length !== 1) return { error: wrongArity('dbsize') };
             return { run: () => integer(store.size(session.db)) };
+        }
+
+        case 'randomkey': {
+            if (args.length !== 1) return { error: wrongArity('randomkey') };
+            return {
+                run: () => {
+                    const picked = randomMember(store.keys(session.db));
+                    return picked === null ? nullReply() : bulk(picked);
+                },
+            };
+        }
+
+        case 'copy':
+            return planCopy(store, session, args);
+
+        case 'expiretime':
+        case 'pexpiretime': {
+            if (args.length !== 2) return { error: wrongArity(name) };
+            const milliseconds = name === 'pexpiretime';
+            return {
+                run: () => {
+                    const kind = kindOf(store, session.db, args[1]);
+                    if (kind === null) return integer(-2);
+                    const deadline = store.deadlineKind(session.db, SUFFIX[kind], args[1]);
+                    if (deadline === null || deadline === undefined) return integer(-1);
+                    return integer(milliseconds ? deadline : Math.floor(deadline / 1000));
+                },
+            };
         }
 
         case 'keys': {
@@ -1182,6 +1218,58 @@ function planRename(store, session, name, args) {
             if (outcome === 'missing') return replyError('ERR no such key');
             if (outcome === 'destination-present') return integer(0);
             return ifAbsent ? integer(1) : simple('OK');
+        },
+    };
+}
+
+/** Plans `COPY source destination [DB index] [REPLACE]`. */
+function planCopy(store, session, args) {
+    if (args.length < 3) {
+        return { error: wrongArity('copy') };
+    }
+    const source = args[1];
+    const destination = args[2];
+    let targetDb = session.db;
+    let replace = false;
+    for (let index = 3; index < args.length; index += 1) {
+        const option = text(args[index]).toLowerCase();
+        if (option === 'replace') {
+            replace = true;
+            continue;
+        }
+        if (option === 'db') {
+            const raw = args[index + 1];
+            if (raw === undefined) return { error: replyError('ERR syntax error') };
+            index += 1;
+            const database = parseInteger(raw);
+            if (database === null || database < 0 || database >= DATABASES) {
+                return { error: replyError('ERR DB index is out of range') };
+            }
+            targetDb = database;
+            continue;
+        }
+        return { error: replyError('ERR syntax error') };
+    }
+    if (targetDb === session.db && source.equals(destination)) {
+        return { error: replyError('ERR source and destination objects are the same') };
+    }
+    const database = session.db;
+    return {
+        run: () => {
+            const kind = kindOf(store, database, source);
+            if (kind === null) return integer(0);
+            if (!replace && kindOf(store, targetDb, destination) !== null) return integer(0);
+            const body = kind === 'string'
+                ? store.get(database, source)
+                : store.getKind(database, SUFFIX[kind], source);
+            if (body === null || body === undefined) return integer(0);
+            const deadline = kind === 'string'
+                ? store.deadline(database, source)
+                : store.deadlineKind(database, SUFFIX[kind], source);
+            dropEveryKind(store, targetDb, destination);
+            if (kind === 'string') store.set(targetDb, destination, body, deadline ?? null);
+            else store.setKind(targetDb, SUFFIX[kind], destination, body, deadline ?? null);
+            return integer(1);
         },
     };
 }

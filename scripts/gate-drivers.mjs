@@ -312,6 +312,48 @@ const EXPECTED = {
     list_range_past: [],
     list_range_negative_stop: [],
     list_range_wrongtype: { error: WRONG_TYPE },
+    k_dbsize_empty: 0,
+    k_random_empty: true,
+    k_random_single: true,
+    k_dbsize_one: 1,
+    k_random_arity: { error: "wrong number of arguments for 'randomkey' command" },
+    k_copy: 1,
+    k_copy_value: 'value',
+    k_copy_again: 0,
+    k_copy_replace: 1,
+    k_copy_replace_value: 'value',
+    k_copy_replace_ttl: -1,
+    k_copy_same: { error: 'source and destination objects are the same' },
+    k_copy_db_range: { error: 'DB index is out of range' },
+    k_copy_bogus: { error: 'syntax error' },
+    k_copy_arity: { error: "wrong number of arguments for 'copy' command" },
+    k_copy_missing: 0,
+    k_copy_missing_value: null,
+    k_copy_ttl: 1,
+    k_ttl_copy: true,
+    k_copy_cross: 1,
+    k_cross_value: 'value',
+    k_copy_set: 1,
+    k_copy_set_members: ['a'],
+    k_copy_set_ttl: true,
+    k_copy_zset: 1,
+    k_copy_zset_score: 1,
+    k_pexpiretime_missing: -2,
+    k_expiretime_missing: -2,
+    k_pexpiretime_nottl: -1,
+    k_expiretime_nottl: -1,
+    k_expiretime_floor: true,
+    k_expiretime_positive: true,
+    k_persist: 1,
+    k_ttl_after_persist: -1,
+    k_persist_again: 0,
+    k_flushdb: true,
+    k_dbsize_after_flush: 0,
+    k_flushdb_bogus: { error: 'syntax error' },
+    k_flushall: true,
+    k_size_d12: 0,
+    k_size_d13: 0,
+    k_flushall_bogus: { error: 'syntax error' },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -773,6 +815,76 @@ out.list_range_clip = await client.lRange(k('lb'), 2, 100);
 out.list_range_past = await client.lRange(k('lb'), 100, 200);
 out.list_range_negative_stop = await client.lRange(k('lb'), 0, -100);
 await capture('list_range_wrongtype', () => client.lRange(k('hw'), 0, -1));
+
+await client.select(12);
+await client.flushDb();
+out.k_dbsize_empty = Number(await client.dbSize());
+out.k_random_empty = (await client.randomKey()) === null;
+await client.set(k('only'), 'v');
+out.k_random_single = (await client.randomKey()) === k('only');
+out.k_dbsize_one = Number(await client.dbSize());
+await captureError('k_random_arity', () => client.sendCommand(['RANDOMKEY', 'extra']));
+
+await client.set(k('src'), 'value');
+out.k_copy = Number(await client.sendCommand(['COPY', k('src'), k('dst')]));
+out.k_copy_value = await client.get(k('dst'));
+out.k_copy_again = Number(await client.sendCommand(['COPY', k('src'), k('dst')]));
+await client.set(k('dst'), 'other');
+out.k_copy_replace = Number(await client.sendCommand(['COPY', k('src'), k('dst'), 'REPLACE']));
+out.k_copy_replace_value = await client.get(k('dst'));
+out.k_copy_replace_ttl = Number(await client.ttl(k('dst')));
+await captureError('k_copy_same', () => client.sendCommand(['COPY', k('src'), k('src')]));
+await captureError('k_copy_db_range', () => client.sendCommand(['COPY', k('src'), k('x'), 'DB', '99']));
+await captureError('k_copy_bogus', () => client.sendCommand(['COPY', k('src'), k('x'), 'BOGUS']));
+await captureError('k_copy_arity', () => client.sendCommand(['COPY', k('src')]));
+out.k_copy_missing = Number(await client.sendCommand(['COPY', k('gone'), k('nowhere')]));
+out.k_copy_missing_value = await client.get(k('nowhere'));
+
+await client.sendCommand(['SET', k('ttl'), 'value', 'EX', '100']);
+out.k_copy_ttl = Number(await client.sendCommand(['COPY', k('ttl'), k('ttlcopy')]));
+out.k_ttl_copy = Number(await client.ttl(k('ttlcopy'))) > 0;
+out.k_copy_cross = Number(await client.sendCommand(['COPY', k('src'), k('remote'), 'DB', '13']));
+await client.select(13);
+out.k_cross_value = await client.get(k('remote'));
+await client.select(12);
+
+await client.sAdd(k('st'), ['a']);
+await client.expire(k('st'), 100);
+out.k_copy_set = Number(await client.sendCommand(['COPY', k('st'), k('stcopy')]));
+out.k_copy_set_members = await client.sMembers(k('stcopy'));
+out.k_copy_set_ttl = Number(await client.ttl(k('stcopy'))) > 0;
+await client.zAdd(k('zt'), [{ score: 1, value: 'm' }]);
+out.k_copy_zset = Number(await client.sendCommand(['COPY', k('zt'), k('ztcopy')]));
+out.k_copy_zset_score = Number(await client.zScore(k('ztcopy'), 'm'));
+
+await client.sendCommand(['SET', k('et'), 'value', 'EX', '100']);
+out.k_pexpiretime_missing = Number(await client.sendCommand(['PEXPIRETIME', k('gone')]));
+out.k_expiretime_missing = Number(await client.sendCommand(['EXPIRETIME', k('gone')]));
+out.k_pexpiretime_nottl = Number(await client.sendCommand(['PEXPIRETIME', k('src')]));
+out.k_expiretime_nottl = Number(await client.sendCommand(['EXPIRETIME', k('src')]));
+const pexpiretime = Number(await client.sendCommand(['PEXPIRETIME', k('et')]));
+const expiretime = Number(await client.sendCommand(['EXPIRETIME', k('et')]));
+out.k_expiretime_floor = pexpiretime > 0 && Math.floor(pexpiretime / 1000) === expiretime;
+out.k_expiretime_positive = expiretime > 0;
+
+out.k_persist = Number(await client.persist(k('et')));
+out.k_ttl_after_persist = Number(await client.ttl(k('et')));
+out.k_persist_again = Number(await client.persist(k('et')));
+
+await client.set(k('fdb'), 'v');
+out.k_flushdb = (await client.sendCommand(['FLUSHDB', 'ASYNC'])) === 'OK';
+out.k_dbsize_after_flush = Number(await client.dbSize());
+await captureError('k_flushdb_bogus', () => client.sendCommand(['FLUSHDB', 'BOGUS']));
+await client.select(13);
+await client.set(k('other'), 'v');
+await client.select(12);
+await client.set(k('mine'), 'v');
+out.k_flushall = (await client.sendCommand(['FLUSHALL', 'ASYNC'])) === 'OK';
+out.k_size_d12 = Number(await client.dbSize());
+await client.select(13);
+out.k_size_d13 = Number(await client.dbSize());
+await client.select(12);
+await captureError('k_flushall_bogus', () => client.sendCommand(['FLUSHALL', 'BOGUS']));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1244,6 +1356,76 @@ out['list_range_clip'] = client.lrange(k('lb'), 2, 100)
 out['list_range_past'] = client.lrange(k('lb'), 100, 200)
 out['list_range_negative_stop'] = client.lrange(k('lb'), 0, -100)
 capture('list_range_wrongtype', lambda: client.lrange(k('hw'), 0, -1))
+
+client.execute_command('SELECT', 12)
+client.flushdb()
+out['k_dbsize_empty'] = client.dbsize()
+out['k_random_empty'] = client.randomkey() is None
+client.set(k('only'), 'v')
+out['k_random_single'] = client.randomkey() == k('only')
+out['k_dbsize_one'] = client.dbsize()
+capture_error('k_random_arity', lambda: client.execute_command('RANDOMKEY', 'extra'))
+
+client.set(k('src'), 'value')
+out['k_copy'] = int(client.execute_command('COPY', k('src'), k('dst')))
+out['k_copy_value'] = client.get(k('dst'))
+out['k_copy_again'] = int(client.execute_command('COPY', k('src'), k('dst')))
+client.set(k('dst'), 'other')
+out['k_copy_replace'] = int(client.execute_command('COPY', k('src'), k('dst'), 'REPLACE'))
+out['k_copy_replace_value'] = client.get(k('dst'))
+out['k_copy_replace_ttl'] = client.ttl(k('dst'))
+capture_error('k_copy_same', lambda: client.execute_command('COPY', k('src'), k('src')))
+capture_error('k_copy_db_range', lambda: client.execute_command('COPY', k('src'), k('x'), 'DB', '99'))
+capture_error('k_copy_bogus', lambda: client.execute_command('COPY', k('src'), k('x'), 'BOGUS'))
+capture_error('k_copy_arity', lambda: client.execute_command('COPY', k('src')))
+out['k_copy_missing'] = int(client.execute_command('COPY', k('gone'), k('nowhere')))
+out['k_copy_missing_value'] = client.get(k('nowhere'))
+
+client.execute_command('SET', k('ttl'), 'value', 'EX', 100)
+out['k_copy_ttl'] = int(client.execute_command('COPY', k('ttl'), k('ttlcopy')))
+out['k_ttl_copy'] = client.ttl(k('ttlcopy')) > 0
+out['k_copy_cross'] = int(client.execute_command('COPY', k('src'), k('remote'), 'DB', 13))
+client.execute_command('SELECT', 13)
+out['k_cross_value'] = client.get(k('remote'))
+client.execute_command('SELECT', 12)
+
+client.sadd(k('st'), 'a')
+client.expire(k('st'), 100)
+out['k_copy_set'] = int(client.execute_command('COPY', k('st'), k('stcopy')))
+out['k_copy_set_members'] = sorted(client.smembers(k('stcopy')))
+out['k_copy_set_ttl'] = client.ttl(k('stcopy')) > 0
+client.zadd(k('zt'), {'m': 1})
+out['k_copy_zset'] = int(client.execute_command('COPY', k('zt'), k('ztcopy')))
+out['k_copy_zset_score'] = int(client.zscore(k('ztcopy'), 'm'))
+
+client.execute_command('SET', k('et'), 'value', 'EX', 100)
+out['k_pexpiretime_missing'] = client.execute_command('PEXPIRETIME', k('gone'))
+out['k_expiretime_missing'] = client.execute_command('EXPIRETIME', k('gone'))
+out['k_pexpiretime_nottl'] = client.execute_command('PEXPIRETIME', k('src'))
+out['k_expiretime_nottl'] = client.execute_command('EXPIRETIME', k('src'))
+pexpiretime = client.execute_command('PEXPIRETIME', k('et'))
+expiretime = client.execute_command('EXPIRETIME', k('et'))
+out['k_expiretime_floor'] = pexpiretime > 0 and pexpiretime // 1000 == expiretime
+out['k_expiretime_positive'] = expiretime > 0
+
+out['k_persist'] = int(client.persist(k('et')))
+out['k_ttl_after_persist'] = client.ttl(k('et'))
+out['k_persist_again'] = int(client.persist(k('et')))
+
+client.set(k('fdb'), 'v')
+out['k_flushdb'] = bool(client.execute_command('FLUSHDB', 'ASYNC'))
+out['k_dbsize_after_flush'] = client.dbsize()
+capture_error('k_flushdb_bogus', lambda: client.execute_command('FLUSHDB', 'BOGUS'))
+client.execute_command('SELECT', 13)
+client.set(k('other'), 'v')
+client.execute_command('SELECT', 12)
+client.set(k('mine'), 'v')
+out['k_flushall'] = bool(client.execute_command('FLUSHALL', 'ASYNC'))
+out['k_size_d12'] = client.dbsize()
+client.execute_command('SELECT', 13)
+out['k_size_d13'] = client.dbsize()
+client.execute_command('SELECT', 12)
+capture_error('k_flushall_bogus', lambda: client.execute_command('FLUSHALL', 'BOGUS'))
 
 client.close()
 print(json.dumps(out))
