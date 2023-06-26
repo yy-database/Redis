@@ -354,6 +354,33 @@ const EXPECTED = {
     k_size_d12: 0,
     k_size_d13: 0,
     k_flushall_bogus: { error: 'syntax error' },
+    za_union: 4,
+    za_union_members: ['a', 'b', 'd', 'c'],
+    za_union_scores: ['a', '1', 'b', '5', 'd', '5', 'c', '7'],
+    za_union_weight_scores: ['a', '2', 'd', '5', 'b', '7', 'c', '10'],
+    za_union_max_scores: ['a', '1', 'b', '3', 'c', '4', 'd', '5'],
+    za_inter: 2,
+    za_inter_scores: ['b', '5', 'c', '7'],
+    za_inter_min_scores: ['b', '3', 'c', '4'],
+    za_inter_missing: 0,
+    za_inter_dest_exists: 0,
+    za_diff: ['a'],
+    za_diff_scores: ['a', '1'],
+    za_diff_missing: ['a', 'b', 'c'],
+    za_diffstore: 2,
+    za_diffstore_scores: ['a', '1', 'b', '2'],
+    za_intercard: 2,
+    za_intercard_limit: 1,
+    za_intercard_zero_limit: 2,
+    za_intercard_missing: 0,
+    za_union_dest_ttl: -1,
+    za_union_wrongtype: { error: WRONG_TYPE },
+    za_intercard_wrongtype: { error: WRONG_TYPE },
+    za_union_numkeys_zero: { error: 'at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE' },
+    za_union_numkeys_overflow: { error: 'syntax error' },
+    za_union_bad_weight: { error: 'weight value is not a float' },
+    za_union_bad_aggregate: { error: 'syntax error' },
+    za_intercard_limit_negative: { error: "LIMIT can't be negative" },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -885,6 +912,54 @@ await client.select(13);
 out.k_size_d13 = Number(await client.dbSize());
 await client.select(12);
 await captureError('k_flushall_bogus', () => client.sendCommand(['FLUSHALL', 'BOGUS']));
+
+await client.select(14);
+await client.flushDb();
+await client.zAdd(k('zqa'), [{ score: 1, value: 'a' }, { score: 2, value: 'b' }, { score: 3, value: 'c' }]);
+await client.zAdd(k('zqb'), [{ score: 3, value: 'b' }, { score: 4, value: 'c' }, { score: 5, value: 'd' }]);
+out.za_union = Number(await client.sendCommand(['ZUNIONSTORE', k('zu'), '2', k('zqa'), k('zqb')]));
+out.za_union_members = await client.sendCommand(['ZRANGE', k('zu'), '0', '-1']);
+out.za_union_scores = await client.sendCommand(['ZRANGE', k('zu'), '0', '-1', 'WITHSCORES']);
+out.za_union_weight_scores = await client.sendCommand([
+    'ZUNIONSTORE', k('zu2'), '2', k('zqa'), k('zqb'), 'WEIGHTS', '2', '1',
+]).then(() => client.sendCommand(['ZRANGE', k('zu2'), '0', '-1', 'WITHSCORES']));
+out.za_union_max_scores = await client.sendCommand([
+    'ZUNIONSTORE', k('zu3'), '2', k('zqa'), k('zqb'), 'AGGREGATE', 'MAX',
+]).then(() => client.sendCommand(['ZRANGE', k('zu3'), '0', '-1', 'WITHSCORES']));
+out.za_inter = Number(await client.sendCommand(['ZINTERSTORE', k('zi'), '2', k('zqa'), k('zqb')]));
+out.za_inter_scores = await client.sendCommand(['ZRANGE', k('zi'), '0', '-1', 'WITHSCORES']);
+out.za_inter_min_scores = await client.sendCommand([
+    'ZINTERSTORE', k('zi2'), '2', k('zqa'), k('zqb'), 'WEIGHTS', '3', '1', 'AGGREGATE', 'MIN',
+]).then(() => client.sendCommand(['ZRANGE', k('zi2'), '0', '-1', 'WITHSCORES']));
+out.za_inter_missing = Number(await client.sendCommand(['ZINTERSTORE', k('zi3'), '2', k('zqa'), k('zqmissing')]));
+out.za_inter_dest_exists = Number(await client.exists(k('zi3')));
+out.za_diff = await client.sendCommand(['ZDIFF', '2', k('zqa'), k('zqb')]);
+out.za_diff_scores = await client.sendCommand(['ZDIFF', '2', k('zqa'), k('zqb'), 'WITHSCORES']);
+out.za_diff_missing = await client.sendCommand(['ZDIFF', '2', k('zqa'), k('zqmissing')]);
+await client.zAdd(k('zqc'), [{ score: 9, value: 'c' }]);
+out.za_diffstore = Number(await client.sendCommand(['ZDIFFSTORE', k('zd'), '2', k('zqa'), k('zqc')]));
+out.za_diffstore_scores = await client.sendCommand(['ZRANGE', k('zd'), '0', '-1', 'WITHSCORES']);
+out.za_intercard = Number(await client.sendCommand(['ZINTERCARD', '2', k('zqa'), k('zqb')]));
+out.za_intercard_limit = Number(await client.sendCommand(['ZINTERCARD', '2', k('zqa'), k('zqb'), 'LIMIT', '1']));
+out.za_intercard_zero_limit = Number(await client.sendCommand(['ZINTERCARD', '2', k('zqa'), k('zqb'), 'LIMIT', '0']));
+out.za_intercard_missing = Number(await client.sendCommand(['ZINTERCARD', '2', k('zqa'), k('zqmissing')]));
+await client.sendCommand(['SET', k('zud'), 'old', 'EX', '100']);
+await client.sendCommand(['ZUNIONSTORE', k('zud'), '1', k('zqa')]);
+out.za_union_dest_ttl = Number(await client.ttl(k('zud')));
+await client.set(k('zstr'), 'v');
+await capture('za_union_wrongtype', () => client.sendCommand(['ZUNIONSTORE', k('zx'), '2', k('zqa'), k('zstr')]));
+await capture('za_intercard_wrongtype', () => client.sendCommand(['ZINTERCARD', '2', k('zqa'), k('zstr')]));
+await captureError('za_union_numkeys_zero', () => client.sendCommand(['ZUNIONSTORE', k('zx'), '0', k('zqa')]));
+await captureError('za_union_numkeys_overflow', () => client.sendCommand(['ZUNIONSTORE', k('zx'), '2', k('zqa')]));
+await captureError('za_union_bad_weight', () => client.sendCommand([
+    'ZUNIONSTORE', k('zx'), '2', k('zqa'), k('zqb'), 'WEIGHTS', '1', 'x',
+]));
+await captureError('za_union_bad_aggregate', () => client.sendCommand([
+    'ZUNIONSTORE', k('zx'), '2', k('zqa'), k('zqb'), 'AGGREGATE', 'AVG',
+]));
+await captureError('za_intercard_limit_negative', () => client.sendCommand([
+    'ZINTERCARD', '2', k('zqa'), k('zqb'), 'LIMIT', '-1',
+]));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1426,6 +1501,51 @@ client.execute_command('SELECT', 13)
 out['k_size_d13'] = client.dbsize()
 client.execute_command('SELECT', 12)
 capture_error('k_flushall_bogus', lambda: client.execute_command('FLUSHALL', 'BOGUS'))
+
+client.execute_command('SELECT', 14)
+client.flushdb()
+client.zadd(k('zqa'), {'a': 1, 'b': 2, 'c': 3})
+client.zadd(k('zqb'), {'b': 3, 'c': 4, 'd': 5})
+out['za_union'] = client.execute_command('ZUNIONSTORE', k('zu'), 2, k('zqa'), k('zqb'))
+out['za_union_members'] = client.execute_command('ZRANGE', k('zu'), 0, -1)
+out['za_union_scores'] = client.execute_command('ZRANGE', k('zu'), 0, -1, 'WITHSCORES')
+client.execute_command('ZUNIONSTORE', k('zu2'), 2, k('zqa'), k('zqb'), 'WEIGHTS', 2, 1)
+out['za_union_weight_scores'] = client.execute_command('ZRANGE', k('zu2'), 0, -1, 'WITHSCORES')
+client.execute_command('ZUNIONSTORE', k('zu3'), 2, k('zqa'), k('zqb'), 'AGGREGATE', 'MAX')
+out['za_union_max_scores'] = client.execute_command('ZRANGE', k('zu3'), 0, -1, 'WITHSCORES')
+out['za_inter'] = client.execute_command('ZINTERSTORE', k('zi'), 2, k('zqa'), k('zqb'))
+out['za_inter_scores'] = client.execute_command('ZRANGE', k('zi'), 0, -1, 'WITHSCORES')
+client.execute_command('ZINTERSTORE', k('zi2'), 2, k('zqa'), k('zqb'), 'WEIGHTS', 3, 1, 'AGGREGATE', 'MIN')
+out['za_inter_min_scores'] = client.execute_command('ZRANGE', k('zi2'), 0, -1, 'WITHSCORES')
+out['za_inter_missing'] = client.execute_command('ZINTERSTORE', k('zi3'), 2, k('zqa'), k('zqmissing'))
+out['za_inter_dest_exists'] = client.exists(k('zi3'))
+out['za_diff'] = client.execute_command('ZDIFF', 2, k('zqa'), k('zqb'))
+out['za_diff_scores'] = client.execute_command('ZDIFF', 2, k('zqa'), k('zqb'), 'WITHSCORES')
+out['za_diff_missing'] = client.execute_command('ZDIFF', 2, k('zqa'), k('zqmissing'))
+client.zadd(k('zqc'), {'c': 9})
+out['za_diffstore'] = client.execute_command('ZDIFFSTORE', k('zd'), 2, k('zqa'), k('zqc'))
+out['za_diffstore_scores'] = client.execute_command('ZRANGE', k('zd'), 0, -1, 'WITHSCORES')
+out['za_intercard'] = client.execute_command('ZINTERCARD', 2, k('zqa'), k('zqb'))
+out['za_intercard_limit'] = client.execute_command('ZINTERCARD', 2, k('zqa'), k('zqb'), 'LIMIT', 1)
+out['za_intercard_zero_limit'] = client.execute_command('ZINTERCARD', 2, k('zqa'), k('zqb'), 'LIMIT', 0)
+out['za_intercard_missing'] = client.execute_command('ZINTERCARD', 2, k('zqa'), k('zqmissing'))
+client.execute_command('SET', k('zud'), 'old', 'EX', 100)
+client.execute_command('ZUNIONSTORE', k('zud'), 1, k('zqa'))
+out['za_union_dest_ttl'] = client.ttl(k('zud'))
+client.set(k('zstr'), 'v')
+capture('za_union_wrongtype', lambda: client.execute_command('ZUNIONSTORE', k('zx'), 2, k('zqa'), k('zstr')))
+capture('za_intercard_wrongtype', lambda: client.execute_command('ZINTERCARD', 2, k('zqa'), k('zstr')))
+capture_error('za_union_numkeys_zero', lambda: client.execute_command('ZUNIONSTORE', k('zx'), 0, k('zqa')))
+capture_error('za_union_numkeys_overflow', lambda: client.execute_command('ZUNIONSTORE', k('zx'), 2, k('zqa')))
+capture_error('za_union_bad_weight', lambda: client.execute_command(
+    'ZUNIONSTORE', k('zx'), 2, k('zqa'), k('zqb'), 'WEIGHTS', 1, 'x'
+))
+capture_error('za_union_bad_aggregate', lambda: client.execute_command(
+    'ZUNIONSTORE', k('zx'), 2, k('zqa'), k('zqb'), 'AGGREGATE', 'AVG'
+))
+capture_error('za_intercard_limit_negative', lambda: client.execute_command(
+    'ZINTERCARD', 2, k('zqa'), k('zqb'), 'LIMIT', -1
+))
 
 client.close()
 print(json.dumps(out))

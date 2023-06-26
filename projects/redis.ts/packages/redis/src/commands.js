@@ -805,6 +805,13 @@ function plan(store, session, name, args) {
         case 'zrandmember':
             return planZRandMember(store, session, args);
 
+        case 'zunionstore':
+        case 'zinterstore':
+        case 'zdiff':
+        case 'zdiffstore':
+        case 'zintercard':
+            return planZSetAggregate(store, session, name, args);
+
         case 'sinter':
         case 'sintercard':
         case 'sunion':
@@ -1703,6 +1710,212 @@ function planZRandMember(store, session, args) {
             return renderZSet(picked, withScores);
         },
     };
+}
+
+/**
+ * Plans one sorted-set aggregate: union, intersection or difference, optionally stored.
+ *
+ * Sources are read before the destination is touched, so a wrong type aborts the
+ * whole command, and the store forms drop every representation plus the deadline
+ * the destination may hold.
+ */
+function planZSetAggregate(store, session, name, args) {
+    const db = session.db;
+    if (name === 'zunionstore' || name === 'zinterstore') {
+        if (args.length < 4) return { error: wrongArity(name) };
+        const plan = parseZSetStorePlan(args);
+        if (plan.error !== undefined) return { error: plan.error };
+        const destination = args[1];
+        const mode = name === 'zunionstore' ? 'union' : 'inter';
+        return {
+            run: () => {
+                const sets = readZSetsForAggregate(store, db, plan.keys);
+                if (sets === null) return wrongType();
+                return storeZSetResult(store, db, destination, combineZSets(sets, plan.weights, plan.aggregate, mode));
+            },
+        };
+    }
+    if (name === 'zdiff' || name === 'zdiffstore') {
+        const keeps = name === 'zdiffstore';
+        const numkeysIndex = keeps ? 2 : 1;
+        if (keeps ? args.length < 4 : args.length < 3) return { error: wrongArity(name) };
+        const numkeys = parseInteger(args[numkeysIndex]);
+        if (numkeys === null || numkeys <= 0) {
+            return { error: replyError(`ERR at least 1 input key is needed for ${keeps ? 'ZDIFFSTORE' : 'ZDIFF'}`) };
+        }
+        if (args.length < numkeysIndex + 1 + numkeys) return { error: replyError('ERR syntax error') };
+        const keys = args.slice(numkeysIndex + 1, numkeysIndex + 1 + numkeys);
+        const next = numkeysIndex + 1 + numkeys;
+        let withScores = false;
+        if (keeps) {
+            if (next !== args.length) return { error: replyError('ERR syntax error') };
+        }
+        else if (args.length - next === 1) {
+            if (text(args[next]).toLowerCase() !== 'withscores') return { error: replyError('ERR syntax error') };
+            withScores = true;
+        }
+        else if (args.length - next > 1) {
+            return { error: replyError('ERR syntax error') };
+        }
+        const destination = keeps ? args[1] : null;
+        return {
+            run: () => {
+                const sets = readZSetsForAggregate(store, db, keys);
+                if (sets === null) return wrongType();
+                const result = combineZSets(sets, keys.map(() => 1), 'sum', 'diff');
+                if (keeps) return storeZSetResult(store, db, destination, result);
+                return renderZSet(result, withScores);
+            },
+        };
+    }
+    // zintercard counts only the intersection and never reads scores.
+    if (args.length < 3) return { error: wrongArity('zintercard') };
+    const numkeys = parseInteger(args[1]);
+    if (numkeys === null || numkeys <= 0) {
+        return { error: replyError('ERR numkeys should be greater than 0') };
+    }
+    if (args.length < 2 + numkeys) {
+        return { error: replyError("ERR Number of keys can't be greater than number of args") };
+    }
+    const keys = args.slice(2, 2 + numkeys);
+    let limit = 0;
+    const next = 2 + numkeys;
+    if (next < args.length) {
+        if (text(args[next]).toLowerCase() !== 'limit' || next + 2 !== args.length) {
+            return { error: replyError('ERR syntax error') };
+        }
+        limit = parseInteger(args[next + 1]);
+        if (limit === null) return { error: integerError() };
+        if (limit < 0) return { error: replyError("ERR LIMIT can't be negative") };
+    }
+    return {
+        run: () => {
+            const sets = readZSetsForAggregate(store, db, keys);
+            if (sets === null) return wrongType();
+            if (sets.length === 0) return integer(0);
+            let found = 0;
+            for (const [member] of sets[0]) {
+                if (!sets.slice(1).every(set => set.some(([candidate]) => candidate.equals(member)))) continue;
+                found += 1;
+                if (limit > 0 && found >= limit) break;
+            }
+            return integer(found);
+        },
+    };
+}
+
+/** Parses `numkeys` plus optional `WEIGHTS` and `AGGREGATE` for the sorted-set stores. */
+function parseZSetStorePlan(args) {
+    const numkeys = parseInteger(args[2]);
+    if (numkeys === null || numkeys <= 0) {
+        return { error: replyError('ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE') };
+    }
+    if (args.length < 3 + numkeys) return { error: replyError('ERR syntax error') };
+    const keys = args.slice(3, 3 + numkeys);
+    const weights = keys.map(() => 1);
+    let aggregate = 'sum';
+    let index = 3 + numkeys;
+    while (index < args.length) {
+        const option = text(args[index]).toLowerCase();
+        if (option === 'weights') {
+            if (index + numkeys >= args.length) return { error: replyError('ERR syntax error') };
+            for (let slot = 0; slot < numkeys; slot += 1) {
+                const weight = parseScore(args[index + 1 + slot]);
+                if (weight === null) return { error: replyError('ERR weight value is not a float') };
+                weights[slot] = weight;
+            }
+            index += 1 + numkeys;
+            continue;
+        }
+        if (option === 'aggregate') {
+            const mode = args[index + 1] === undefined ? '' : text(args[index + 1]).toLowerCase();
+            if (mode !== 'sum' && mode !== 'min' && mode !== 'max') {
+                return { error: replyError('ERR syntax error') };
+            }
+            aggregate = mode;
+            index += 2;
+            continue;
+        }
+        return { error: replyError('ERR syntax error') };
+    }
+    return { keys, weights, aggregate };
+}
+
+/** Reads every named sorted set, `null` when one holds another kind or a corrupt body. */
+function readZSetsForAggregate(store, db, keys) {
+    const sets = [];
+    for (const key of keys) {
+        const kind = kindOf(store, db, key);
+        if (kind === null) {
+            sets.push([]);
+            continue;
+        }
+        if (kind !== 'zset') return null;
+        const entries = readZSet(store, db, key);
+        if (entries === null) return null;
+        sets.push(entries);
+    }
+    return sets;
+}
+
+/** Computes the weighted union, intersection or difference, sorted by score then member. */
+function combineZSets(sets, weights, aggregate, mode) {
+    const weighted = (score, weight) => {
+        const value = score * weight;
+        return Number.isNaN(value) ? 0 : value;
+    };
+    const combine = (left, right) => {
+        const value = aggregate === 'min' ? Math.min(left, right) : aggregate === 'max' ? Math.max(left, right) : left + right;
+        return Number.isNaN(value) ? 0 : value;
+    };
+    const result = [];
+    if (mode === 'union') {
+        sets.forEach((set, index) => {
+            const weight = weights[index] ?? 1;
+            for (const [member, score] of set) {
+                const value = weighted(score, weight);
+                const hit = result.find(([existing]) => existing.equals(member));
+                if (hit === undefined) result.push([member, value]);
+                else hit[1] = combine(hit[1], value);
+            }
+        });
+    }
+    else if (mode === 'inter') {
+        if (sets.length > 0) {
+            for (const [member, score] of sets[0]) {
+                let combined = weighted(score, weights[0] ?? 1);
+                let present = true;
+                for (let index = 1; index < sets.length; index += 1) {
+                    const hit = sets[index].find(([candidate]) => candidate.equals(member));
+                    if (hit === undefined) {
+                        present = false;
+                        break;
+                    }
+                    combined = combine(combined, weighted(hit[1], weights[index] ?? 1));
+                }
+                if (present) result.push([member, combined]);
+            }
+        }
+    }
+    else if (sets.length > 0) {
+        for (const [member, score] of sets[0]) {
+            if (sets.slice(1).some(set => set.some(([candidate]) => candidate.equals(member))) === false) {
+                result.push([member, score]);
+            }
+        }
+    }
+    sortZSet(result);
+    return result;
+}
+
+/** Overwrites the store destination: an empty result removes the key entirely. */
+function storeZSetResult(store, db, destination, result) {
+    dropEveryKind(store, db, destination);
+    if (result.length === 0) return integer(0);
+    const body = encodeZSet(result);
+    if (body === null) return replyError('ERR zset value exceeds the storage limit');
+    store.setKind(db, 'zset', destination, body, null);
+    return integer(result.length);
 }
 
 /**
