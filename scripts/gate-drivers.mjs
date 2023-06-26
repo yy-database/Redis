@@ -272,6 +272,46 @@ const EXPECTED = {
     zscan_missing: ['0', []],
     zscan_bad_cursor: { error: 'invalid cursor' },
     zscan_wrongtype: { error: WRONG_TYPE },
+    h_setnx_new: 1,
+    h_get_new: '4',
+    h_setnx_existing: 0,
+    h_get_existing: '1',
+    h_keys: ['a', 'b', 'c'],
+    h_vals: ['1', '2', '3'],
+    h_exists_yes: 1,
+    h_exists_no: 0,
+    h_incrfloat_new: '1.5',
+    h_incrfloat_second: '1.75',
+    h_rand_single: 'f',
+    h_rand_count: ['f'],
+    h_rand_values: ['f', 'v'],
+    h_scan: ['2', ['a', '1', 'b', '2']],
+    h_scan_match: ['0', ['b', '2']],
+    h_type: 'hash',
+    h_setnx_wrongtype: { error: WRONG_TYPE },
+    h_incrfloat_bad: { error: 'value is not a valid float' },
+    h_scan_wrongtype: { error: WRONG_TYPE },
+    list_insert_before: 4,
+    list_insert_before_values: ['a', 'x', 'b', 'c'],
+    list_insert_after: 4,
+    list_insert_after_values: ['a', 'b', 'x', 'c'],
+    list_insert_missing_pivot: -1,
+    list_insert_missing_key: 0,
+    list_insert_bad_direction: { error: 'syntax error' },
+    list_insert_wrongtype: { error: WRONG_TYPE },
+    list_mpop_left: [1, ['a', 'b']],
+    list_mpop_left_rest: ['c'],
+    list_mpop_none: null,
+    list_mpop_zero: { error: 'numkeys should be greater than 0' },
+    list_mpop_bad_side: { error: 'syntax error' },
+    list_mpop_zero_count: { error: 'count should be greater than 0' },
+    list_mpop_wrongtype: { error: WRONG_TYPE },
+    list_range_full: ['a', 'b', 'c'],
+    list_range_tail: ['b', 'c'],
+    list_range_clip: ['c'],
+    list_range_past: [],
+    list_range_negative_stop: [],
+    list_range_wrongtype: { error: WRONG_TYPE },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -680,6 +720,59 @@ out.zscan_match = await client.sendCommand(['ZSCAN', k('za'), '0', 'MATCH', 'b*'
 out.zscan_missing = await client.sendCommand(['ZSCAN', k('zm'), '0']);
 await captureError('zscan_bad_cursor', () => client.sendCommand(['ZSCAN', k('za'), 'not-a-cursor']));
 await capture('zscan_wrongtype', () => client.sendCommand(['ZSCAN', k('zw'), '0']));
+
+await client.select(11);
+await client.flushDb();
+await client.hSet(k('h1'), { a: '1', b: '2', c: '3' });
+out.h_keys = await client.hKeys(k('h1'));
+out.h_vals = await client.hVals(k('h1'));
+out.h_setnx_new = Number(await client.hSetNX(k('h1'), 'd', '4'));
+out.h_get_new = await client.hGet(k('h1'), 'd');
+out.h_setnx_existing = Number(await client.hSetNX(k('h1'), 'a', '9'));
+out.h_get_existing = await client.hGet(k('h1'), 'a');
+out.h_exists_yes = Number(await client.hExists(k('h1'), 'a'));
+out.h_exists_no = Number(await client.hExists(k('h1'), 'z'));
+out.h_incrfloat_new = await client.sendCommand(['HINCRBYFLOAT', k('h1'), 'n', '1.5']);
+out.h_incrfloat_second = await client.sendCommand(['HINCRBYFLOAT', k('h1'), 'n', '0.25']);
+out.h_type = await client.type(k('h1'));
+await client.hSet(k('hf'), 'f', 'v');
+out.h_rand_single = await client.sendCommand(['HRANDFIELD', k('hf')]);
+out.h_rand_count = await client.sendCommand(['HRANDFIELD', k('hf'), '2']);
+out.h_rand_values = await client.sendCommand(['HRANDFIELD', k('hf'), '1', 'WITHVALUES']);
+const hscan = await client.sendCommand(['HSCAN', k('h1'), '0', 'COUNT', '2']);
+out.h_scan = [String(hscan[0]), hscan[1]];
+out.h_scan_match = await client.sendCommand(['HSCAN', k('h1'), '0', 'MATCH', 'b*', 'COUNT', '100']);
+await client.set(k('hw'), 'v');
+await capture('h_setnx_wrongtype', () => client.hSetNX(k('hw'), 'f', 'v'));
+await captureError('h_incrfloat_bad', () => client.sendCommand(['HINCRBYFLOAT', k('h1'), 'n', 'bad']));
+await capture('h_scan_wrongtype', () => client.sendCommand(['HSCAN', k('hw'), '0']));
+
+await client.rPush(k('li'), ['a', 'b', 'c']);
+await client.rPush(k('lj'), ['a', 'b', 'c']);
+out.list_insert_before = Number(await client.sendCommand(['LINSERT', k('li'), 'BEFORE', 'b', 'x']));
+out.list_insert_before_values = await client.lRange(k('li'), 0, -1);
+out.list_insert_after = Number(await client.sendCommand(['LINSERT', k('lj'), 'AFTER', 'b', 'x']));
+out.list_insert_after_values = await client.lRange(k('lj'), 0, -1);
+out.list_insert_missing_pivot = Number(await client.sendCommand(['LINSERT', k('li'), 'BEFORE', 'z', 'x']));
+out.list_insert_missing_key = Number(await client.sendCommand(['LINSERT', k('ln'), 'BEFORE', 'a', 'x']));
+await captureError('list_insert_bad_direction', () => client.sendCommand(['LINSERT', k('li'), 'MIDDLE', 'a', 'x']));
+await capture('list_insert_wrongtype', () => client.sendCommand(['LINSERT', k('hw'), 'BEFORE', 'a', 'x']));
+await client.rPush(k('lp'), ['a', 'b', 'c']);
+const lmpop = await client.sendCommand(['LMPOP', '1', k('lp'), 'LEFT', 'COUNT', '2']);
+out.list_mpop_left = [lmpop[0] === k('lp') ? 1 : 0, lmpop[1]];
+out.list_mpop_left_rest = await client.lRange(k('lp'), 0, -1);
+out.list_mpop_none = await client.sendCommand(['LMPOP', '2', k('ln'), k('lm'), 'LEFT']);
+await captureError('list_mpop_zero', () => client.sendCommand(['LMPOP', '0', k('lp'), 'LEFT']));
+await captureError('list_mpop_bad_side', () => client.sendCommand(['LMPOP', '1', k('lp'), 'UP']));
+await captureError('list_mpop_zero_count', () => client.sendCommand(['LMPOP', '1', k('lp'), 'LEFT', 'COUNT', '0']));
+await capture('list_mpop_wrongtype', () => client.sendCommand(['LMPOP', '1', k('hw'), 'LEFT']));
+await client.rPush(k('lb'), ['a', 'b', 'c']);
+out.list_range_full = await client.lRange(k('lb'), 0, -1);
+out.list_range_tail = await client.lRange(k('lb'), -2, -1);
+out.list_range_clip = await client.lRange(k('lb'), 2, 100);
+out.list_range_past = await client.lRange(k('lb'), 100, 200);
+out.list_range_negative_stop = await client.lRange(k('lb'), 0, -100);
+await capture('list_range_wrongtype', () => client.lRange(k('hw'), 0, -1));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1097,6 +1190,60 @@ zscan = client.execute_command('ZSCAN', k('zm'), 0)
 out['zscan_missing'] = [str(zscan[0]), [item for pair in zscan[1] for item in (str(pair[0]), '%g' % float(pair[1]))]]
 capture_error('zscan_bad_cursor', lambda: client.execute_command('ZSCAN', k('za'), 'not-a-cursor'))
 capture('zscan_wrongtype', lambda: client.execute_command('ZSCAN', k('zw'), 0))
+
+client.execute_command('SELECT', 11)
+client.flushdb()
+client.hset(k('h1'), mapping={'a': '1', 'b': '2', 'c': '3'})
+out['h_keys'] = client.hkeys(k('h1'))
+out['h_vals'] = client.hvals(k('h1'))
+out['h_setnx_new'] = int(client.hsetnx(k('h1'), 'd', '4'))
+out['h_get_new'] = client.hget(k('h1'), 'd')
+out['h_setnx_existing'] = int(client.hsetnx(k('h1'), 'a', '9'))
+out['h_get_existing'] = client.hget(k('h1'), 'a')
+out['h_exists_yes'] = int(client.hexists(k('h1'), 'a'))
+out['h_exists_no'] = int(client.hexists(k('h1'), 'z'))
+out['h_incrfloat_new'] = '%g' % client.hincrbyfloat(k('h1'), 'n', 1.5)
+out['h_incrfloat_second'] = '%g' % client.hincrbyfloat(k('h1'), 'n', 0.25)
+out['h_type'] = client.type(k('h1'))
+client.hset(k('hf'), mapping={'f': 'v'})
+out['h_rand_single'] = client.execute_command('HRANDFIELD', k('hf'))
+out['h_rand_count'] = client.execute_command('HRANDFIELD', k('hf'), 2)
+out['h_rand_values'] = client.execute_command('HRANDFIELD', k('hf'), 1, 'WITHVALUES')
+hscan = client.hscan(k('h1'), 0, count=2)
+out['h_scan'] = [str(hscan[0]), [item for pair in hscan[1].items() for item in pair]]
+hscan = client.hscan(k('h1'), 0, match='b*', count=100)
+out['h_scan_match'] = [str(hscan[0]), [item for pair in hscan[1].items() for item in pair]]
+client.set(k('hw'), 'v')
+capture('h_setnx_wrongtype', lambda: client.hsetnx(k('hw'), 'f', 'v'))
+capture_error('h_incrfloat_bad', lambda: client.execute_command('HINCRBYFLOAT', k('h1'), 'n', 'bad'))
+capture('h_scan_wrongtype', lambda: client.execute_command('HSCAN', k('hw'), 0))
+
+client.rpush(k('li'), 'a', 'b', 'c')
+client.rpush(k('lj'), 'a', 'b', 'c')
+out['list_insert_before'] = client.execute_command('LINSERT', k('li'), 'BEFORE', 'b', 'x')
+out['list_insert_before_values'] = client.lrange(k('li'), 0, -1)
+out['list_insert_after'] = client.execute_command('LINSERT', k('lj'), 'AFTER', 'b', 'x')
+out['list_insert_after_values'] = client.lrange(k('lj'), 0, -1)
+out['list_insert_missing_pivot'] = client.execute_command('LINSERT', k('li'), 'BEFORE', 'z', 'x')
+out['list_insert_missing_key'] = client.execute_command('LINSERT', k('ln'), 'BEFORE', 'a', 'x')
+capture_error('list_insert_bad_direction', lambda: client.execute_command('LINSERT', k('li'), 'MIDDLE', 'a', 'x'))
+capture('list_insert_wrongtype', lambda: client.execute_command('LINSERT', k('hw'), 'BEFORE', 'a', 'x'))
+client.rpush(k('lp'), 'a', 'b', 'c')
+lmpop = client.execute_command('LMPOP', 1, k('lp'), 'LEFT', 'COUNT', 2)
+out['list_mpop_left'] = [1 if lmpop[0] == k('lp') else 0, lmpop[1]]
+out['list_mpop_left_rest'] = client.lrange(k('lp'), 0, -1)
+out['list_mpop_none'] = client.execute_command('LMPOP', 2, k('ln'), k('lm'), 'LEFT')
+capture_error('list_mpop_zero', lambda: client.execute_command('LMPOP', 0, k('lp'), 'LEFT'))
+capture_error('list_mpop_bad_side', lambda: client.execute_command('LMPOP', 1, k('lp'), 'UP'))
+capture_error('list_mpop_zero_count', lambda: client.execute_command('LMPOP', 1, k('lp'), 'LEFT', 'COUNT', 0))
+capture('list_mpop_wrongtype', lambda: client.execute_command('LMPOP', 1, k('hw'), 'LEFT'))
+client.rpush(k('lb'), 'a', 'b', 'c')
+out['list_range_full'] = client.lrange(k('lb'), 0, -1)
+out['list_range_tail'] = client.lrange(k('lb'), -2, -1)
+out['list_range_clip'] = client.lrange(k('lb'), 2, 100)
+out['list_range_past'] = client.lrange(k('lb'), 100, 200)
+out['list_range_negative_stop'] = client.lrange(k('lb'), 0, -100)
+capture('list_range_wrongtype', lambda: client.lrange(k('hw'), 0, -1))
 
 client.close()
 print(json.dumps(out))

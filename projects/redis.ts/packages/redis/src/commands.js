@@ -759,6 +759,13 @@ function plan(store, session, name, args) {
         case 'hdel':
         case 'hlen':
         case 'hincrby':
+        case 'hsetnx':
+        case 'hkeys':
+        case 'hvals':
+        case 'hexists':
+        case 'hincrbyfloat':
+        case 'hrandfield':
+        case 'hscan':
         case 'lpush':
         case 'rpush':
         case 'lrange':
@@ -766,6 +773,8 @@ function plan(store, session, name, args) {
         case 'lpop':
         case 'rpop':
         case 'llen':
+        case 'linsert':
+        case 'lmpop':
         case 'sadd':
         case 'srem':
         case 'smembers':
@@ -1619,6 +1628,150 @@ function planCollection(store, session, name, args) {
     const db = session.db;
     const key = args.length > 1 ? args[1] : null;
     switch (name) {
+        case 'hsetnx': {
+            if (args.length !== 4) return { error: wrongArity('hsetnx') };
+            const field = args[2];
+            const value = args[3];
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = kind === null ? [] : readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    if (fields.some(([name]) => name.equals(field))) return integer(0);
+                    fields.push([field, value]);
+                    const body = encodeHash(fields);
+                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
+                    rewriteKind(store, db, 'hash', key, body);
+                    return integer(1);
+                },
+            };
+        }
+
+        case 'hkeys':
+        case 'hvals': {
+            if (args.length !== 2) return { error: wrongArity(name) };
+            const byName = name === 'hkeys';
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    if (kind === null) return array([]);
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    return array(fields.map(([field, value]) => bulk(byName ? field : value)));
+                },
+            };
+        }
+
+        case 'hexists': {
+            if (args.length !== 3) return { error: wrongArity('hexists') };
+            const field = args[2];
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    if (kind === null) return integer(0);
+                    const fields = readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    return integer(fields.some(([name]) => name.equals(field)) ? 1 : 0);
+                },
+            };
+        }
+
+        case 'hincrbyfloat': {
+            if (args.length !== 4) return { error: wrongArity('hincrbyfloat') };
+            const increment = parseFloatText(args[3]);
+            if (increment === null || !Number.isFinite(increment)) {
+                return { error: replyError('ERR value is not a valid float') };
+            }
+            const field = args[2];
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = kind === null ? [] : readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    const position = fields.findIndex(([name]) => name.equals(field));
+                    let current = 0;
+                    if (position >= 0) {
+                        const parsed = parseFloatText(fields[position][1]);
+                        if (parsed === null || Number.isNaN(parsed)) {
+                            return replyError('ERR hash value is not a float');
+                        }
+                        current = parsed;
+                    }
+                    const updated = current + increment;
+                    if (!Number.isFinite(updated)) {
+                        return replyError('ERR increment would produce NaN or Infinity');
+                    }
+                    const value = Buffer.from(scoreText(updated), 'utf8');
+                    if (position >= 0) fields[position] = [field, value];
+                    else fields.push([field, value]);
+                    const body = encodeHash(fields);
+                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
+                    rewriteKind(store, db, 'hash', key, body);
+                    return bulk(value);
+                },
+            };
+        }
+
+        case 'hrandfield': {
+            if (args.length < 2 || args.length > 4) return { error: wrongArity('hrandfield') };
+            let count = null;
+            let withValues = false;
+            if (args.length >= 3) {
+                count = parseInteger(args[2]);
+                if (count === null) return { error: integerError() };
+                if (args.length === 4) {
+                    if (text(args[3]).toLowerCase() !== 'withvalues') return { error: replyError('ERR syntax error') };
+                    withValues = true;
+                }
+            }
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = kind === null ? [] : readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    if (count === null) {
+                        if (fields.length === 0) return nullReply();
+                        return bulk(randomMember(fields)[0]);
+                    }
+                    const items = [];
+                    for (const [field, value] of sampleMembers(fields, count)) {
+                        items.push(bulk(field));
+                        if (withValues) items.push(bulk(value));
+                    }
+                    return array(items);
+                },
+            };
+        }
+
+        case 'hscan': {
+            if (args.length < 3) return { error: wrongArity('hscan') };
+            const cursor = parseScanCursor(args[2]);
+            if (cursor === null) return { error: replyError('ERR invalid cursor') };
+            const options = parseScanOptions(args, 3);
+            if (options.error !== undefined) return { error: options.error };
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'hash') return wrongType();
+                    const fields = kind === null ? [] : readHash(store, db, key);
+                    if (fields === null) return replyError('ERR stored hash value is corrupt');
+                    return scanReply(
+                        fields,
+                        cursor,
+                        options.count,
+                        options.pattern,
+                        entry => entry[0],
+                        entry => [bulk(entry[0]), bulk(entry[1])],
+                    );
+                },
+            };
+        }
+
         case 'hset': {
             if (args.length < 4 || (args.length - 2) % 2 !== 0) return { error: wrongArity('hset') };
             return {
@@ -1754,6 +1907,82 @@ function planCollection(store, session, name, args) {
                     if (body === null) return replyError('ERR hash value exceeds the storage limit');
                     rewriteKind(store, db, 'hash', key, body);
                     return integer(updated);
+                },
+            };
+        }
+
+        case 'linsert': {
+            if (args.length !== 5) return { error: wrongArity('linsert') };
+            const where = text(args[2]).toLowerCase();
+            if (where !== 'before' && where !== 'after') return { error: replyError('ERR syntax error') };
+            const pivot = args[3];
+            const element = args[4];
+            return {
+                run: () => {
+                    const kind = kindOf(store, db, key);
+                    if (kind !== null && kind !== 'list') return wrongType();
+                    if (kind === null) return integer(0);
+                    const elements = readList(store, db, key);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    const position = elements.findIndex(entry => entry.equals(pivot));
+                    if (position < 0) return integer(-1);
+                    const at = where === 'before' ? position : position + 1;
+                    const updated = elements.slice(0, at).concat([element], elements.slice(at));
+                    const body = encodeList(updated);
+                    if (body === null) return replyError('ERR list value exceeds the storage limit');
+                    rewriteKind(store, db, 'list', key, body);
+                    return integer(updated.length);
+                },
+            };
+        }
+
+        case 'lmpop': {
+            if (args.length < 4) return { error: wrongArity('lmpop') };
+            const count = parseInteger(args[1]);
+            if (count === null || count <= 0) {
+                return { error: replyError('ERR numkeys should be greater than 0') };
+            }
+            if (count > args.length - 2) {
+                return { error: replyError("ERR Number of keys can't be greater than number of args") };
+            }
+            const keys = args.slice(2, 2 + count);
+            const sideIndex = 2 + count;
+            const side = text(args[sideIndex]).toLowerCase();
+            if (side !== 'left' && side !== 'right') return { error: replyError('ERR syntax error') };
+            let amount = 1;
+            if (sideIndex + 1 < args.length) {
+                if (text(args[sideIndex + 1]).toLowerCase() !== 'count' || sideIndex + 3 !== args.length) {
+                    return { error: replyError('ERR syntax error') };
+                }
+                const requested = parseInteger(args[sideIndex + 2]);
+                if (requested === null || requested <= 0) {
+                    return { error: replyError('ERR count should be greater than 0') };
+                }
+                amount = requested;
+            }
+            return {
+                run: () => {
+                    for (const candidate of keys) {
+                        const kind = kindOf(store, db, candidate);
+                        if (kind === null) continue;
+                        if (kind !== 'list') return wrongType();
+                        const elements = readList(store, db, candidate);
+                        if (elements === null) return replyError('ERR stored list value is corrupt');
+                        if (elements.length === 0) continue;
+                        const take = Math.min(amount, elements.length);
+                        const popped = side === 'left' ? elements.slice(0, take) : elements.slice(-take).reverse();
+                        const kept = side === 'left' ? elements.slice(take) : elements.slice(0, elements.length - take);
+                        if (kept.length === 0) {
+                            store.deleteKind(db, SUFFIX.list, candidate);
+                        }
+                        else {
+                            const body = encodeList(kept);
+                            if (body === null) return replyError('ERR list value exceeds the storage limit');
+                            rewriteKind(store, db, 'list', candidate, body);
+                        }
+                        return array([bulk(candidate), array(popped.map(element => bulk(element)))]);
+                    }
+                    return nullArray();
                 },
             };
         }

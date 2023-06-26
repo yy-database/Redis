@@ -1,0 +1,344 @@
+{
+  "format": "redis.case/v1",
+  "table": "hash-ops",
+  "cases": [
+    {
+      "id": "command.hsetnx.new-field",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSETNX", "h1", "d", "4"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "010000006101000000310100000062010000003201000000630100000033" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "6831", "expect": { "bytes": "01000000610100000031010000006201000000320100000063010000003301000000640100000034" } }
+      ]
+    },
+    {
+      "id": "command.hsetnx.existing-field",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSETNX", "h1", "a", "9"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "0100000061010000003101000000620100000032" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "6831", "expect": { "bytes": "0100000061010000003101000000620100000032" } }
+      ]
+    },
+    {
+      "id": "command.hsetnx.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSETNX", "h9", "f", "v"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "6839", "expect": { "bytes": "01000000660100000076" } }
+      ]
+    },
+    {
+      "id": "command.hsetnx.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSETNX", "s1", "f", "v"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hkeys.basic",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HKEYS", "h1"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [99] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "010000006101000000310100000062010000003201000000630100000033" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hkeys.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HKEYS", "h9"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hvals.basic",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HVALS", "h1"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [49] }, { "type": "bulk", "bytes": [50] }, { "type": "bulk", "bytes": [51] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "010000006101000000310100000062010000003201000000630100000033" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hvals.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HVALS", "h9"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hexists.present",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HEXISTS", "h1", "a"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "0100000061010000003101000000620100000032" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hexists.absent",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HEXISTS", "h1", "z"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "0100000061010000003101000000620100000032" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hexists.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HEXISTS", "h9", "a"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hexists.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HEXISTS", "s1", "a"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hincrbyfloat.new-field",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HINCRBYFLOAT", "h1", "f", "1.5"],
+      "reply": { "type": "bulk", "bytes": [49, 46, 53] },
+      "setup": [],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "hash", "keyHex": "6831", "expect": { "bytes": "010000006603000000312e35" } }
+      ]
+    },
+    {
+      "id": "command.hincrbyfloat.accumulates",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HINCRBYFLOAT", "h1", "f", "0.25"],
+      "reply": { "type": "bulk", "bytes": [53, 46, 50, 53] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000660100000035" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hincrbyfloat.bad-increment",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HINCRBYFLOAT", "h1", "f", "not-a-float"],
+      "reply": { "type": "error", "value": "ERR value is not a valid float" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hincrbyfloat.bad-current",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HINCRBYFLOAT", "h1", "bad", "1"],
+      "reply": { "type": "error", "value": "ERR hash value is not a float" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "03000000626164050000006e6f742d61" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hincrbyfloat.overflow",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HINCRBYFLOAT", "h1", "big", "1e308"],
+      "reply": { "type": "error", "value": "ERR increment would produce NaN or Infinity" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "03000000626967050000003165333038" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hincrbyfloat.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HINCRBYFLOAT", "s1", "f", "1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hrandfield.single",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HRANDFIELD", "h1"],
+      "reply": { "type": "bulk", "bytes": [97] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000610100000031" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hrandfield.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HRANDFIELD", "h9"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hrandfield.positive-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HRANDFIELD", "h1", "3"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000610100000031" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hrandfield.negative-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HRANDFIELD", "h1", "-2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000610100000031" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hrandfield.withvalues",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HRANDFIELD", "h1", "1", "WITHVALUES"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [49] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "01000000610100000031" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hrandfield.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HRANDFIELD", "s1", "1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hscan.full-page",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSCAN", "h1", "0", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [50] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [49] }, { "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [50] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "010000006101000000310100000062010000003201000000630100000033" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hscan.match",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSCAN", "h1", "0", "MATCH", "b*", "COUNT", "100"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [48] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [50] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "6831", "valueHex": "010000006101000000310100000062010000003201000000630100000033" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.hscan.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSCAN", "h9", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [48] }, { "type": "array", "value": [] }] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hscan.invalid-cursor",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSCAN", "h1", "nan"],
+      "reply": { "type": "error", "value": "ERR invalid cursor" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.hscan.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["HSCAN", "s1", "0"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    }
+  ]
+}

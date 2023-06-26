@@ -1,0 +1,280 @@
+{
+  "format": "redis.case/v1",
+  "table": "list-ops",
+  "cases": [
+    {
+      "id": "command.linsert.before",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LINSERT", "l1", "BEFORE", "b", "x"],
+      "reply": { "type": "int", "value": 4 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000061010000007801000000620100000063" } }
+      ]
+    },
+    {
+      "id": "command.linsert.after",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LINSERT", "l1", "AFTER", "b", "x"],
+      "reply": { "type": "int", "value": 4 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000061010000006201000000780100000063" } }
+      ]
+    },
+    {
+      "id": "command.linsert.pivot-missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LINSERT", "l1", "BEFORE", "z", "x"],
+      "reply": { "type": "int", "value": -1 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "010000006101000000620100000063" } }
+      ]
+    },
+    {
+      "id": "command.linsert.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LINSERT", "l9", "BEFORE", "a", "x"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c39", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.linsert.bad-direction",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LINSERT", "l1", "MIDDLE", "a", "x"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.linsert.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LINSERT", "s1", "BEFORE", "a", "x"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.left-one",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "1", "l1", "LEFT"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "01000000620100000063" } }
+      ]
+    },
+    {
+      "id": "command.lmpop.left-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "1", "l1", "LEFT", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000063" } }
+      ]
+    },
+    {
+      "id": "command.lmpop.right-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "1", "l1", "RIGHT", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [99] }, { "type": "bulk", "bytes": [98] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.lmpop.skips-missing-first",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "2", "l9", "l1", "LEFT"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.none",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "2", "l9", "l8", "LEFT"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.zero-numkeys",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "0", "l1", "LEFT"],
+      "reply": { "type": "error", "value": "ERR numkeys should be greater than 0" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.too-many-keys",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "3", "l1", "LEFT"],
+      "reply": { "type": "error", "value": "ERR Number of keys can't be greater than number of args" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.bad-side",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "1", "l1", "UP"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.zero-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "1", "l1", "LEFT", "COUNT", "0"],
+      "reply": { "type": "error", "value": "ERR count should be greater than 0" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lmpop.wrong-type-first",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LMPOP", "1", "s1", "LEFT"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.full",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l1", "0", "-1"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [99] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.negative-tail",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l1", "-2", "-1"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [99] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.clip-stop",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l1", "2", "100"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [99] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.start-past-end",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l1", "100", "200"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.negative-stop-before-start",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l1", "0", "-100"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "l9", "0", "-1"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lrange.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LRANGE", "s1", "0", "-1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    }
+  ]
+}
