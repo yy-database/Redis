@@ -381,6 +381,22 @@ const EXPECTED = {
     za_union_bad_weight: { error: 'weight value is not a float' },
     za_union_bad_aggregate: { error: 'syntax error' },
     za_intercard_limit_negative: { error: "LIMIT can't be negative" },
+    sort_numeric: ['1', '2', '3', '10'],
+    sort_desc: ['10', '3', '2', '1'],
+    sort_limit: ['2', '3'],
+    sort_alpha: ['apple', 'banana', 'cherry'],
+    sort_by_pattern: ['b', 'c', 'a'],
+    sort_by_hash: ['c', 'a', 'b'],
+    sort_get_missing: [null, null, 'va'],
+    sort_zset_nosort: ['2', '3', '1'],
+    sort_store_reply: 4,
+    sort_store_values: ['1', '2', '3', '10'],
+    sort_store_ttl: -1,
+    sort_ro: ['1', '2', '3', '10'],
+    sort_wrongtype: { error: WRONG_TYPE },
+    sort_bad_number: { error: "One or more scores can't be converted into double" },
+    sort_ro_store: { error: 'SORT_RO does not support the STORE option' },
+    sort_bad_option: { error: 'syntax error' },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -960,6 +976,39 @@ await captureError('za_union_bad_aggregate', () => client.sendCommand([
 await captureError('za_intercard_limit_negative', () => client.sendCommand([
     'ZINTERCARD', '2', k('zqa'), k('zqb'), 'LIMIT', '-1',
 ]));
+
+await client.rPush(k('srtn'), ['3', '1', '2', '10']);
+out.sort_numeric = await client.sendCommand(['SORT', k('srtn')]);
+out.sort_desc = await client.sendCommand(['SORT', k('srtn'), 'DESC']);
+out.sort_limit = await client.sendCommand(['SORT', k('srtn'), 'LIMIT', '1', '2']);
+out.sort_ro = await client.sendCommand(['SORT_RO', k('srtn')]);
+await client.rPush(k('srtw'), ['banana', 'apple', 'cherry']);
+out.sort_alpha = await client.sendCommand(['SORT', k('srtw'), 'ALPHA']);
+await client.rPush(k('srti'), ['a', 'b', 'c']);
+await client.set(k('srtw_a'), '10');
+await client.set(k('srtw_b'), '1');
+await client.set(k('srtw_c'), '5');
+out.sort_by_pattern = await client.sendCommand(['SORT', k('srti'), 'BY', k('srtw_') + '*']);
+await client.set(k('srtd_a'), 'va');
+out.sort_get_missing = await client.sendCommand([
+    'SORT', k('srti'), 'BY', k('srtw_') + '*', 'GET', k('srtd_') + '*',
+]);
+await client.hSet(k('srth_a'), 'v', '7');
+await client.hSet(k('srth_b'), 'v', '9');
+await client.hSet(k('srth_c'), 'v', '1');
+out.sort_by_hash = await client.sendCommand(['SORT', k('srti'), 'BY', k('srth_') + '*->v']);
+await client.zAdd(k('srtz'), [{ score: 5, value: '3' }, { score: 9, value: '1' }, { score: 1, value: '2' }]);
+out.sort_zset_nosort = await client.sendCommand(['SORT', k('srtz'), 'BY', 'nosort']);
+await client.sendCommand(['SET', k('srto'), 'old', 'EX', '100']);
+out.sort_store_reply = Number(await client.sendCommand(['SORT', k('srtn'), 'STORE', k('srto')]));
+out.sort_store_values = await client.lRange(k('srto'), 0, -1);
+out.sort_store_ttl = Number(await client.ttl(k('srto')));
+await client.set(k('srtp'), 'v');
+await capture('sort_wrongtype', () => client.sendCommand(['SORT', k('srtp')]));
+await client.rPush(k('srtb'), ['x', '1']);
+await captureError('sort_bad_number', () => client.sendCommand(['SORT', k('srtb')]));
+await captureError('sort_ro_store', () => client.sendCommand(['SORT_RO', k('srtn'), 'STORE', k('srto')]));
+await captureError('sort_bad_option', () => client.sendCommand(['SORT', k('srtn'), 'BOGUS']));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1546,6 +1595,39 @@ capture_error('za_union_bad_aggregate', lambda: client.execute_command(
 capture_error('za_intercard_limit_negative', lambda: client.execute_command(
     'ZINTERCARD', 2, k('zqa'), k('zqb'), 'LIMIT', -1
 ))
+
+client.rpush(k('srtn'), '3', '1', '2', '10')
+out['sort_numeric'] = client.execute_command('SORT', k('srtn'))
+out['sort_desc'] = client.execute_command('SORT', k('srtn'), 'DESC')
+out['sort_limit'] = client.execute_command('SORT', k('srtn'), 'LIMIT', 1, 2)
+out['sort_ro'] = client.execute_command('SORT_RO', k('srtn'))
+client.rpush(k('srtw'), 'banana', 'apple', 'cherry')
+out['sort_alpha'] = client.execute_command('SORT', k('srtw'), 'ALPHA')
+client.rpush(k('srti'), 'a', 'b', 'c')
+client.set(k('srtw_a'), '10')
+client.set(k('srtw_b'), '1')
+client.set(k('srtw_c'), '5')
+out['sort_by_pattern'] = client.execute_command('SORT', k('srti'), 'BY', k('srtw_') + '*')
+client.set(k('srtd_a'), 'va')
+out['sort_get_missing'] = client.execute_command(
+    'SORT', k('srti'), 'BY', k('srtw_') + '*', 'GET', k('srtd_') + '*'
+)
+client.hset(k('srth_a'), 'v', '7')
+client.hset(k('srth_b'), 'v', '9')
+client.hset(k('srth_c'), 'v', '1')
+out['sort_by_hash'] = client.execute_command('SORT', k('srti'), 'BY', k('srth_') + '*->v')
+client.zadd(k('srtz'), {'3': 5, '1': 9, '2': 1})
+out['sort_zset_nosort'] = client.execute_command('SORT', k('srtz'), 'BY', 'nosort')
+client.execute_command('SET', k('srto'), 'old', 'EX', 100)
+out['sort_store_reply'] = client.execute_command('SORT', k('srtn'), 'STORE', k('srto'))
+out['sort_store_values'] = client.lrange(k('srto'), 0, -1)
+out['sort_store_ttl'] = client.ttl(k('srto'))
+client.set(k('srtp'), 'v')
+capture('sort_wrongtype', lambda: client.execute_command('SORT', k('srtp')))
+client.rpush(k('srtb'), 'x', '1')
+capture_error('sort_bad_number', lambda: client.execute_command('SORT', k('srtb')))
+capture_error('sort_ro_store', lambda: client.execute_command('SORT_RO', k('srtn'), 'STORE', k('srto')))
+capture_error('sort_bad_option', lambda: client.execute_command('SORT', k('srtn'), 'BOGUS'))
 
 client.close()
 print(json.dumps(out))
