@@ -397,6 +397,29 @@ const EXPECTED = {
     sort_bad_number: { error: "One or more scores can't be converted into double" },
     sort_ro_store: { error: 'SORT_RO does not support the STORE option' },
     sort_bad_option: { error: 'syntax error' },
+    bf_set_get: [0, 255],
+    bf_get_missing: [0],
+    bf_missing_exists: 0,
+    bf_wrap_u8: [44],
+    bf_sat_u8: [255],
+    bf_fail_u8: [null],
+    bf_fail_kept: [200],
+    bf_i8_wrap: [127],
+    bf_u1_wrap: [0, 0],
+    bf_i64_get: -1,
+    bf_hash_offset: [0, 7],
+    bf_ro_get: [200],
+    bf_multi_get: [200, 0],
+    bf_incr_keep: [98],
+    bf_ttl: 100,
+    bf_wrongtype: { error: WRONG_TYPE },
+    bf_ro_set: { error: 'BITFIELD_RO only supports the GET subcommand' },
+    bf_u64: { error: 'Invalid bitfield type. Use something like i16 u8. Note that u64 is not supported but i64 is.' },
+    bf_negative_offset: { error: 'bit offset is not an integer or out of range' },
+    bf_bad_value: { error: 'value is not an integer or out of range' },
+    bf_bad_overflow: { error: 'Invalid OVERFLOW type specified' },
+    bf_syntax: { error: 'syntax error' },
+    bf_arity: { error: "wrong number of arguments for 'bitfield' command" },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1009,6 +1032,42 @@ await client.rPush(k('srtb'), ['x', '1']);
 await captureError('sort_bad_number', () => client.sendCommand(['SORT', k('srtb')]));
 await captureError('sort_ro_store', () => client.sendCommand(['SORT_RO', k('srtn'), 'STORE', k('srto')]));
 await captureError('sort_bad_option', () => client.sendCommand(['SORT', k('srtn'), 'BOGUS']));
+
+const bitfield = async (...parts) => (await client.sendCommand(['BITFIELD', ...parts]))
+    .map(value => (value === null ? null : Number(value)));
+const bitfieldRo = async (...parts) => (await client.sendCommand(['BITFIELD_RO', ...parts]))
+    .map(value => (value === null ? null : Number(value)));
+out.bf_set_get = await bitfield(k('bf1'), 'SET', 'u8', '0', '255', 'GET', 'u8', '0');
+out.bf_get_missing = await bitfield(k('bfmissing'), 'GET', 'u8', '0');
+out.bf_missing_exists = Number(await client.exists(k('bfmissing')));
+await bitfield(k('bf2'), 'SET', 'u8', '0', '200');
+out.bf_wrap_u8 = await bitfield(k('bf2'), 'INCRBY', 'u8', '0', '100');
+await bitfield(k('bf2'), 'SET', 'u8', '0', '200');
+out.bf_sat_u8 = await bitfield(k('bf2'), 'OVERFLOW', 'SAT', 'INCRBY', 'u8', '0', '100');
+await bitfield(k('bf2'), 'SET', 'u8', '0', '200');
+out.bf_fail_u8 = await bitfield(k('bf2'), 'OVERFLOW', 'FAIL', 'INCRBY', 'u8', '0', '100');
+out.bf_fail_kept = await bitfield(k('bf2'), 'GET', 'u8', '0');
+await bitfield(k('bf3'), 'SET', 'i8', '0', '-128');
+out.bf_i8_wrap = await bitfield(k('bf3'), 'INCRBY', 'i8', '0', '-1');
+out.bf_u1_wrap = await bitfield(k('bf4'), 'SET', 'u1', '0', '1', 'INCRBY', 'u1', '0', '1');
+await bitfield(k('bf5'), 'SET', 'i64', '0', '-1');
+out.bf_i64_get = (await bitfield(k('bf5'), 'GET', 'i64', '0'))[0];
+out.bf_hash_offset = await bitfield(k('bf6'), 'SET', 'u8', '#1', '7', 'GET', 'u8', '8');
+await bitfield(k('bf7'), 'SET', 'u8', '0', '200');
+out.bf_ro_get = await bitfieldRo(k('bf7'), 'GET', 'u8', '0');
+out.bf_multi_get = await bitfield(k('bf7'), 'GET', 'u8', '0', 'GET', 'u8', '8');
+await client.set(k('bf8'), 'abc', { EX: 100 });
+out.bf_incr_keep = await bitfield(k('bf8'), 'INCRBY', 'u8', '0', '1');
+out.bf_ttl = Number(await client.ttl(k('bf8')));
+await client.hSet(k('bfhash'), 'f', '1');
+await capture('bf_wrongtype', () => client.sendCommand(['BITFIELD', k('bfhash'), 'GET', 'u8', '0']));
+await captureError('bf_ro_set', () => client.sendCommand(['BITFIELD_RO', k('bf7'), 'SET', 'u8', '0', '1']));
+await captureError('bf_u64', () => client.sendCommand(['BITFIELD', k('bf7'), 'GET', 'u64', '0']));
+await captureError('bf_negative_offset', () => client.sendCommand(['BITFIELD', k('bf7'), 'GET', 'u8', '-1']));
+await captureError('bf_bad_value', () => client.sendCommand(['BITFIELD', k('bf7'), 'SET', 'u8', '0', 'x']));
+await captureError('bf_bad_overflow', () => client.sendCommand(['BITFIELD', k('bf7'), 'OVERFLOW', 'PREV', 'INCRBY', 'u8', '0', '1']));
+await captureError('bf_syntax', () => client.sendCommand(['BITFIELD', k('bf7'), 'BOGUS', 'u8', '0']));
+await captureError('bf_arity', () => client.sendCommand(['BITFIELD']));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1628,6 +1687,46 @@ client.rpush(k('srtb'), 'x', '1')
 capture_error('sort_bad_number', lambda: client.execute_command('SORT', k('srtb')))
 capture_error('sort_ro_store', lambda: client.execute_command('SORT_RO', k('srtn'), 'STORE', k('srto')))
 capture_error('sort_bad_option', lambda: client.execute_command('SORT', k('srtn'), 'BOGUS'))
+
+def bitfield(*parts):
+    return [None if value is None else int(value) for value in client.execute_command('BITFIELD', *parts)]
+
+
+def bitfield_ro(*parts):
+    return [None if value is None else int(value) for value in client.execute_command('BITFIELD_RO', *parts)]
+
+
+out['bf_set_get'] = bitfield(k('bf1'), 'SET', 'u8', '0', '255', 'GET', 'u8', '0')
+out['bf_get_missing'] = bitfield(k('bfmissing'), 'GET', 'u8', '0')
+out['bf_missing_exists'] = int(client.exists(k('bfmissing')))
+bitfield(k('bf2'), 'SET', 'u8', '0', '200')
+out['bf_wrap_u8'] = bitfield(k('bf2'), 'INCRBY', 'u8', '0', '100')
+bitfield(k('bf2'), 'SET', 'u8', '0', '200')
+out['bf_sat_u8'] = bitfield(k('bf2'), 'OVERFLOW', 'SAT', 'INCRBY', 'u8', '0', '100')
+bitfield(k('bf2'), 'SET', 'u8', '0', '200')
+out['bf_fail_u8'] = bitfield(k('bf2'), 'OVERFLOW', 'FAIL', 'INCRBY', 'u8', '0', '100')
+out['bf_fail_kept'] = bitfield(k('bf2'), 'GET', 'u8', '0')
+bitfield(k('bf3'), 'SET', 'i8', '0', '-128')
+out['bf_i8_wrap'] = bitfield(k('bf3'), 'INCRBY', 'i8', '0', '-1')
+out['bf_u1_wrap'] = bitfield(k('bf4'), 'SET', 'u1', '0', '1', 'INCRBY', 'u1', '0', '1')
+bitfield(k('bf5'), 'SET', 'i64', '0', '-1')
+out['bf_i64_get'] = bitfield(k('bf5'), 'GET', 'i64', '0')[0]
+out['bf_hash_offset'] = bitfield(k('bf6'), 'SET', 'u8', '#1', '7', 'GET', 'u8', '8')
+bitfield(k('bf7'), 'SET', 'u8', '0', '200')
+out['bf_ro_get'] = bitfield_ro(k('bf7'), 'GET', 'u8', '0')
+out['bf_multi_get'] = bitfield(k('bf7'), 'GET', 'u8', '0', 'GET', 'u8', '8')
+client.set(k('bf8'), 'abc', ex=100)
+out['bf_incr_keep'] = bitfield(k('bf8'), 'INCRBY', 'u8', '0', '1')
+out['bf_ttl'] = int(client.ttl(k('bf8')))
+client.hset(k('bfhash'), 'f', '1')
+capture('bf_wrongtype', lambda: client.execute_command('BITFIELD', k('bfhash'), 'GET', 'u8', '0'))
+capture_error('bf_ro_set', lambda: client.execute_command('BITFIELD_RO', k('bf7'), 'SET', 'u8', '0', '1'))
+capture_error('bf_u64', lambda: client.execute_command('BITFIELD', k('bf7'), 'GET', 'u64', '0'))
+capture_error('bf_negative_offset', lambda: client.execute_command('BITFIELD', k('bf7'), 'GET', 'u8', '-1'))
+capture_error('bf_bad_value', lambda: client.execute_command('BITFIELD', k('bf7'), 'SET', 'u8', '0', 'x'))
+capture_error('bf_bad_overflow', lambda: client.execute_command('BITFIELD', k('bf7'), 'OVERFLOW', 'PREV', 'INCRBY', 'u8', '0', '1'))
+capture_error('bf_syntax', lambda: client.execute_command('BITFIELD', k('bf7'), 'BOGUS', 'u8', '0'))
+capture_error('bf_arity', lambda: client.execute_command('BITFIELD'))
 
 client.close()
 print(json.dumps(out))

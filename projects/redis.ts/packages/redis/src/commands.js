@@ -223,6 +223,102 @@ function parseBitOffset(raw) {
     return value !== null && value >= 0 && value <= MAX_BIT_OFFSET ? value : null;
 }
 
+const INT64_MIN = -(1n << 63n);
+const INT64_MAX = (1n << 63n) - 1n;
+
+/** Parses one signed 64-bit integer exactly, `null` outside the range or on bad text. */
+function parseI64(raw) {
+    const value = text(raw);
+    const negative = value.startsWith('-');
+    const digits = negative ? value.slice(1) : value;
+    if (digits.length === 0 || digits.length > 19 || !/^\d+$/.test(digits)) return null;
+    if (digits.length > 1 && digits.startsWith('0')) return null;
+    const magnitude = BigInt(digits);
+    const parsed = negative ? -magnitude : magnitude;
+    return parsed >= INT64_MIN && parsed <= INT64_MAX ? parsed : null;
+}
+
+/**
+ * Parses `iN` / `uN` the way the gateway does.
+ *
+ * Unsigned widths stop at `u63` and signed widths stop at `i64`, matching the
+ * documented rejection of `u64`.
+ */
+function parseBitEncoding(raw) {
+    const value = text(raw);
+    const match = /^(i|u)(\d+)$/.exec(value.toLowerCase());
+    if (match === null) return null;
+    const signed = match[1] === 'i';
+    const bits = Number(match[2]);
+    if (!Number.isSafeInteger(bits) || bits < 1) return null;
+    if (bits > (signed ? 64 : 63)) return null;
+    return { signed, bits };
+}
+
+/** Parses a bit offset: plain bit index, or `#n` multiplied by the encoding width. */
+function parseBitfieldOffset(raw, bits) {
+    const value = text(raw);
+    let big;
+    if (value.startsWith('#')) {
+        const scaled = parseI64(value.slice(1));
+        big = scaled === null ? null : scaled * BigInt(bits);
+    }
+    else {
+        big = parseI64(value);
+    }
+    if (big === null || big < 0n || big > BigInt(MAX_BIT_OFFSET)) return null;
+    return Number(big);
+}
+
+/** Reads one bitfield value, missing bits counting as zero. */
+function readBitfield(body, offset, encoding) {
+    let raw = 0n;
+    for (let step = 0; step < encoding.bits; step += 1) {
+        const position = offset + step;
+        const index = Math.floor(position / 8);
+        const bit = index < body.length ? (body[index] >> (7 - (position % 8))) & 1 : 0;
+        raw = (raw << 1n) | BigInt(bit);
+    }
+    if (encoding.signed && raw >= (1n << BigInt(encoding.bits - 1))) {
+        return raw - (1n << BigInt(encoding.bits));
+    }
+    return raw;
+}
+
+/** Writes one bitfield value, growing the body and zero filling as needed. */
+function writeBitfield(body, offset, encoding, value) {
+    const bits = encoding.bits;
+    const mask = (1n << BigInt(bits)) - 1n;
+    const raw = value & mask;
+    const needed = Math.floor((offset + bits + 7) / 8);
+    if (body.length < needed) {
+        const grown = Buffer.alloc(needed);
+        body.copy(grown, 0);
+        body = grown;
+    }
+    for (let step = 0; step < bits; step += 1) {
+        const position = offset + step;
+        const byte = Math.floor(position / 8);
+        const bit = (raw >> BigInt(bits - 1 - step)) & 1n;
+        const shift = 7 - (position % 8);
+        if (bit === 1n) body[byte] |= 1 << shift;
+        else body[byte] &= ~(1 << shift);
+    }
+    return body;
+}
+
+/** Range check plus the selected `WRAP` / `SAT` / `FAIL` policy; `null` on `FAIL`. */
+function normalizeBitfield(value, encoding, overflow) {
+    const bits = BigInt(encoding.bits);
+    const minimum = encoding.signed ? -(1n << (bits - 1n)) : 0n;
+    const maximum = encoding.signed ? (1n << (bits - 1n)) - 1n : (1n << bits) - 1n;
+    if (value >= minimum && value <= maximum) return value;
+    if (overflow === 'fail') return null;
+    if (overflow === 'sat') return value < minimum ? minimum : maximum;
+    const span = maximum - minimum + 1n;
+    return minimum + (((value - minimum) % span) + span) % span;
+}
+
 /**
  * Parses one float the way `INCRBYFLOAT` reads it.
  *
@@ -752,6 +848,10 @@ function plan(store, session, name, args) {
                 },
             };
         }
+
+        case 'bitfield':
+        case 'bitfield_ro':
+            return planBitfield(store, session, name, args);
 
         case 'hset':
         case 'hget':
@@ -2043,6 +2143,95 @@ function planSort(store, session, name, args) {
                 return integer(gathered.length);
             }
             return array(gathered.map(value => (value === null ? nullReply() : bulk(value))));
+        },
+    };
+}
+
+/**
+ * Plans one `BITFIELD` / `BITFIELD_RO` call.
+ *
+ * Every subcommand is parsed before the key is touched, so a malformed encoding
+ * or value rejects the whole call without creating or rewriting the key. Only
+ * `GET` leaves the body untouched, which is why a read never materialises an
+ * absent key.
+ */
+function planBitfield(store, session, name, args) {
+    const db = session.db;
+    const readonly = name === 'bitfield_ro';
+    if (args.length < 2) return { error: wrongArity(name) };
+    let overflow = 'wrap';
+    const operations = [];
+    let index = 2;
+    while (index < args.length) {
+        const keyword = text(args[index]).toLowerCase();
+        if (keyword === 'overflow') {
+            const policy = args[index + 1] === undefined ? null : text(args[index + 1]).toLowerCase();
+            if (policy === null) return { error: replyError('ERR syntax error') };
+            if (policy !== 'wrap' && policy !== 'sat' && policy !== 'fail') {
+                return { error: replyError('ERR Invalid OVERFLOW type specified') };
+            }
+            overflow = policy;
+            index += 2;
+            continue;
+        }
+        const writing = keyword === 'set' || keyword === 'incrby';
+        if (readonly && writing) {
+            return { error: replyError('ERR BITFIELD_RO only supports the GET subcommand') };
+        }
+        const needed = keyword === 'get' ? 3 : writing ? 4 : 0;
+        if (needed === 0 || index + needed > args.length) {
+            return { error: replyError('ERR syntax error') };
+        }
+        const encoding = parseBitEncoding(args[index + 1]);
+        if (encoding === null) {
+            return { error: replyError('ERR Invalid bitfield type. Use something like i16 u8. Note that u64 is not supported but i64 is.') };
+        }
+        const offset = parseBitfieldOffset(args[index + 2], encoding.bits);
+        if (offset === null) {
+            return { error: replyError('ERR bit offset is not an integer or out of range') };
+        }
+        if (keyword === 'get') {
+            operations.push({ kind: 'get', encoding, offset });
+        }
+        else {
+            const value = parseI64(args[index + 3]);
+            if (value === null) {
+                return { error: replyError('ERR value is not an integer or out of range') };
+            }
+            operations.push({ kind: keyword, encoding, offset, value, overflow });
+        }
+        index += needed;
+    }
+    return {
+        run: () => {
+            const kind = kindOf(store, db, args[1]);
+            if (kind !== null && kind !== 'string') return wrongType();
+            let body = readString(store, db, args[1]) ?? Buffer.alloc(0);
+            const results = [];
+            let changed = false;
+            for (const operation of operations) {
+                if (operation.kind === 'get') {
+                    results.push(readBitfield(body, operation.offset, operation.encoding));
+                    continue;
+                }
+                const previous = readBitfield(body, operation.offset, operation.encoding);
+                if (operation.kind === 'set') {
+                    body = writeBitfield(body, operation.offset, operation.encoding, operation.value);
+                    changed = true;
+                    results.push(previous);
+                    continue;
+                }
+                const updated = normalizeBitfield(previous + operation.value, operation.encoding, operation.overflow);
+                if (updated === null) {
+                    results.push(null);
+                    continue;
+                }
+                body = writeBitfield(body, operation.offset, operation.encoding, updated);
+                changed = true;
+                results.push(updated);
+            }
+            if (changed) rewriteString(store, db, args[1], body);
+            return array(results.map(value => (value === null ? nullReply() : integer(Number(value)))));
         },
     };
 }

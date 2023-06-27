@@ -1,0 +1,370 @@
+{
+  "format": "redis.case/v1",
+  "table": "bitfield-ops",
+  "cases": [
+    {
+      "id": "command.bitfield.set-get-u8",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "SET", "u8", "0", "255", "GET", "u8", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": 255 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6266", "expect": { "bytes": "ff" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.get-missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "GET", "u8", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }] },
+      "setup": [],
+      "effect": [
+        { "call": "exists", "db": 0, "keyHex": "6266", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.bitfield.ro.get-missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD_RO", "bf", "GET", "u8", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }] },
+      "setup": [],
+      "effect": [
+        { "call": "exists", "db": 0, "keyHex": "6266", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.bitfield.set-returns-previous",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "SET", "u8", "0", "7"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 200 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6266", "valueHex": "c8" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6266", "expect": { "bytes": "07" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.set-truncates-u8",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "grow", "SET", "u8", "0", "256"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "67726f77", "expect": { "bytes": "00" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.set-negative-u8",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "SET", "u8", "0", "-1"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6266", "expect": { "bytes": "ff" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.incrby-wrap-u8",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "cnt", "INCRBY", "u8", "0", "100"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 44 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "636e74", "valueHex": "c8" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "636e74", "expect": { "bytes": "2c" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.incrby-sat-u8",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "cnt", "OVERFLOW", "SAT", "INCRBY", "u8", "0", "100"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 255 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "636e74", "valueHex": "c8" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "636e74", "expect": { "bytes": "ff" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.incrby-fail-u8",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "cnt", "OVERFLOW", "FAIL", "INCRBY", "u8", "0", "100"],
+      "reply": { "type": "array", "value": [{ "type": "null" }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "636e74", "valueHex": "c8" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "636e74", "expect": { "bytes": "c8" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.incrby-i8-wrap",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "s", "INCRBY", "i8", "0", "-1"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 127 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "73", "valueHex": "80" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "73", "expect": { "bytes": "7f" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.incrby-i8-sat",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "s", "OVERFLOW", "SAT", "INCRBY", "i8", "0", "1"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 127 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "73", "valueHex": "7f" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "73", "expect": { "bytes": "7f" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.incrby-i8-fail",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "s", "OVERFLOW", "FAIL", "INCRBY", "i8", "0", "1"],
+      "reply": { "type": "array", "value": [{ "type": "null" }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "73", "valueHex": "7f" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "73", "expect": { "bytes": "7f" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.u1-wrap",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "one", "SET", "u1", "0", "1", "INCRBY", "u1", "0", "1"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": 0 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6f6e65", "expect": { "bytes": "00" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.i7-signed",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "n", "SET", "i7", "0", "-64", "GET", "i7", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": -64 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6e", "expect": { "bytes": "80" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.i64-set-get",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "w", "SET", "i64", "0", "-1", "GET", "i64", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": -1 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "77", "expect": { "bytes": "ffffffffffffffff" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.multi-get",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "GET", "u8", "0", "GET", "u8", "8"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 200 }, { "type": "int", "value": 0 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6266", "valueHex": "c8" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6266", "expect": { "bytes": "c8" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.hash-offset",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "hasy", "SET", "u8", "#1", "7", "GET", "u8", "8"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": 7 }] },
+      "setup": [],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "68617379", "expect": { "bytes": "0007" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.overflow-scope",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "cnt", "OVERFLOW", "SAT", "INCRBY", "u8", "0", "100", "INCRBY", "u8", "0", "100"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 255 }, { "type": "int", "value": 255 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "636e74", "valueHex": "c8" }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "636e74", "expect": { "bytes": "ff" } }
+      ]
+    },
+    {
+      "id": "command.bitfield.ttl-preserved",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "keep", "INCRBY", "u8", "0", "1"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 98 }] },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6b656570", "valueHex": "616263", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "get", "db": 0, "keyHex": "6b656570", "expect": { "bytes": "626263" } },
+        { "call": "deadline", "db": 0, "keyHex": "6b656570", "expect": { "int": 4000000000000 } },
+        { "call": "exists", "db": 0, "keyHex": "6b656570", "expect": { "bool": true } }
+      ]
+    },
+    {
+      "id": "command.bitfield.empty-ops",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": [
+        { "call": "exists", "db": 0, "keyHex": "6266", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.bitfield.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "h", "GET", "u8", "0"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "68", "valueHex": "01000000660100000031" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.ro.set-rejected",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD_RO", "bf", "SET", "u8", "0", "1"],
+      "reply": { "type": "error", "value": "ERR BITFIELD_RO only supports the GET subcommand" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.u64-rejected",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "GET", "u64", "0"],
+      "reply": { "type": "error", "value": "ERR Invalid bitfield type. Use something like i16 u8. Note that u64 is not supported but i64 is." },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.i65-rejected",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "GET", "i65", "0"],
+      "reply": { "type": "error", "value": "ERR Invalid bitfield type. Use something like i16 u8. Note that u64 is not supported but i64 is." },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.negative-offset",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "GET", "u8", "-1"],
+      "reply": { "type": "error", "value": "ERR bit offset is not an integer or out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.bad-value",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "SET", "u8", "0", "x"],
+      "reply": { "type": "error", "value": "ERR value is not an integer or out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.bad-overflow",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "OVERFLOW", "PREV", "INCRBY", "u8", "0", "1"],
+      "reply": { "type": "error", "value": "ERR Invalid OVERFLOW type specified" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.overflow-missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "OVERFLOW"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.syntax",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD", "bf", "BOGUS", "u8", "0"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.bitfield.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BITFIELD"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'bitfield' command" },
+      "setup": [],
+      "effect": []
+    }
+  ]
+}
