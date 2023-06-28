@@ -891,6 +891,9 @@ function plan(store, session, name, args) {
         case 'zscan':
             return planCollection(store, session, name, args);
 
+        case 'lpos':
+            return planLpos(store, session, args);
+
         case 'zrangebyscore':
         case 'zrevrangebyscore':
         case 'zrangebylex':
@@ -2232,6 +2235,74 @@ function planBitfield(store, session, name, args) {
             }
             if (changed) rewriteString(store, db, args[1], body);
             return array(results.map(value => (value === null ? nullReply() : integer(Number(value)))));
+        },
+    };
+}
+
+/**
+ * Plans one `LPOS` call.
+ *
+ * `RANK` counts matches from the head for positive values and from the tail for
+ * negative ones, `COUNT 0` returns every match, and `MAXLEN` only caps the
+ * number of elements compared in that direction.
+ */
+function planLpos(store, session, args) {
+    const db = session.db;
+    if (args.length < 3) return { error: wrongArity('lpos') };
+    const key = args[1];
+    const element = args[2];
+    let rank = 1;
+    let count = null;
+    let maxlen = null;
+    let index = 3;
+    while (index < args.length) {
+        const option = text(args[index]).toUpperCase();
+        if (option === 'RANK' || option === 'COUNT' || option === 'MAXLEN') {
+            if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
+            const value = parseInteger(args[index + 1]);
+            if (value === null) return { error: integerError() };
+            if (option === 'RANK') {
+                if (value === 0) {
+                    return { error: replyError("ERR RANK can't be zero: use 1 to start from the first match, 2 from the second ... or use negative to start from the end of the list") };
+                }
+                rank = value;
+            }
+            else if (option === 'COUNT') {
+                if (value < 0) return { error: replyError("ERR COUNT can't be negative") };
+                count = value === 0 ? Infinity : value;
+            }
+            else {
+                if (value < 0) return { error: replyError("ERR MAXLEN can't be negative") };
+                maxlen = value === 0 ? null : value;
+            }
+            index += 2;
+            continue;
+        }
+        return { error: replyError('ERR syntax error') };
+    }
+    return {
+        run: () => {
+            const kind = kindOf(store, db, key);
+            if (kind !== null && kind !== 'list') return wrongType();
+            const elements = readList(store, db, key) ?? [];
+            const forward = rank > 0;
+            const skip = Math.abs(rank) - 1;
+            const matches = [];
+            let hits = 0;
+            const limit = maxlen === null ? elements.length : Math.min(elements.length, maxlen);
+            for (let step = 0; step < limit; step += 1) {
+                const position = forward ? step : elements.length - 1 - step;
+                if (Buffer.compare(elements[position], element) === 0) {
+                    hits += 1;
+                    if (hits > skip) {
+                        matches.push(position);
+                        if (count === null) break;
+                        if (matches.length >= count) break;
+                    }
+                }
+            }
+            if (count !== null) return array(matches.map(position => integer(position)));
+            return matches.length === 0 ? nullReply() : integer(matches[0]);
         },
     };
 }

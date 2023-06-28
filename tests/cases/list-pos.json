@@ -1,0 +1,270 @@
+{
+  "format": "redis.case/v1",
+  "table": "list-pos",
+  "cases": [
+    {
+      "id": "command.lpos.default",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c", "expect": { "bool": true } }
+      ]
+    },
+    {
+      "id": "command.lpos.missing-element",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "d"],
+      "reply": { "type": "null" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.rank-positive",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "2"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.rank-negative",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "-1"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.rank-negative-second",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "-2"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.rank-exhausted",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "-3"],
+      "reply": { "type": "null" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.count-all",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "COUNT", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": 3 }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.count-one",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "COUNT", "1"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.count-all-reverse",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "-1", "COUNT", "0"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 3 }, { "type": "int", "value": 0 }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.count-missing-element",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "d", "COUNT", "0"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.maxlen-too-short",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "2", "MAXLEN", "3"],
+      "reply": { "type": "null" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.maxlen-reaches-second",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "2", "MAXLEN", "4"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.maxlen-tail-miss",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "-1", "MAXLEN", "2"],
+      "reply": { "type": "null" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.maxlen-zero-is-unlimited",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "2", "MAXLEN", "0"],
+      "reply": { "type": "int", "value": 3 },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c", "valueHex": "010000006101000000620100000063010000006101000000620100000063" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "absent", "a"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "616273656e74", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.lpos.missing-key-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "absent", "a", "COUNT", "0"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.rank-zero",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK", "0"],
+      "reply": { "type": "error", "value": "ERR RANK can't be zero: use 1 to start from the first match, 2 from the second ... or use negative to start from the end of the list" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.count-negative",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "COUNT", "-1"],
+      "reply": { "type": "error", "value": "ERR COUNT can't be negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.maxlen-negative",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "MAXLEN", "-1"],
+      "reply": { "type": "error", "value": "ERR MAXLEN can't be negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.option-missing-value",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "RANK"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.unknown-option",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l", "a", "BOGUS", "1"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "l"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'lpos' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.lpos.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LPOS", "s", "v"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "73", "valueHex": "76" }
+      ],
+      "effect": []
+    }
+  ]
+}

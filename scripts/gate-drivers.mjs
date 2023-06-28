@@ -420,6 +420,21 @@ const EXPECTED = {
     bf_bad_overflow: { error: 'Invalid OVERFLOW type specified' },
     bf_syntax: { error: 'syntax error' },
     bf_arity: { error: "wrong number of arguments for 'bitfield' command" },
+    lp_default: 0,
+    lp_missing_element: null,
+    lp_rank2: 3,
+    lp_rank_neg: 3,
+    lp_count_all: [0, 3],
+    lp_count_reverse: [3, 0],
+    lp_maxlen_miss: null,
+    lp_missing_key: null,
+    lp_missing_count: [],
+    lp_rank_zero: { error: "RANK can't be zero: use 1 to start from the first match, 2 from the second ... or use negative to start from the end of the list" },
+    lp_count_negative: { error: "COUNT can't be negative" },
+    lp_maxlen_negative: { error: "MAXLEN can't be negative" },
+    lp_syntax: { error: 'syntax error' },
+    lp_arity: { error: "wrong number of arguments for 'lpos' command" },
+    lp_wrongtype: { error: WRONG_TYPE },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1068,6 +1083,24 @@ await captureError('bf_bad_value', () => client.sendCommand(['BITFIELD', k('bf7'
 await captureError('bf_bad_overflow', () => client.sendCommand(['BITFIELD', k('bf7'), 'OVERFLOW', 'PREV', 'INCRBY', 'u8', '0', '1']));
 await captureError('bf_syntax', () => client.sendCommand(['BITFIELD', k('bf7'), 'BOGUS', 'u8', '0']));
 await captureError('bf_arity', () => client.sendCommand(['BITFIELD']));
+
+await client.rPush(k('lst'), ['a', 'b', 'c', 'a', 'b', 'c']);
+out.lp_default = Number(await client.lPos(k('lst'), 'a'));
+out.lp_missing_element = await client.lPos(k('lst'), 'd');
+out.lp_rank2 = Number(await client.sendCommand(['LPOS', k('lst'), 'a', 'RANK', '2']));
+out.lp_rank_neg = Number(await client.sendCommand(['LPOS', k('lst'), 'a', 'RANK', '-1']));
+out.lp_count_all = (await client.sendCommand(['LPOS', k('lst'), 'a', 'COUNT', '0'])).map(Number);
+out.lp_count_reverse = (await client.sendCommand(['LPOS', k('lst'), 'a', 'RANK', '-1', 'COUNT', '0'])).map(Number);
+out.lp_maxlen_miss = await client.sendCommand(['LPOS', k('lst'), 'a', 'RANK', '2', 'MAXLEN', '3']);
+out.lp_missing_key = await client.sendCommand(['LPOS', k('nolist'), 'a']);
+out.lp_missing_count = await client.sendCommand(['LPOS', k('nolist'), 'a', 'COUNT', '0']);
+await captureError('lp_rank_zero', () => client.sendCommand(['LPOS', k('lst'), 'a', 'RANK', '0']));
+await captureError('lp_count_negative', () => client.sendCommand(['LPOS', k('lst'), 'a', 'COUNT', '-1']));
+await captureError('lp_maxlen_negative', () => client.sendCommand(['LPOS', k('lst'), 'a', 'MAXLEN', '-1']));
+await captureError('lp_syntax', () => client.sendCommand(['LPOS', k('lst'), 'a', 'BOGUS', '1']));
+await captureError('lp_arity', () => client.sendCommand(['LPOS', k('lst')]));
+await client.set(k('lpstr'), 'v');
+await capture('lp_wrongtype', () => client.sendCommand(['LPOS', k('lpstr'), 'v']));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1727,6 +1760,24 @@ capture_error('bf_bad_value', lambda: client.execute_command('BITFIELD', k('bf7'
 capture_error('bf_bad_overflow', lambda: client.execute_command('BITFIELD', k('bf7'), 'OVERFLOW', 'PREV', 'INCRBY', 'u8', '0', '1'))
 capture_error('bf_syntax', lambda: client.execute_command('BITFIELD', k('bf7'), 'BOGUS', 'u8', '0'))
 capture_error('bf_arity', lambda: client.execute_command('BITFIELD'))
+
+client.rpush(k('lst'), 'a', 'b', 'c', 'a', 'b', 'c')
+out['lp_default'] = int(client.lpos(k('lst'), 'a'))
+out['lp_missing_element'] = client.lpos(k('lst'), 'd')
+out['lp_rank2'] = int(client.execute_command('LPOS', k('lst'), 'a', 'RANK', '2'))
+out['lp_rank_neg'] = int(client.execute_command('LPOS', k('lst'), 'a', 'RANK', '-1'))
+out['lp_count_all'] = [int(value) for value in client.execute_command('LPOS', k('lst'), 'a', 'COUNT', '0')]
+out['lp_count_reverse'] = [int(value) for value in client.execute_command('LPOS', k('lst'), 'a', 'RANK', '-1', 'COUNT', '0')]
+out['lp_maxlen_miss'] = client.execute_command('LPOS', k('lst'), 'a', 'RANK', '2', 'MAXLEN', '3')
+out['lp_missing_key'] = client.execute_command('LPOS', k('nolist'), 'a')
+out['lp_missing_count'] = client.execute_command('LPOS', k('nolist'), 'a', 'COUNT', '0')
+capture_error('lp_rank_zero', lambda: client.execute_command('LPOS', k('lst'), 'a', 'RANK', '0'))
+capture_error('lp_count_negative', lambda: client.execute_command('LPOS', k('lst'), 'a', 'COUNT', '-1'))
+capture_error('lp_maxlen_negative', lambda: client.execute_command('LPOS', k('lst'), 'a', 'MAXLEN', '-1'))
+capture_error('lp_syntax', lambda: client.execute_command('LPOS', k('lst'), 'a', 'BOGUS', '1'))
+capture_error('lp_arity', lambda: client.execute_command('LPOS', k('lst')))
+client.set(k('lpstr'), 'v')
+capture('lp_wrongtype', lambda: client.execute_command('LPOS', k('lpstr'), 'v'))
 
 client.close()
 print(json.dumps(out))
