@@ -1,0 +1,2316 @@
+{
+  "format": "redis.case/v1",
+  "table": "key-space",
+  "cases": [
+    {
+      "id": "command.keys.empty",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.keys.prefix",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.question",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:?"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.all-kinds",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              114,
+              100,
+              101,
+              114,
+              58,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              114,
+              100,
+              101,
+              114,
+              58,
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              114,
+              100,
+              101,
+              114,
+              58,
+              51
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.exact",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              49
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.no-match",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "nope*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.class",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:[12]"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              50
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.class-negated",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:[^1]"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.class-range",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "order:[1-2]"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              114,
+              100,
+              101,
+              114,
+              58,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              114,
+              100,
+              101,
+              114,
+              58,
+              50
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.escape-literal-star",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "star-\\*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              115,
+              116,
+              97,
+              114,
+              45,
+              42
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737461722d2a",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.unclosed-class",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:[1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.arity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'keys' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.keys.extra-argument",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*",
+        "extra"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'keys' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.keys.preserves-expiry",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "user:*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              50
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a32",
+          "valueHex": "76",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "deadline_set",
+          "db": 0,
+          "keyHex": "757365723a32",
+          "expect": {
+            "bool": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.type.string",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "user:1"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "string"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.hash",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "user:2"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "hash"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.list",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "user:3"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "list"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.set",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "order:1"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "set"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.zset",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "order:2"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "zset"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.missing",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "ghost"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "none"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.type.arity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'type' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.type.extra-argument",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "user:1",
+        "extra"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'type' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.type.preserves-expiry",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "user:2"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "hash"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "deadline_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "expect": {
+            "int": 4000000000000
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.scan.empty",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.first-page",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "3"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  58,
+                  49
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  58,
+                  50
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  58,
+                  51
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.second-page",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "3",
+        "COUNT",
+        "3"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  49
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  50
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  51
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.past-end",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "99"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-prefix",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "user:*",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  49
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  50
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  51
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-question",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "user:?",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  49
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  50
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  51
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-class",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "user:[12]",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  49
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  50
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-class-negated",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "order:[^12]",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  58,
+                  51
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-miss",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "nope*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-filters-page",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "user:*",
+        "COUNT",
+        "1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "757365723a33",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f726465723a31",
+          "valueHex": "010000000100000076"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f726465723a32",
+          "valueHex": "01000000010000006d0000000000000000"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f726465723a33",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.count-negative",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "-1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.invalid-cursor",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "not-a-number"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR invalid cursor"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.unknown-option",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "BOGUS",
+        "x"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.missing-option-value",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.arity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'scan' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.preserves-expiry",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  58,
+                  50
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "valueHex": "0100000001000000660100000076",
+          "expiresAt": 4000000000000
+        }
+      ],
+      "effect": [
+        {
+          "call": "deadline_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "757365723a32",
+          "expect": {
+            "int": 4000000000000
+          }
+        }
+      ]
+    }
+  ]
+}

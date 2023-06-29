@@ -461,6 +461,37 @@ const EXPECTED = {
     pf_add_arity: { error: "wrong number of arguments for 'pfadd' command" },
     pf_count_arity: { error: "wrong number of arguments for 'pfcount' command" },
     pf_merge_arity: { error: "wrong number of arguments for 'pfmerge' command" },
+    ks_keys_all: ['ks:order:1', 'ks:order:2', 'ks:order:3', 'ks:user:1', 'ks:user:2', 'ks:user:3'],
+    ks_keys_prefix: ['ks:user:1', 'ks:user:2', 'ks:user:3'],
+    ks_keys_question: ['ks:user:1', 'ks:user:2', 'ks:user:3'],
+    ks_keys_class: ['ks:user:1', 'ks:user:2'],
+    ks_keys_class_negated: ['ks:user:2', 'ks:user:3'],
+    ks_keys_class_range: ['ks:order:1', 'ks:order:2'],
+    ks_keys_exact: ['ks:user:1'],
+    ks_keys_no_match: [],
+    ks_type_string: 'string',
+    ks_type_hash: 'hash',
+    ks_type_list: 'list',
+    ks_type_set: 'set',
+    ks_type_zset: 'zset',
+    ks_type_hll: 'string',
+    ks_type_missing: 'none',
+    ks_type_ttl_kept: true,
+    ks_keys_ttl_kept: true,
+    ks_scan_first: ['3', ['ks:order:1', 'ks:order:2', 'ks:order:3']],
+    ks_scan_second: ['0', ['ks:user:1', 'ks:user:2', 'ks:user:3']],
+    ks_scan_match: ['0', ['ks:user:1', 'ks:user:2', 'ks:user:3']],
+    ks_scan_match_class: ['0', ['ks:user:1', 'ks:user:2']],
+    ks_scan_match_class_negated: ['0', ['ks:order:3']],
+    ks_keys_escape: ['ks:star-*'],
+    ks_keys_unclosed_class: [],
+    ks_scan_count_zero: { error: 'syntax error' },
+    ks_scan_invalid_cursor: { error: 'invalid cursor' },
+    ks_keys_arity: { error: "wrong number of arguments for 'keys' command" },
+    ks_keys_extra: { error: "wrong number of arguments for 'keys' command" },
+    ks_type_arity: { error: "wrong number of arguments for 'type' command" },
+    ks_type_extra: { error: "wrong number of arguments for 'type' command" },
+    ks_scan_arity: { error: "wrong number of arguments for 'scan' command" },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1162,6 +1193,51 @@ await capture('pf_hash_wrongtype', () => client.pfCount(k('pfhash')));
 await captureError('pf_add_arity', () => client.sendCommand(['PFADD']));
 await captureError('pf_count_arity', () => client.sendCommand(['PFCOUNT']));
 await captureError('pf_merge_arity', () => client.sendCommand(['PFMERGE', k('pfd')]));
+
+// Key space in an isolated database: KEYS, TYPE and SCAN over every value kind.
+await client.select(1);
+await client.flushDb();
+await client.set('ks:user:1', 'v');
+await client.hSet('ks:user:2', 'f', 'v');
+await client.rPush('ks:user:3', 'v');
+await client.sAdd('ks:order:1', 'v');
+await client.zAdd('ks:order:2', [{ score: 1, value: 'v' }]);
+await client.pfAdd('ks:order:3', ['v']);
+out.ks_keys_all = await client.sendCommand(['KEYS', 'ks:*']);
+out.ks_keys_prefix = await client.sendCommand(['KEYS', 'ks:user:*']);
+out.ks_keys_question = await client.sendCommand(['KEYS', 'ks:user:?']);
+out.ks_keys_class = await client.sendCommand(['KEYS', 'ks:user:[12]']);
+out.ks_keys_class_negated = await client.sendCommand(['KEYS', 'ks:user:[^1]']);
+out.ks_keys_class_range = await client.sendCommand(['KEYS', 'ks:order:[1-2]']);
+out.ks_keys_exact = await client.sendCommand(['KEYS', 'ks:user:1']);
+out.ks_keys_no_match = await client.sendCommand(['KEYS', 'ks:nope*']);
+out.ks_type_string = await client.type('ks:user:1');
+out.ks_type_hash = await client.type('ks:user:2');
+out.ks_type_list = await client.type('ks:user:3');
+out.ks_type_set = await client.type('ks:order:1');
+out.ks_type_zset = await client.type('ks:order:2');
+out.ks_type_hll = await client.type('ks:order:3');
+out.ks_type_missing = await client.type('ks:ghost');
+await client.expire('ks:user:2', 100);
+out.ks_type_hash = await client.type('ks:user:2');
+out.ks_type_ttl_kept = (ttl => ttl > 0 && ttl <= 100)(await client.ttl('ks:user:2'));
+out.ks_keys_prefix = await client.sendCommand(['KEYS', 'ks:user:*']);
+out.ks_keys_ttl_kept = (ttl => ttl > 0 && ttl <= 100)(await client.ttl('ks:user:2'));
+out.ks_scan_first = await client.sendCommand(['SCAN', '0', 'COUNT', '3']);
+out.ks_scan_second = await client.sendCommand(['SCAN', '3', 'COUNT', '3']);
+out.ks_scan_match = await client.sendCommand(['SCAN', '0', 'MATCH', 'ks:user:*', 'COUNT', '100']);
+out.ks_scan_match_class = await client.sendCommand(['SCAN', '0', 'MATCH', 'ks:user:[12]', 'COUNT', '100']);
+out.ks_scan_match_class_negated = await client.sendCommand(['SCAN', '0', 'MATCH', 'ks:order:[^12]', 'COUNT', '100']);
+await captureError('ks_scan_count_zero', () => client.sendCommand(['SCAN', '0', 'COUNT', '0']));
+await captureError('ks_scan_invalid_cursor', () => client.sendCommand(['SCAN', 'nope']));
+await captureError('ks_keys_arity', () => client.sendCommand(['KEYS']));
+await captureError('ks_keys_extra', () => client.sendCommand(['KEYS', 'ks:*', 'extra']));
+await captureError('ks_type_arity', () => client.sendCommand(['TYPE']));
+await captureError('ks_type_extra', () => client.sendCommand(['TYPE', 'ks:user:1', 'extra']));
+await captureError('ks_scan_arity', () => client.sendCommand(['SCAN']));
+await client.set('ks:star-*', 'v');
+out.ks_keys_escape = await client.sendCommand(['KEYS', 'ks:star-' + String.fromCharCode(92) + '*']);
+out.ks_keys_unclosed_class = await client.sendCommand(['KEYS', 'ks:user:[1']);
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1873,6 +1949,58 @@ capture('pf_hash_wrongtype', lambda: client.pfcount(k('pfhash')))
 capture_error('pf_add_arity', lambda: client.execute_command('PFADD'))
 capture_error('pf_count_arity', lambda: client.execute_command('PFCOUNT'))
 capture_error('pf_merge_arity', lambda: client.execute_command('PFMERGE', k('pfd')))
+
+# Key space in an isolated database: KEYS, TYPE and SCAN over every value kind.
+client.execute_command('SELECT', 1)
+client.flushdb()
+
+
+def scan_pair(*parts):
+    cursor, keys = client.execute_command(*parts)
+    return [str(cursor), keys]
+
+
+client.set('ks:user:1', 'v')
+client.hset('ks:user:2', 'f', 'v')
+client.rpush('ks:user:3', 'v')
+client.sadd('ks:order:1', 'v')
+client.zadd('ks:order:2', {'v': 1})
+client.pfadd('ks:order:3', 'v')
+out['ks_keys_all'] = client.execute_command('KEYS', 'ks:*')
+out['ks_keys_prefix'] = client.execute_command('KEYS', 'ks:user:*')
+out['ks_keys_question'] = client.execute_command('KEYS', 'ks:user:?')
+out['ks_keys_class'] = client.execute_command('KEYS', 'ks:user:[12]')
+out['ks_keys_class_negated'] = client.execute_command('KEYS', 'ks:user:[^1]')
+out['ks_keys_class_range'] = client.execute_command('KEYS', 'ks:order:[1-2]')
+out['ks_keys_exact'] = client.execute_command('KEYS', 'ks:user:1')
+out['ks_keys_no_match'] = client.execute_command('KEYS', 'ks:nope*')
+out['ks_type_string'] = client.type('ks:user:1')
+out['ks_type_hash'] = client.type('ks:user:2')
+out['ks_type_list'] = client.type('ks:user:3')
+out['ks_type_set'] = client.type('ks:order:1')
+out['ks_type_zset'] = client.type('ks:order:2')
+out['ks_type_hll'] = client.type('ks:order:3')
+out['ks_type_missing'] = client.type('ks:ghost')
+client.expire('ks:user:2', 100)
+out['ks_type_hash'] = client.type('ks:user:2')
+out['ks_type_ttl_kept'] = 0 < int(client.ttl('ks:user:2')) <= 100
+out['ks_keys_prefix'] = client.execute_command('KEYS', 'ks:user:*')
+out['ks_keys_ttl_kept'] = 0 < int(client.ttl('ks:user:2')) <= 100
+out['ks_scan_first'] = scan_pair('SCAN', '0', 'COUNT', '3')
+out['ks_scan_second'] = scan_pair('SCAN', '3', 'COUNT', '3')
+out['ks_scan_match'] = scan_pair('SCAN', '0', 'MATCH', 'ks:user:*', 'COUNT', '100')
+out['ks_scan_match_class'] = scan_pair('SCAN', '0', 'MATCH', 'ks:user:[12]', 'COUNT', '100')
+out['ks_scan_match_class_negated'] = scan_pair('SCAN', '0', 'MATCH', 'ks:order:[^12]', 'COUNT', '100')
+capture_error('ks_scan_count_zero', lambda: client.execute_command('SCAN', '0', 'COUNT', '0'))
+capture_error('ks_scan_invalid_cursor', lambda: client.execute_command('SCAN', 'nope'))
+capture_error('ks_keys_arity', lambda: client.execute_command('KEYS'))
+capture_error('ks_keys_extra', lambda: client.execute_command('KEYS', 'ks:*', 'extra'))
+capture_error('ks_type_arity', lambda: client.execute_command('TYPE'))
+capture_error('ks_type_extra', lambda: client.execute_command('TYPE', 'ks:user:1', 'extra'))
+capture_error('ks_scan_arity', lambda: client.execute_command('SCAN'))
+client.set('ks:star-*', 'v')
+out['ks_keys_escape'] = client.execute_command('KEYS', 'ks:star-' + chr(92) + '*')
+out['ks_keys_unclosed_class'] = client.execute_command('KEYS', 'ks:user:[1')
 
 client.close()
 print(json.dumps(out))
