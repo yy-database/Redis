@@ -435,6 +435,32 @@ const EXPECTED = {
     lp_syntax: { error: 'syntax error' },
     lp_arity: { error: "wrong number of arguments for 'lpos' command" },
     lp_wrongtype: { error: WRONG_TYPE },
+    pf_add: 1,
+    pf_count: 3,
+    pf_add_duplicate: 0,
+    pf_add_empty: 1,
+    pf_count_empty: 4,
+    pf_add_second: 1,
+    pf_count_multi: 7,
+    pf_count_duplicate: 4,
+    pf_merge: true,
+    pf_count_merged: 7,
+    pf_count_missing: 0,
+    pf_merge_missing: true,
+    pf_count_empty_merge: 0,
+    pf_type: 'string',
+    pf_strlen: 12304,
+    pf_many: 1,
+    pf_many_count: 996,
+    pf_ttl_add: 1,
+    pf_ttl_kept: true,
+    pf_merge_ttl: true,
+    pf_merge_ttl_kept: true,
+    pf_invalid_string: { error: 'WRONGTYPE Key is not a valid HyperLogLog string value.' },
+    pf_hash_wrongtype: { error: WRONG_TYPE },
+    pf_add_arity: { error: "wrong number of arguments for 'pfadd' command" },
+    pf_count_arity: { error: "wrong number of arguments for 'pfcount' command" },
+    pf_merge_arity: { error: "wrong number of arguments for 'pfmerge' command" },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1101,6 +1127,41 @@ await captureError('lp_syntax', () => client.sendCommand(['LPOS', k('lst'), 'a',
 await captureError('lp_arity', () => client.sendCommand(['LPOS', k('lst')]));
 await client.set(k('lpstr'), 'v');
 await capture('lp_wrongtype', () => client.sendCommand(['LPOS', k('lpstr'), 'v']));
+
+const okReply = async (...parts) => (await client.sendCommand(parts)) === 'OK';
+out.pf_add = Number(await client.pfAdd(k('pfh'), ['a', 'b', 'c']));
+out.pf_count = Number(await client.pfCount(k('pfh')));
+out.pf_add_duplicate = Number(await client.pfAdd(k('pfh'), ['a', 'b', 'c']));
+out.pf_add_empty = Number(await client.pfAdd(k('pfh'), ['']));
+out.pf_count_empty = Number(await client.pfCount(k('pfh')));
+out.pf_add_second = Number(await client.pfAdd(k('pfh2'), ['d', 'e', 'f']));
+out.pf_count_multi = Number(await client.pfCount([k('pfh'), k('pfh2')]));
+out.pf_count_duplicate = Number(await client.pfCount([k('pfh'), k('pfh')]));
+out.pf_merge = await okReply('PFMERGE', k('pfd'), k('pfh'), k('pfh2'));
+out.pf_count_merged = Number(await client.pfCount(k('pfd')));
+out.pf_count_missing = Number(await client.pfCount(k('pfmissing')));
+out.pf_merge_missing = await okReply('PFMERGE', k('pfd2'), k('pfmissing'), k('pfmissing2'));
+out.pf_count_empty_merge = Number(await client.pfCount(k('pfd2')));
+out.pf_type = await client.type(k('pfh'));
+out.pf_strlen = Number(await client.strLen(k('pfh')));
+const manyElements = Array.from({ length: 1000 }, (_, index) => 'item-' + index);
+out.pf_many = Number(await client.pfAdd(k('pfmany'), manyElements));
+out.pf_many_count = Number(await client.pfCount(k('pfmany')));
+await client.pfAdd(k('pfttl'), ['a']);
+await client.expire(k('pfttl'), 100);
+out.pf_ttl_add = Number(await client.pfAdd(k('pfttl'), ['b']));
+out.pf_ttl_kept = (ttl => ttl > 0 && ttl <= 100)(await client.ttl(k('pfttl')));
+await client.pfAdd(k('pfdt'), ['a']);
+await client.expire(k('pfdt'), 100);
+out.pf_merge_ttl = await okReply('PFMERGE', k('pfdt'), k('pfh'));
+out.pf_merge_ttl_kept = (ttl => ttl > 0 && ttl <= 100)(await client.ttl(k('pfdt')));
+await client.set(k('pfplain'), 'v');
+await capture('pf_invalid_string', () => client.pfAdd(k('pfplain'), ['x']));
+await client.hSet(k('pfhash'), 'f', '1');
+await capture('pf_hash_wrongtype', () => client.pfCount(k('pfhash')));
+await captureError('pf_add_arity', () => client.sendCommand(['PFADD']));
+await captureError('pf_count_arity', () => client.sendCommand(['PFCOUNT']));
+await captureError('pf_merge_arity', () => client.sendCommand(['PFMERGE', k('pfd')]));
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -1778,6 +1839,40 @@ capture_error('lp_syntax', lambda: client.execute_command('LPOS', k('lst'), 'a',
 capture_error('lp_arity', lambda: client.execute_command('LPOS', k('lst')))
 client.set(k('lpstr'), 'v')
 capture('lp_wrongtype', lambda: client.execute_command('LPOS', k('lpstr'), 'v'))
+
+out['pf_add'] = int(client.pfadd(k('pfh'), 'a', 'b', 'c'))
+out['pf_count'] = int(client.pfcount(k('pfh')))
+out['pf_add_duplicate'] = int(client.pfadd(k('pfh'), 'a', 'b', 'c'))
+out['pf_add_empty'] = int(client.pfadd(k('pfh'), ''))
+out['pf_count_empty'] = int(client.pfcount(k('pfh')))
+out['pf_add_second'] = int(client.pfadd(k('pfh2'), 'd', 'e', 'f'))
+out['pf_count_multi'] = int(client.pfcount(k('pfh'), k('pfh2')))
+out['pf_count_duplicate'] = int(client.pfcount(k('pfh'), k('pfh')))
+out['pf_merge'] = bool(client.pfmerge(k('pfd'), k('pfh'), k('pfh2')))
+out['pf_count_merged'] = int(client.pfcount(k('pfd')))
+out['pf_count_missing'] = int(client.pfcount(k('pfmissing')))
+out['pf_merge_missing'] = bool(client.pfmerge(k('pfd2'), k('pfmissing'), k('pfmissing2')))
+out['pf_count_empty_merge'] = int(client.pfcount(k('pfd2')))
+out['pf_type'] = client.type(k('pfh'))
+out['pf_strlen'] = int(client.strlen(k('pfh')))
+many_elements = ['item-%d' % index for index in range(1000)]
+out['pf_many'] = int(client.pfadd(k('pfmany'), *many_elements))
+out['pf_many_count'] = int(client.pfcount(k('pfmany')))
+client.pfadd(k('pfttl'), 'a')
+client.expire(k('pfttl'), 100)
+out['pf_ttl_add'] = int(client.pfadd(k('pfttl'), 'b'))
+out['pf_ttl_kept'] = 0 < int(client.ttl(k('pfttl'))) <= 100
+client.pfadd(k('pfdt'), 'a')
+client.expire(k('pfdt'), 100)
+out['pf_merge_ttl'] = bool(client.pfmerge(k('pfdt'), k('pfh')))
+out['pf_merge_ttl_kept'] = 0 < int(client.ttl(k('pfdt'))) <= 100
+client.set(k('pfplain'), 'v')
+capture('pf_invalid_string', lambda: client.pfadd(k('pfplain'), 'x'))
+client.hset(k('pfhash'), 'f', '1')
+capture('pf_hash_wrongtype', lambda: client.pfcount(k('pfhash')))
+capture_error('pf_add_arity', lambda: client.execute_command('PFADD'))
+capture_error('pf_count_arity', lambda: client.execute_command('PFCOUNT'))
+capture_error('pf_merge_arity', lambda: client.execute_command('PFMERGE', k('pfd')))
 
 client.close()
 print(json.dumps(out))

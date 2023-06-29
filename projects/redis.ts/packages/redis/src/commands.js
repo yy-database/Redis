@@ -378,6 +378,247 @@ function commandName(args) {
     return args[0].toString('utf8').toLowerCase();
 }
 
+const HLL_P = 14;
+const HLL_Q = 50;
+const HLL_REGISTERS = 1 << HLL_P;
+const HLL_BITS = 6;
+const HLL_HEADER = 16;
+const HLL_REGISTER_BYTES = (HLL_REGISTERS * HLL_BITS) / 8;
+const HLL_DENSE_SIZE = HLL_HEADER + HLL_REGISTER_BYTES;
+const HLL_ALPHA_INF = 0.721347520444481703680;
+const INVALID_HLL = 'WRONGTYPE Key is not a valid HyperLogLog string value.';
+const MURMUR_M = 0xc6a4a7935bd1e995n;
+const MURMUR_R = 47n;
+const MASK64 = 0xffffffffffffffffn;
+
+/** Redis 的 MurmurHash64A，种子固定为 `0xadc83b19`。 */
+function murmur64a(buffer) {
+    const seed = 0xadc83b19n;
+    let hash = (seed ^ ((BigInt(buffer.length) * MURMUR_M) & MASK64)) & MASK64;
+    let offset = 0;
+    while (offset + 8 <= buffer.length) {
+        let block = 0n;
+        for (let index = 0; index < 8; index += 1) {
+            block |= BigInt(buffer[offset + index]) << BigInt(8 * index);
+        }
+        block = (block * MURMUR_M) & MASK64;
+        block ^= block >> MURMUR_R;
+        block = (block * MURMUR_M) & MASK64;
+        hash ^= block;
+        hash = (hash * MURMUR_M) & MASK64;
+        offset += 8;
+    }
+    if (offset < buffer.length) {
+        let extra = 0n;
+        for (let index = offset; index < buffer.length; index += 1) {
+            extra |= BigInt(buffer[index]) << BigInt(8 * (index - offset));
+        }
+        hash ^= extra;
+        hash = (hash * MURMUR_M) & MASK64;
+    }
+    hash ^= hash >> MURMUR_R;
+    hash = (hash * MURMUR_M) & MASK64;
+    hash ^= hash >> MURMUR_R;
+    return hash;
+}
+
+/** 元素映射为「寄存器下标 + 尾零计数」。 */
+function hllPatLen(element) {
+    const buffer = Buffer.isBuffer(element) ? element : Buffer.from(String(element));
+    let hash = murmur64a(buffer);
+    const index = Number(hash & BigInt(HLL_REGISTERS - 1));
+    hash >>= BigInt(HLL_P);
+    hash |= 1n << BigInt(HLL_Q);
+    let bit = 1n;
+    let count = 1;
+    while ((hash & bit) === 0n) {
+        count += 1;
+        bit <<= 1n;
+    }
+    return [index, count];
+}
+
+function hllGetRegister(registers, index) {
+    const bit = index * HLL_BITS;
+    const byte = Math.floor(bit / 8);
+    const shift = bit % 8;
+    const low = registers[byte];
+    const high = byte + 1 < registers.length ? registers[byte + 1] : 0;
+    return ((low >> shift) | (high << (8 - shift))) & 63;
+}
+
+function hllSetRegister(registers, index, value) {
+    const register = value & 63;
+    const bit = index * HLL_BITS;
+    const byte = Math.floor(bit / 8);
+    const shift = bit % 8;
+    const lowBits = Math.min(8 - shift, HLL_BITS);
+    const lowMask = (((1 << lowBits) - 1) << shift) & 0xff;
+    registers[byte] = (registers[byte] & ~lowMask & 0xff) | ((register << shift) & lowMask);
+    if (shift + HLL_BITS > 8) {
+        const spill = shift + HLL_BITS - 8;
+        const mask = (1 << spill) - 1;
+        const next = byte + 1;
+        if (next < registers.length) {
+            registers[next] = (registers[next] & ~mask & 0xff) | ((register >> (8 - shift)) & mask);
+        }
+    }
+}
+
+function hllTau(value) {
+    if (value === 0 || value === 1) return 0;
+    let x = value;
+    let y = 1;
+    let z = 1 - x;
+    for (;;) {
+        x = Math.sqrt(x);
+        const previous = z;
+        y *= 0.5;
+        z -= (1 - x) * (1 - x) * y;
+        if (previous === z) return z / 3;
+    }
+}
+
+function hllSigma(value) {
+    if (value === 1) return Infinity;
+    let x = value;
+    let y = 1;
+    let z = x;
+    for (;;) {
+        x *= x;
+        const previous = z;
+        z += x * y;
+        y += y;
+        if (previous === z) return z;
+    }
+}
+
+/** 从寄存器直方图做基数估计，公式与真机一致。 */
+function hllEstimate(registers) {
+    const m = HLL_REGISTERS;
+    const histogram = new Array(64).fill(0);
+    for (let index = 0; index < HLL_REGISTERS; index += 1) {
+        histogram[hllGetRegister(registers, index)] += 1;
+    }
+    let z = m * hllTau((m - histogram[HLL_Q + 1]) / m);
+    for (let j = HLL_Q; j >= 1; j -= 1) {
+        z += histogram[j];
+        z *= 0.5;
+    }
+    z += m * hllSigma(histogram[0] / m);
+    return Math.round((HLL_ALPHA_INF * m * m) / z);
+}
+
+function newHllBytes() {
+    const bytes = Buffer.alloc(HLL_DENSE_SIZE);
+    bytes.write('HYLL', 0, 'ascii');
+    return bytes;
+}
+
+/** 校验 dense HyperLogLog，返回寄存器区；不合法时返回 `null`。 */
+function hllRegisters(body) {
+    if (body === null || body === undefined || body.length !== HLL_DENSE_SIZE) return null;
+    if (body[0] !== 0x48 || body[1] !== 0x59 || body[2] !== 0x4c || body[3] !== 0x4c) return null;
+    if (body[4] !== 0) return null;
+    return body.subarray(HLL_HEADER);
+}
+
+function hllMergeMax(target, source) {
+    for (let index = 0; index < HLL_REGISTERS; index += 1) {
+        const value = hllGetRegister(source, index);
+        if (value > hllGetRegister(target, index)) hllSetRegister(target, index, value);
+    }
+}
+
+/**
+ * 读取一个 HLL 键。
+ *
+ * HLL 在真机上就是字符串，所以它落在字符串命名空间，`TYPE` 也回复 `string`。
+ */
+function loadHll(store, db, key) {
+    const kind = kindOf(store, db, key);
+    if (kind === null) return { state: 'missing' };
+    if (kind !== 'string') return { state: 'wrong-type' };
+    const body = store.getKind(db, SUFFIX.string, key);
+    if (body === null || body === undefined) return { state: 'missing' };
+    if (hllRegisters(body) === null) return { state: 'invalid' };
+    return { state: 'found', body: Buffer.from(body) };
+}
+
+function planHyperLogLog(store, session, name, args) {
+    if (name === 'pfadd') {
+        if (args.length < 2) return { error: wrongArity('pfadd') };
+        const key = args[1];
+        return {
+            run: () => {
+                const loaded = loadHll(store, session.db, key);
+                if (loaded.state === 'wrong-type') return wrongType();
+                if (loaded.state === 'invalid') return replyError(INVALID_HLL);
+                const body = loaded.state === 'found' ? loaded.body : newHllBytes();
+                const registers = body.subarray(HLL_HEADER);
+                let modified = loaded.state === 'missing';
+                for (const element of args.slice(2)) {
+                    const [index, count] = hllPatLen(element);
+                    if (hllGetRegister(registers, index) < count) {
+                        hllSetRegister(registers, index, count);
+                        modified = true;
+                    }
+                }
+                if (modified) {
+                    body[15] |= 0x80;
+                    rewriteString(store, session.db, key, body);
+                }
+                return integer(modified ? 1 : 0);
+            },
+        };
+    }
+    if (name === 'pfcount') {
+        if (args.length < 2) return { error: wrongArity('pfcount') };
+        return {
+            run: () => {
+                if (args.length === 2) {
+                    const loaded = loadHll(store, session.db, args[1]);
+                    if (loaded.state === 'wrong-type') return wrongType();
+                    if (loaded.state === 'invalid') return replyError(INVALID_HLL);
+                    if (loaded.state === 'missing') return integer(0);
+                    return integer(hllEstimate(hllRegisters(loaded.body)));
+                }
+                const merged = Buffer.alloc(HLL_REGISTER_BYTES);
+                for (const key of args.slice(1)) {
+                    const loaded = loadHll(store, session.db, key);
+                    if (loaded.state === 'wrong-type') return wrongType();
+                    if (loaded.state === 'invalid') return replyError(INVALID_HLL);
+                    if (loaded.state === 'missing') continue;
+                    hllMergeMax(merged, hllRegisters(loaded.body));
+                }
+                return integer(hllEstimate(merged));
+            },
+        };
+    }
+    if (args.length < 3) return { error: wrongArity('pfmerge') };
+    return {
+        run: () => {
+            const merged = Buffer.alloc(HLL_REGISTER_BYTES);
+            for (const key of args.slice(1)) {
+                const loaded = loadHll(store, session.db, key);
+                if (loaded.state === 'wrong-type') return wrongType();
+                if (loaded.state === 'invalid') return replyError(INVALID_HLL);
+                if (loaded.state === 'missing') continue;
+                hllMergeMax(merged, hllRegisters(loaded.body));
+            }
+            const destination = args[1];
+            const loaded = loadHll(store, session.db, destination);
+            if (loaded.state === 'wrong-type') return wrongType();
+            if (loaded.state === 'invalid') return replyError(INVALID_HLL);
+            const body = loaded.state === 'found' ? loaded.body : newHllBytes();
+            body.subarray(HLL_HEADER).set(merged);
+            body[15] |= 0x80;
+            rewriteString(store, session.db, destination, body);
+            return simple('OK');
+        },
+    };
+}
+
 function text(buffer) {
     return buffer.toString('utf8');
 }
@@ -893,6 +1134,11 @@ function plan(store, session, name, args) {
 
         case 'lpos':
             return planLpos(store, session, args);
+
+        case 'pfadd':
+        case 'pfcount':
+        case 'pfmerge':
+            return planHyperLogLog(store, session, name, args);
 
         case 'zrangebyscore':
         case 'zrevrangebyscore':
