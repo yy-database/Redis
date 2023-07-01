@@ -209,7 +209,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["BLMOVE", "missing", "l2", "LEFT", "LEFT", "0.05"],
-      "reply": { "type": "null" },
+      "reply": { "type": "null-array" },
       "setup": [],
       "effect": []
     },
@@ -234,7 +234,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["BRPOPLPUSH", "missing", "l2", "0.05"],
-      "reply": { "type": "null" },
+      "reply": { "type": "null-array" },
       "setup": [],
       "effect": []
     },

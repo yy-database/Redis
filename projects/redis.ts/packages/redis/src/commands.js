@@ -3154,7 +3154,7 @@ function planCollection(store, session, name, args) {
                 }
                 return bulk(element);
             };
-            return blockingPlan(db, [source], timeout.timeoutMs, attempt, nullReply());
+            return blockingPlan(db, [source], timeout.timeoutMs, attempt, nullArray());
         }
 
         case 'blmpop': {
