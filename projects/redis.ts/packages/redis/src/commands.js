@@ -337,6 +337,42 @@ function parseFloatText(raw) {
     return Number(value);
 }
 
+/**
+ * Parses a blocking timeout in seconds.
+ *
+ * `0` means wait forever. Negative values and anything that is not a finite
+ * decimal answer the upstream error strings.
+ */
+function parseBlockingTimeout(raw) {
+    const value = parseFloatText(raw);
+    if (value === null || !Number.isFinite(value)) {
+        return { error: 'ERR timeout is not a float or out of range' };
+    }
+    if (value < 0) {
+        return { error: 'ERR timeout is negative' };
+    }
+    return { timeoutMs: value === 0 ? 0 : value * 1000 };
+}
+
+/** Wakes consumers parked on `key` once a push has landed. */
+function notifyPush(session, db, key) {
+    session.hub?.wake(db, key);
+}
+
+/**
+ * Wraps one blocking attempt into the descriptor `startServer` parks.
+ *
+ * `attempt` returns a reply specification when it can claim a value and `null`
+ * while the key is still empty. `run` is the non-blocking form used inside
+ * `EXEC`, where upstream Redis answers the timeout reply at once.
+ */
+function blockingPlan(db, keys, timeoutMs, attempt, timeoutReply) {
+    return {
+        block: { db, keys, timeoutMs, attempt, timeoutReply },
+        run: () => attempt() ?? timeoutReply,
+    };
+}
+
 /** Live hash fields, `[]` when the hash is missing and `null` when the body is corrupt. */
 function readHash(store, db, key) {
     const body = store.getKind(db, SUFFIX.hash, key);
@@ -706,6 +742,19 @@ export function execute(store, session, args) {
     if (session.queued) {
         session.queued.push(planned.run);
         return { reply: simple('QUEUED') };
+    }
+    if (planned.block !== undefined) {
+        // A blocking command tries once before parking. Without a hub (the
+        // conformance harness drives `execute` directly) it keeps the shape of
+        // the timeout reply but never waits.
+        const immediate = planned.block.attempt();
+        if (immediate !== null) {
+            return { reply: immediate };
+        }
+        if (session.hub === undefined) {
+            return { reply: planned.block.timeoutReply };
+        }
+        return { block: planned.block };
     }
     return { reply: planned.run() };
 }
@@ -1116,6 +1165,11 @@ function plan(store, session, name, args) {
         case 'llen':
         case 'linsert':
         case 'lmpop':
+        case 'blpop':
+        case 'brpop':
+        case 'blmove':
+        case 'brpoplpush':
+        case 'blmpop':
         case 'sadd':
         case 'srem':
         case 'smembers':
@@ -2955,6 +3009,7 @@ function planCollection(store, session, name, args) {
                     const body = encodeList(updated);
                     if (body === null) return replyError('ERR list value exceeds the storage limit');
                     rewriteKind(store, db, 'list', key, body);
+                    notifyPush(session, db, key);
                     return integer(updated.length);
                 },
             };
@@ -3011,6 +3066,145 @@ function planCollection(store, session, name, args) {
             };
         }
 
+        case 'blpop':
+        case 'brpop': {
+            if (args.length < 3) return { error: wrongArity(name) };
+            const timeout = parseBlockingTimeout(args[args.length - 1]);
+            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            const keys = args.slice(1, args.length - 1);
+            const attempt = () => {
+                for (const candidate of keys) {
+                    const kind = kindOf(store, db, candidate);
+                    if (kind === null) continue;
+                    if (kind !== 'list') return wrongType();
+                    const elements = readList(store, db, candidate);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    if (elements.length === 0) continue;
+                    const element = name === 'blpop' ? elements.shift() : elements.pop();
+                    if (elements.length === 0) {
+                        store.deleteKind(db, SUFFIX.list, candidate);
+                    }
+                    else {
+                        const body = encodeList(elements);
+                        if (body === null) return replyError('ERR list value exceeds the storage limit');
+                        rewriteKind(store, db, 'list', candidate, body);
+                    }
+                    return array([bulk(candidate), bulk(element)]);
+                }
+                return null;
+            };
+            return blockingPlan(db, keys, timeout.timeoutMs, attempt, nullArray());
+        }
+
+        case 'blmove':
+        case 'brpoplpush': {
+            let sourceSide = 'right';
+            let destinationSide = 'left';
+            let timeoutRaw = args[3];
+            if (name === 'blmove') {
+                if (args.length !== 6) return { error: wrongArity('blmove') };
+                sourceSide = text(args[3]).toLowerCase();
+                destinationSide = text(args[4]).toLowerCase();
+                timeoutRaw = args[5];
+            }
+            else if (args.length !== 4) {
+                return { error: wrongArity('brpoplpush') };
+            }
+            if ((sourceSide !== 'left' && sourceSide !== 'right') || (destinationSide !== 'left' && destinationSide !== 'right')) {
+                return { error: replyError('ERR syntax error') };
+            }
+            const timeout = parseBlockingTimeout(timeoutRaw);
+            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            const source = args[1];
+            const destination = args[2];
+            const sameKey = source.equals(destination);
+            const attempt = () => {
+                const kind = kindOf(store, db, source);
+                if (kind !== null && kind !== 'list') return wrongType();
+                if (kind === null) return null;
+                const elements = readList(store, db, source);
+                if (elements === null) return replyError('ERR stored list value is corrupt');
+                if (elements.length === 0) return null;
+                let destinationElements = null;
+                if (!sameKey) {
+                    const destinationKind = kindOf(store, db, destination);
+                    if (destinationKind !== null && destinationKind !== 'list') return wrongType();
+                    destinationElements = destinationKind === null ? [] : readList(store, db, destination);
+                    if (destinationElements === null) return replyError('ERR stored list value is corrupt');
+                }
+                const element = sourceSide === 'left' ? elements.shift() : elements.pop();
+                if (sameKey) {
+                    if (destinationSide === 'left') elements.unshift(element);
+                    else elements.push(element);
+                }
+                else if (destinationSide === 'left') {
+                    destinationElements.unshift(element);
+                }
+                else {
+                    destinationElements.push(element);
+                }
+                const body = encodeList(elements);
+                if (body === null) return replyError('ERR list value exceeds the storage limit');
+                rewriteKind(store, db, 'list', source, body);
+                if (!sameKey) {
+                    const destinationBody = encodeList(destinationElements);
+                    if (destinationBody === null) return replyError('ERR list value exceeds the storage limit');
+                    rewriteKind(store, db, 'list', destination, destinationBody);
+                    notifyPush(session, db, destination);
+                }
+                return bulk(element);
+            };
+            return blockingPlan(db, [source], timeout.timeoutMs, attempt, nullReply());
+        }
+
+        case 'blmpop': {
+            if (args.length < 5) return { error: wrongArity('blmpop') };
+            const timeout = parseBlockingTimeout(args[1]);
+            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            const numkeys = parseInteger(args[2]);
+            if (numkeys === null) return { error: integerError() };
+            if (numkeys <= 0) return { error: replyError('ERR numkeys should be greater than 0') };
+            if (args.length < numkeys + 4) return { error: replyError('ERR syntax error') };
+            const keys = args.slice(3, 3 + numkeys);
+            const side = text(args[3 + numkeys]).toLowerCase();
+            if (side !== 'left' && side !== 'right') return { error: replyError('ERR syntax error') };
+            let amount = 1;
+            const tail = 4 + numkeys;
+            if (args.length > tail) {
+                if (text(args[tail]).toLowerCase() !== 'count' || tail + 2 !== args.length) {
+                    return { error: replyError('ERR syntax error') };
+                }
+                const requested = parseInteger(args[tail + 1]);
+                if (requested === null) return { error: integerError() };
+                if (requested <= 0) return { error: replyError('ERR count should be greater than 0') };
+                amount = requested;
+            }
+            const attempt = () => {
+                for (const candidate of keys) {
+                    const kind = kindOf(store, db, candidate);
+                    if (kind === null) continue;
+                    if (kind !== 'list') return wrongType();
+                    const elements = readList(store, db, candidate);
+                    if (elements === null) return replyError('ERR stored list value is corrupt');
+                    if (elements.length === 0) continue;
+                    const take = Math.min(amount, elements.length);
+                    const popped = side === 'left' ? elements.slice(0, take) : elements.slice(-take).reverse();
+                    const kept = side === 'left' ? elements.slice(take) : elements.slice(0, elements.length - take);
+                    if (kept.length === 0) {
+                        store.deleteKind(db, SUFFIX.list, candidate);
+                    }
+                    else {
+                        const body = encodeList(kept);
+                        if (body === null) return replyError('ERR list value exceeds the storage limit');
+                        rewriteKind(store, db, 'list', candidate, body);
+                    }
+                    return array([bulk(candidate), array(popped.map(value => bulk(value)))]);
+                }
+                return null;
+            };
+            return blockingPlan(db, keys, timeout.timeoutMs, attempt, nullArray());
+        }
+
         case 'lpush':
         case 'rpush': {
             if (args.length < 3) return { error: wrongArity(name) };
@@ -3030,6 +3224,7 @@ function planCollection(store, session, name, args) {
                     const body = encodeList(elements);
                     if (body === null) return replyError('ERR list value exceeds the storage limit');
                     rewriteKind(store, db, 'list', key, body);
+                    notifyPush(session, db, key);
                     return integer(elements.length);
                 },
             };

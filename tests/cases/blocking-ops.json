@@ -1,0 +1,314 @@
+{
+  "format": "redis.case/v1",
+  "table": "blocking-ops",
+  "cases": [
+    {
+      "id": "command.blpop.head",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "l1", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "01000000620100000063" } }
+      ]
+    },
+    {
+      "id": "command.brpop.tail",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BRPOP", "l1", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "bulk", "bytes": [99] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "01000000610100000062" } }
+      ]
+    },
+    {
+      "id": "command.blpop.first-key-wins",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "l1", "l2", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "0100000061" },
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c32", "valueHex": "010000007a" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c32", "expect": { "bytes": "010000007a" } }
+      ]
+    },
+    {
+      "id": "command.blpop.second-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "l2", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 50] }, { "type": "bulk", "bytes": [122] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c32", "valueHex": "010000007a" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c32", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.blpop.missing-timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "0.05"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6d697373696e67", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.blpop.negative-timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "l1", "-1"],
+      "reply": { "type": "error", "value": "ERR timeout is negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.non-float-timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "l1", "abc"],
+      "reply": { "type": "error", "value": "ERR timeout is not a float or out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "s1", "0"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "l1"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'blpop' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.keeps-expiry",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "l1", "0"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "01000000610100000062", "expiresAt": 4000000000000 }
+      ],
+      "effect": [
+        { "call": "deadline_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "int": 4000000000000 } }
+      ]
+    },
+    {
+      "id": "command.brpop.timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BRPOP", "missing", "0.05"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmove.left-right",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "l1", "l2", "LEFT", "RIGHT", "0"],
+      "reply": { "type": "bulk", "bytes": [97] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000062" } },
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c32", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.blmove.rotation",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "l1", "l1", "RIGHT", "LEFT", "0"],
+      "reply": { "type": "bulk", "bytes": [99] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "010000006301000000610100000062" } }
+      ]
+    },
+    {
+      "id": "command.blmove.bad-side",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "l1", "l2", "MIDDLE", "RIGHT", "0"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmove.wrong-type-source",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "s1", "l2", "LEFT", "LEFT", "0"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.blmove.wrong-type-destination",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "l1", "s1", "LEFT", "LEFT", "0"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "0100000061" },
+        { "call": "set", "db": 0, "keyHex": "7331", "valueHex": "76" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.blmove.missing-timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "missing", "l2", "LEFT", "LEFT", "0.05"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.brpoplpush.immediate",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BRPOPLPUSH", "l1", "l2", "0"],
+      "reply": { "type": "bulk", "bytes": [98] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "01000000610100000062" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000061" } },
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c32", "expect": { "bytes": "0100000062" } }
+      ]
+    },
+    {
+      "id": "command.brpoplpush.timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BRPOPLPUSH", "missing", "l2", "0.05"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmpop.count-left",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "1", "l1", "LEFT", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000063" } }
+      ]
+    },
+    {
+      "id": "command.blmpop.count-right",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "1", "l1", "RIGHT", "COUNT", "2"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 49] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [99] }, { "type": "bulk", "bytes": [98] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c31", "valueHex": "010000006101000000620100000063" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "list", "keyHex": "6c31", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.blmpop.second-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "2", "l1", "l2", "LEFT"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [108, 50] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [122] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "6c32", "valueHex": "010000007a" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "6c32", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.blmpop.timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0.05", "1", "missing", "LEFT"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmpop.numkeys-zero",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "0", "l1", "LEFT"],
+      "reply": { "type": "error", "value": "ERR numkeys should be greater than 0" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmpop.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "1", "l1", "LEFT", "COUNT", "0"],
+      "reply": { "type": "error", "value": "ERR count should be greater than 0" },
+      "setup": [],
+      "effect": []
+    }
+  ]
+}

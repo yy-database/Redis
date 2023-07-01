@@ -492,6 +492,28 @@ const EXPECTED = {
     ks_type_arity: { error: "wrong number of arguments for 'type' command" },
     ks_type_extra: { error: "wrong number of arguments for 'type' command" },
     ks_scan_arity: { error: "wrong number of arguments for 'scan' command" },
+    blpop_timeout: true,
+    blpop_timeout_elapsed: true,
+    blpop_wake: [1, 'w'],
+    blpop_fifo: ['one', 'two'],
+    brpop_tail: 'c',
+    blmove_value: 'a',
+    blmove_src_rest: ['b', 'c'],
+    blmove_dest: ['a'],
+    blmove_timeout: true,
+    brpoplpush_value: 'b',
+    brpoplpush_src_rest: ['a'],
+    brpoplpush_dest: ['b'],
+    brpoplpush_timeout: true,
+    blmpop: [1, ['a', 'b']],
+    blmpop_rest: ['c'],
+    blmpop_timeout: true,
+    blpop_wrongtype: { error: WRONG_TYPE },
+    blpop_negative_timeout: { error: 'timeout is negative' },
+    blpop_bad_timeout: { error: 'timeout is not a float or out of range' },
+    blmove_bad_side: { error: 'syntax error' },
+    blmpop_zero_numkeys: { error: 'numkeys should be greater than 0' },
+    blpop_resp3_timeout: true,
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1238,6 +1260,92 @@ await captureError('ks_scan_arity', () => client.sendCommand(['SCAN']));
 await client.set('ks:star-*', 'v');
 out.ks_keys_escape = await client.sendCommand(['KEYS', 'ks:star-' + String.fromCharCode(92) + '*']);
 out.ks_keys_unclosed_class = await client.sendCommand(['KEYS', 'ks:user:[1']);
+
+// Blocking list commands on an isolated database with extra connections.
+await client.select(5);
+await client.flushDb();
+
+const makeClient = protocol => createClient({
+    socket: { host: process.env.REDIS_HOST, port: Number(process.env.REDIS_PORT) },
+    RESP: protocol,
+});
+const blockerA = makeClient(2);
+const blockerB = makeClient(2);
+const resp3 = makeClient(3);
+await blockerA.connect();
+await blockerB.connect();
+await resp3.connect();
+await blockerA.select(5);
+await blockerB.select(5);
+await resp3.select(5);
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const popPair = (reply, expected) => {
+    if (reply === null || reply === undefined) return null;
+    let value = reply;
+    if (Array.isArray(value) && value.length === 1 && Array.isArray(value[0])) value = value[0];
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        return [value.key === expected ? 1 : 0, value.element];
+    }
+    return [value[0] === expected ? 1 : 0, value[1]];
+};
+const mpopPair = (reply, expected) => {
+    if (reply === null || reply === undefined) return null;
+    let value = reply;
+    if (Array.isArray(value) && value.length === 1 && Array.isArray(value[0])) value = value[0];
+    return [value[0] === expected ? 1 : 0, value[1]];
+};
+
+const startedAt = Date.now();
+out.blpop_timeout = (await blockerA.sendCommand(['BLPOP', k('blq'), '0.1'])) === null;
+out.blpop_timeout_elapsed = (Date.now() - startedAt) >= 50 && (Date.now() - startedAt) < 2000;
+
+const parked = blockerA.sendCommand(['BLPOP', k('blw'), '0']).catch(error => ({ error: error.message }));
+await sleep(100);
+await client.rPush(k('blw'), ['w']);
+out.blpop_wake = popPair(await parked, k('blw'));
+
+const firstWait = blockerA.sendCommand(['BLPOP', k('blfifo'), '0']).catch(error => ({ error: error.message }));
+await sleep(100);
+const secondWait = blockerB.sendCommand(['BLPOP', k('blfifo'), '0']).catch(error => ({ error: error.message }));
+await sleep(100);
+await client.rPush(k('blfifo'), ['one', 'two']);
+const firstPair = popPair(await firstWait, k('blfifo'));
+const secondPair = popPair(await secondWait, k('blfifo'));
+out.blpop_fifo = [firstPair === null ? null : firstPair[1], secondPair === null ? null : secondPair[1]];
+
+await client.rPush(k('brt'), ['a', 'b', 'c']);
+const tailPair = popPair(await blockerA.sendCommand(['BRPOP', k('brt'), '0']), k('brt'));
+out.brpop_tail = tailPair === null ? null : tailPair[1];
+
+await client.rPush(k('blms'), ['a', 'b', 'c']);
+out.blmove_value = await blockerA.sendCommand(['BLMOVE', k('blms'), k('blmd'), 'LEFT', 'RIGHT', '0']);
+out.blmove_src_rest = await client.lRange(k('blms'), 0, -1);
+out.blmove_dest = await client.lRange(k('blmd'), 0, -1);
+out.blmove_timeout = (await blockerA.sendCommand(['BLMOVE', k('blme'), k('blmx'), 'LEFT', 'RIGHT', '0.1'])) === null;
+
+await client.rPush(k('brs'), ['a', 'b']);
+out.brpoplpush_value = await blockerA.sendCommand(['BRPOPLPUSH', k('brs'), k('brd'), '0']);
+out.brpoplpush_src_rest = await client.lRange(k('brs'), 0, -1);
+out.brpoplpush_dest = await client.lRange(k('brd'), 0, -1);
+out.brpoplpush_timeout = (await blockerA.sendCommand(['BRPOPLPUSH', k('brmiss'), k('brd2'), '0.1'])) === null;
+
+await client.rPush(k('blmp'), ['a', 'b', 'c']);
+out.blmpop = mpopPair(await blockerA.sendCommand(['BLMPOP', '0', '1', k('blmp'), 'LEFT', 'COUNT', '2']), k('blmp'));
+out.blmpop_rest = await client.lRange(k('blmp'), 0, -1);
+out.blmpop_timeout = (await blockerA.sendCommand(['BLMPOP', '0.1', '1', k('blmpmiss'), 'LEFT'])) === null;
+
+await client.set(k('blstr'), 'v');
+await capture('blpop_wrongtype', () => blockerA.sendCommand(['BLPOP', k('blstr'), '0']));
+await captureError('blpop_negative_timeout', () => blockerA.sendCommand(['BLPOP', k('blq'), '-1']));
+await captureError('blpop_bad_timeout', () => blockerA.sendCommand(['BLPOP', k('blq'), 'nan']));
+await captureError('blmove_bad_side', () => blockerA.sendCommand(['BLMOVE', k('blms'), k('blmd'), 'UP', 'RIGHT', '0']));
+await captureError('blmpop_zero_numkeys', () => blockerA.sendCommand(['BLMPOP', '0', '0', k('blmp'), 'LEFT']));
+out.blpop_resp3_timeout = (await resp3.sendCommand(['BLPOP', k('blq3'), '0.1'])) === null;
+
+await blockerA.quit();
+await blockerB.quit();
+await resp3.quit();
 
 await client.quit();
 process.stdout.write(JSON.stringify(out));
@@ -2001,6 +2109,137 @@ capture_error('ks_scan_arity', lambda: client.execute_command('SCAN'))
 client.set('ks:star-*', 'v')
 out['ks_keys_escape'] = client.execute_command('KEYS', 'ks:star-' + chr(92) + '*')
 out['ks_keys_unclosed_class'] = client.execute_command('KEYS', 'ks:user:[1')
+
+# Blocking list commands on an isolated database with extra connections.
+import threading
+import time
+
+blocker = redis.Redis(
+    host=os.environ['REDIS_HOST'],
+    port=int(os.environ['REDIS_PORT']),
+    protocol=2,
+    decode_responses=True,
+)
+second = redis.Redis(
+    host=os.environ['REDIS_HOST'],
+    port=int(os.environ['REDIS_PORT']),
+    protocol=2,
+    decode_responses=True,
+)
+resp3 = redis.Redis(
+    host=os.environ['REDIS_HOST'],
+    port=int(os.environ['REDIS_PORT']),
+    protocol=3,
+    decode_responses=True,
+)
+
+client.execute_command('SELECT', 5)
+client.flushdb()
+for extra in (blocker, second, resp3):
+    extra.execute_command('SELECT', 5)
+
+
+def pop_pair(reply, expected):
+    if reply is None:
+        return None
+    if isinstance(reply, tuple):
+        reply = list(reply)
+    if len(reply) == 1 and isinstance(reply[0], (list, tuple)):
+        reply = list(reply[0])
+    return [1 if reply[0] == expected else 0, reply[1]]
+
+
+def mpop_pair(reply, expected):
+    if reply is None:
+        return None
+    if isinstance(reply, tuple):
+        reply = list(reply)
+    if len(reply) == 1 and isinstance(reply[0], (list, tuple)):
+        reply = list(reply[0])
+    return [1 if reply[0] == expected else 0, reply[1]]
+
+
+def park_on(target, store, name, key):
+    try:
+        store[name] = target.execute_command('BLPOP', key, 0)
+    except redis.ResponseError as error:
+        store[name] = {'error': str(error)}
+
+
+started = time.monotonic()
+out['blpop_timeout'] = blocker.execute_command('BLPOP', k('blq'), '0.1') is None
+out['blpop_timeout_elapsed'] = 50 <= (time.monotonic() - started) * 1000 < 2000
+
+parked = {}
+parked_thread = threading.Thread(target=park_on, args=(blocker, parked, 'wake', k('blw')))
+parked_thread.start()
+time.sleep(0.1)
+client.rpush(k('blw'), 'w')
+parked_thread.join()
+out['blpop_wake'] = pop_pair(parked['wake'], k('blw'))
+
+fifo = {}
+first_thread = threading.Thread(target=park_on, args=(blocker, fifo, 'first', k('blfifo')))
+first_thread.start()
+time.sleep(0.1)
+second_thread = threading.Thread(target=park_on, args=(second, fifo, 'second', k('blfifo')))
+second_thread.start()
+time.sleep(0.1)
+client.rpush(k('blfifo'), 'one', 'two')
+first_thread.join()
+second_thread.join()
+first_pair = pop_pair(fifo['first'], k('blfifo'))
+second_pair = pop_pair(fifo['second'], k('blfifo'))
+out['blpop_fifo'] = [
+    None if first_pair is None else first_pair[1],
+    None if second_pair is None else second_pair[1],
+]
+
+client.rpush(k('brt'), 'a', 'b', 'c')
+tail_pair = pop_pair(blocker.execute_command('BRPOP', k('brt'), '0'), k('brt'))
+out['brpop_tail'] = None if tail_pair is None else tail_pair[1]
+
+client.rpush(k('blms'), 'a', 'b', 'c')
+out['blmove_value'] = blocker.execute_command('BLMOVE', k('blms'), k('blmd'), 'LEFT', 'RIGHT', '0')
+out['blmove_src_rest'] = client.lrange(k('blms'), 0, -1)
+out['blmove_dest'] = client.lrange(k('blmd'), 0, -1)
+out['blmove_timeout'] = blocker.execute_command(
+    'BLMOVE', k('blme'), k('blmx'), 'LEFT', 'RIGHT', '0.1'
+) is None
+
+client.rpush(k('brs'), 'a', 'b')
+out['brpoplpush_value'] = blocker.execute_command('BRPOPLPUSH', k('brs'), k('brd'), '0')
+out['brpoplpush_src_rest'] = client.lrange(k('brs'), 0, -1)
+out['brpoplpush_dest'] = client.lrange(k('brd'), 0, -1)
+out['brpoplpush_timeout'] = blocker.execute_command(
+    'BRPOPLPUSH', k('brmiss'), k('brd2'), '0.1'
+) is None
+
+client.rpush(k('blmp'), 'a', 'b', 'c')
+out['blmpop'] = mpop_pair(
+    blocker.execute_command('BLMPOP', '0', '1', k('blmp'), 'LEFT', 'COUNT', '2'),
+    k('blmp'),
+)
+out['blmpop_rest'] = client.lrange(k('blmp'), 0, -1)
+out['blmpop_timeout'] = blocker.execute_command(
+    'BLMPOP', '0.1', '1', k('blmpmiss'), 'LEFT'
+) is None
+
+client.set(k('blstr'), 'v')
+capture('blpop_wrongtype', lambda: blocker.execute_command('BLPOP', k('blstr'), '0'))
+capture_error('blpop_negative_timeout', lambda: blocker.execute_command('BLPOP', k('blq'), '-1'))
+capture_error('blpop_bad_timeout', lambda: blocker.execute_command('BLPOP', k('blq'), 'nan'))
+capture_error('blmove_bad_side', lambda: blocker.execute_command(
+    'BLMOVE', k('blms'), k('blmd'), 'UP', 'RIGHT', '0'
+))
+capture_error('blmpop_zero_numkeys', lambda: blocker.execute_command(
+    'BLMPOP', '0', '0', k('blmp'), 'LEFT'
+))
+out['blpop_resp3_timeout'] = resp3.execute_command('BLPOP', k('blq3'), '0.1') is None
+
+blocker.close()
+second.close()
+resp3.close()
 
 client.close()
 print(json.dumps(out))
