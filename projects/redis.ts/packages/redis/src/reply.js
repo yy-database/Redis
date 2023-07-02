@@ -6,6 +6,8 @@ export const integer = value => ({ type: 'int', value });
 export const nullReply = () => ({ type: 'null' });
 export const nullArray = () => ({ type: 'null-array' });
 export const array = values => ({ type: 'array', value: values });
+/** Push frame: `>` under RESP3, a plain array under RESP2. */
+export const push = values => ({ type: 'push', value: values });
 
 export function bulk(value) {
     if (value === null || value === undefined) {

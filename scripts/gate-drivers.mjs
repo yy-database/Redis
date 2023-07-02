@@ -514,6 +514,28 @@ const EXPECTED = {
     blmove_bad_side: { error: 'syntax error' },
     blmpop_zero_numkeys: { error: 'numkeys should be greater than 0' },
     blpop_resp3_timeout: true,
+    pubsub_publish_missing: 0,
+    pubsub_numsub: ['pub:alpha', 2, 'pub:beta', 1, 'pub:missing', 0],
+    pubsub_channels: ['pub:alpha', 'pub:beta'],
+    pubsub_numpat: 1,
+    pubsub_publish_alpha: 3,
+    pubsub_publish_beta: 2,
+    pubsub_events_resp2: [
+        ['message', 'pub:alpha', 'hello'],
+        ['pmessage', 'pub:alpha', 'hello'],
+        ['message', 'pub:beta', 'world'],
+        ['pmessage', 'pub:beta', 'world'],
+    ],
+    pubsub_events_resp3: [
+        ['message', 'pub:alpha', 'hello'],
+        ['message', 'pub:alpha', 'again'],
+    ],
+    pubsub_restricted: {
+        error: "Can't execute 'get': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context",
+    },
+    pubsub_numsub_after: ['pub:alpha', 1, 'pub:beta', 0],
+    pubsub_numpat_after: 0,
+    pubsub_publish_after: 1,
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1342,6 +1364,47 @@ await captureError('blpop_bad_timeout', () => blockerA.sendCommand(['BLPOP', k('
 await captureError('blmove_bad_side', () => blockerA.sendCommand(['BLMOVE', k('blms'), k('blmd'), 'UP', 'RIGHT', '0']));
 await captureError('blmpop_zero_numkeys', () => blockerA.sendCommand(['BLMPOP', '0', '0', k('blmp'), 'LEFT']));
 out.blpop_resp3_timeout = (await resp3.sendCommand(['BLPOP', k('blq3'), '0.1'])) === null;
+
+// Pub/sub across separate RESP2 and RESP3 connections. Channel names are not
+// namespaced, so both drivers observe the same names on the same server.
+const sub2 = makeClient(2);
+const sub3 = makeClient(3);
+await sub2.connect();
+await sub3.connect();
+out.pubsub_publish_missing = await client.sendCommand(['PUBLISH', 'pub:missing', 'nobody']);
+const events2 = [];
+const events3 = [];
+await sub2.subscribe('pub:alpha', (message, channel) => events2.push(['message', channel, message]));
+await sub2.subscribe('pub:beta', (message, channel) => events2.push(['message', channel, message]));
+await sub2.pSubscribe('pub:*', (message, channel) => events2.push(['pmessage', channel, message]));
+await sub3.subscribe('pub:alpha', (message, channel) => events3.push(['message', channel, message]));
+
+out.pubsub_numsub = await client.sendCommand(['PUBSUB', 'NUMSUB', 'pub:alpha', 'pub:beta', 'pub:missing']);
+out.pubsub_channels = (await client.sendCommand(['PUBSUB', 'CHANNELS'])).sort();
+out.pubsub_numpat = await client.sendCommand(['PUBSUB', 'NUMPAT']);
+
+const drain = async (events, expected, timeout = 2000) => {
+    const deadline = Date.now() + timeout;
+    while (events.length < expected && Date.now() < deadline) await sleep(25);
+    return events.slice(0, expected);
+};
+
+out.pubsub_publish_alpha = await client.publish('pub:alpha', 'hello');
+out.pubsub_publish_beta = await client.publish('pub:beta', 'world');
+out.pubsub_events_resp2 = await drain(events2, 4);
+await drain(events3, 1);
+
+await captureError('pubsub_restricted', () => sub2.sendCommand(['GET', 'pub:alpha']));
+
+await sub2.unsubscribe(['pub:alpha', 'pub:beta']);
+await sub2.pUnsubscribe(['pub:*']);
+out.pubsub_numsub_after = await client.sendCommand(['PUBSUB', 'NUMSUB', 'pub:alpha', 'pub:beta']);
+out.pubsub_numpat_after = await client.sendCommand(['PUBSUB', 'NUMPAT']);
+out.pubsub_publish_after = await client.publish('pub:alpha', 'again');
+out.pubsub_events_resp3 = await drain(events3, 2);
+
+await sub2.quit();
+await sub3.quit();
 
 await blockerA.quit();
 await blockerB.quit();
@@ -2236,6 +2299,59 @@ capture_error('blmpop_zero_numkeys', lambda: blocker.execute_command(
     'BLMPOP', '0', '0', k('blmp'), 'LEFT'
 ))
 out['blpop_resp3_timeout'] = resp3.execute_command('BLPOP', k('blq3'), '0.1') is None
+
+client3 = redis.Redis(
+    host=os.environ['REDIS_HOST'],
+    port=int(os.environ['REDIS_PORT']),
+    protocol=3,
+    decode_responses=True,
+)
+sub2 = client.pubsub(ignore_subscribe_messages=True)
+sub3 = client3.pubsub(ignore_subscribe_messages=True)
+out['pubsub_publish_missing'] = client.publish('pub:missing', 'nobody')
+sub2.subscribe('pub:alpha', 'pub:beta')
+sub2.psubscribe('pub:*')
+sub3.subscribe('pub:alpha')
+
+
+def drain(target, expected, timeout=2.0):
+    seen = []
+    deadline = time.monotonic() + timeout
+    while len(seen) < expected and time.monotonic() < deadline:
+        message = target.get_message(timeout=0.05)
+        if message is None:
+            continue
+        if message['type'] in ('message', 'pmessage'):
+            seen.append([message['type'], message['channel'], message['data']])
+    return seen
+
+
+out['pubsub_numsub'] = client.execute_command('PUBSUB', 'NUMSUB', 'pub:alpha', 'pub:beta', 'pub:missing')
+out['pubsub_channels'] = sorted(client.execute_command('PUBSUB', 'CHANNELS'))
+out['pubsub_numpat'] = client.execute_command('PUBSUB', 'NUMPAT')
+
+out['pubsub_publish_alpha'] = client.publish('pub:alpha', 'hello')
+out['pubsub_publish_beta'] = client.publish('pub:beta', 'world')
+out['pubsub_events_resp2'] = drain(sub2, 4)
+resp3_first = drain(sub3, 1)
+
+def restricted_get():
+    sub2.connection.send_command('GET', 'pub:alpha')
+    return sub2.connection.read_response()
+
+
+capture_error('pubsub_restricted', restricted_get)
+
+sub2.unsubscribe('pub:alpha', 'pub:beta')
+sub2.punsubscribe('pub:*')
+out['pubsub_numsub_after'] = client.execute_command('PUBSUB', 'NUMSUB', 'pub:alpha', 'pub:beta')
+out['pubsub_numpat_after'] = client.execute_command('PUBSUB', 'NUMPAT')
+out['pubsub_publish_after'] = client.publish('pub:alpha', 'again')
+out['pubsub_events_resp3'] = resp3_first + drain(sub3, 1)
+
+sub2.close()
+sub3.close()
+client3.close()
 
 blocker.close()
 second.close()

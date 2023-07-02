@@ -37,6 +37,7 @@ const specs = [
     { type: 'null' },
     { type: 'array', value: [] },
     { type: 'array', value: [bulk('a'), { type: 'int', value: 3 }, { type: 'null' }] },
+    { type: 'push', value: [bulk('message'), bulk('news'), bulk('hello')] },
     { type: 'map', value: [[bulk('k'), { type: 'int', value: 7 }]] },
     { type: 'map', value: [] },
 ];
@@ -59,6 +60,7 @@ const frames = [
     '$5\r\nhello\r\n',
     '*0\r\n',
     '*3\r\n:1\r\n$2\r\nab\r\n_\r\n',
+    '>3\r\n$7\r\nmessage\r\n$4\r\nnews\r\n$5\r\nhello\r\n',
     '%2\r\n$1\r\na\r\n:1\r\n$1\r\nb\r\n:2\r\n',
 ];
 for (const [index, frame] of frames.entries()) {

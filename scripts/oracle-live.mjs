@@ -111,20 +111,32 @@ class Link {
         }
     }
 
-    read() {
+    read(label = 'a reply') {
         const frame = this.take();
         if (frame !== null) return Promise.resolve(frame);
-        return new Promise(resolve => {
-            this.waiter = resolve;
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this.waiter = null;
+                reject(new Error(`timed out waiting for ${label}`));
+            }, 10000);
+            this.waiter = frame => {
+                clearTimeout(timer);
+                resolve(frame);
+            };
         });
     }
 
-    send(parts) {
+    /** Frames one command without waiting for a reply. */
+    write(parts) {
         const encoded = `*${parts.length}\r\n` + parts
             .map(part => `$${Buffer.byteLength(String(part))}\r\n${part}\r\n`)
             .join('');
         this.socket.write(encoded);
-        return this.read();
+    }
+
+    send(parts, label = parts[0]) {
+        this.write(parts);
+        return this.read(label);
     }
 
     close() {
@@ -193,7 +205,85 @@ function readBlockingPop(frame) {
     return [frame.value[0].value, frame.value[1].value];
 }
 
+/** Runs a pub/sub scenario over four links and prints the frame shapes. */
+async function pubsubScenario() {
+    const links = await open(4);
+    const [subscriber, publisher, plain, plainTwo] = links;
+    for (const link of links) await link.send(['SELECT', '0']);
+    if (PROTOCOL !== 2) {
+        for (const link of links) await link.send(['HELLO', String(PROTOCOL)]);
+    }
+    const observed = { protocol: PROTOCOL };
+
+    observed.publish_none = shape(await publisher.send(['PUBLISH', 'solo', 'nobody'], 'publish_none'));
+
+    observed.pubsub_numsub_empty = shape(await plain.send(['PUBSUB', 'NUMSUB'], 'numsub empty'));
+    observed.pubsub_channels_empty = shape(await plain.send(['PUBSUB', 'CHANNELS'], 'channels empty'));
+    observed.pubsub_numpat_zero = shape(await plain.send(['PUBSUB', 'NUMPAT'], 'numpat zero'));
+    observed.pubsub_unknown = shape(await plain.send(['PUBSUB', 'BOGUS'], 'pubsub unknown'));
+
+    subscriber.write(['SUBSCRIBE', 'ch', 'ch2']);
+    observed.subscribe = [shape(await subscriber.read('subscribe ch')), shape(await subscriber.read('subscribe ch2'))];
+    subscriber.write(['SUBSCRIBE', 'ch']);
+    observed.subscribe_duplicate = shape(await subscriber.read('subscribe duplicate'));
+    observed.numsub = shape(await publisher.send(['PUBSUB', 'NUMSUB', 'ch', 'ch2', 'missing'], 'numsub'));
+    observed.channels = shape(await publisher.send(['PUBSUB', 'CHANNELS'], 'channels'));
+
+    observed.publish_one = shape(await publisher.send(['PUBLISH', 'ch', 'hello'], 'publish_one'));
+    observed.message = shape(await subscriber.read('message'));
+
+    observed.ping_while_subscribed = shape(await subscriber.send(['PING'], 'ping subscribed'));
+    observed.restricted_get = shape(await subscriber.send(['GET', 'plain'], 'get subscribed'));
+
+    subscriber.write(['UNSUBSCRIBE', 'ch']);
+    observed.unsubscribe = shape(await subscriber.read('unsubscribe ch'));
+
+    subscriber.write(['PSUBSCRIBE', 'news.*']);
+    observed.psubscribe = shape(await subscriber.read('psubscribe'));
+    observed.numpat = shape(await publisher.send(['PUBSUB', 'NUMPAT'], 'numpat'));
+
+    observed.publish_pattern = shape(await publisher.send(['PUBLISH', 'news.tech', 'tick'], 'publish_pattern'));
+    observed.pmessage = shape(await subscriber.read('pmessage'));
+    observed.channels_with_pattern = shape(await publisher.send(['PUBSUB', 'CHANNELS', 'news.*'], 'channels pattern'));
+
+    subscriber.write(['SUBSCRIBE', 'news.tech']);
+    observed.resubscribe = shape(await subscriber.read('resubscribe'));
+    observed.publish_both = shape(await publisher.send(['PUBLISH', 'news.tech', 'both'], 'publish_both'));
+    observed.message_direct = shape(await subscriber.read('message direct'));
+    observed.pmessage_then = shape(await subscriber.read('pmessage then'));
+
+    subscriber.write(['PUNSUBSCRIBE', 'news.*']);
+    observed.punsubscribe = shape(await subscriber.read('punsubscribe'));
+
+    observed.unsubscribe_when_none = shape(await plain.send(['UNSUBSCRIBE'], 'unsubscribe idle'));
+    observed.punsubscribe_when_none = shape(await plainTwo.send(['PUNSUBSCRIBE'], 'punsubscribe idle'));
+
+    observed.subscribe_no_args = shape(await publisher.send(['SUBSCRIBE'], 'subscribe no args'));
+    observed.publish_after = shape(await publisher.send(['PUBLISH', 'news.tech', 'late'], 'publish_after'));
+    observed.message_after = shape(await subscriber.read('message after'));
+    observed.reset = shape(await subscriber.send(['RESET'], 'reset'));
+    observed.get_after_reset = shape(await subscriber.send(['GET', 'plain'], 'get after reset'));
+
+    for (const link of links) link.close();
+    console.log(JSON.stringify(observed, null, 2));
+}
+
+/** Reduces one parsed frame to its kind and payload, recursively. */
+function shape(frame) {
+    if (frame.kind === 'array' || frame.kind === 'push') {
+        return { kind: frame.kind, value: frame.value.map(shape) };
+    }
+    if (frame.kind === 'map') {
+        return { kind: 'map', value: frame.value.map(([key, value]) => [shape(key), shape(value)]) };
+    }
+    return { kind: frame.kind, value: frame.value };
+}
+
 async function main() {
+    if (TABLES.includes('pubsub-scenario')) {
+        await pubsubScenario();
+        return;
+    }
     if (TABLES.includes('blocking-scenario')) {
         await blockingScenario();
         return;
@@ -212,6 +302,17 @@ async function main() {
     for (const table of TABLES.length > 0 ? TABLES : ['blocking-ops']) {
         const payload = JSON.parse(readFileSync(join(ROOT, 'tests', 'cases', `${table}.json`), 'utf8'));
         for (const entry of payload.cases) {
+            if (entry.op === 'dispatch') {
+                // `RESET` drops subscriptions in the real server and returns the
+                // connection to RESP2, so a case cannot leak into the next one.
+                await link.send(['RESET']);
+                await link.send(['SELECT', String(entry.db ?? 0)]);
+                await link.send(['FLUSHDB']);
+                const outcome = await replayDispatch(link, entry, 2);
+                checked += 1;
+                for (const mismatch of outcome) problems.push(`${table}/${entry.id}: ${mismatch}`);
+                continue;
+            }
             await link.send(['SELECT', String(entry.db ?? 0)]);
             await link.send(['FLUSHDB']);
             for (const step of entry.setup ?? []) {
@@ -236,6 +337,51 @@ async function main() {
         return;
     }
     console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches`);
+}
+
+/** Replays a multi-step dispatcher case, comparing replies and push frames. */
+async function replayDispatch(link, entry, initialProtocol) {
+    const problems = [];
+    let protocol = initialProtocol;
+    for (const step of entry.steps) {
+        if (step.protocol !== undefined && step.protocol !== protocol) {
+            await link.send(['HELLO', String(step.protocol)]);
+            protocol = step.protocol;
+        }
+        if (step.frames === undefined) {
+            const reply = await link.send(step.argsText);
+            const mismatch = compareReply(step.reply, reply);
+            if (mismatch !== null) problems.push(`${step.argsText.join(' ')}: reply ${mismatch}`);
+            if (step.argsText[0].toUpperCase() === 'RESET') protocol = 2;
+            continue;
+        }
+        link.write(step.argsText);
+        for (const [index, expected] of step.frames.entries()) {
+            const frame = await link.read(`${step.argsText[0]} frame ${index}`);
+            const mismatch = compareFrame(expected, frame, protocol);
+            if (mismatch !== null) problems.push(`${step.argsText.join(' ')} frame ${index}: ${mismatch}`);
+        }
+    }
+    return problems;
+}
+
+/** Compares one push specification with a frame; RESP2 answers it as a plain array. */
+function compareFrame(expected, actual, protocol) {
+    if (expected.type !== 'push') {
+        return compareReply(expected, actual);
+    }
+    const kind = protocol >= 3 ? 'push' : 'array';
+    if (actual.kind !== kind) {
+        return `expected a ${kind}, read ${describe(actual)}`;
+    }
+    if (actual.value.length !== expected.value.length) {
+        return `expected ${expected.value.length} element(s), read ${actual.value.length}`;
+    }
+    for (let index = 0; index < expected.value.length; index += 1) {
+        const inner = compareReply(expected.value[index], actual.value[index]);
+        if (inner !== null) return `element ${index}: ${inner}`;
+    }
+    return null;
 }
 
 /** Replays one setup step with the commands a client would issue. */

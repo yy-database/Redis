@@ -34,6 +34,8 @@ pub enum Reply {
     NullArray,
     /// Ordered array.
     Array(Vec<Reply>),
+    /// Push frame (`>` on RESP3, a plain array on RESP2), used by pub/sub delivery.
+    Push(Vec<Reply>),
     /// Ordered map (`%` on RESP3, a flattened array on RESP2).
     Map(Vec<(Reply, Reply)>),
 }
@@ -70,6 +72,13 @@ impl Reply {
                     value.encode(protocol, out);
                 }
             }
+            Self::Push(values) => {
+                out.extend_from_slice(if protocol >= 3 { b">" } else { b"*" });
+                out.extend_from_slice(format!("{}\r\n", values.len()).as_bytes());
+                for value in values {
+                    value.encode(protocol, out);
+                }
+            }
             Self::Map(entries) => {
                 if protocol >= 3 {
                     out.extend_from_slice(format!("%{}\r\n", entries.len()).as_bytes());
@@ -96,6 +105,9 @@ impl Reply {
             Self::NullArray => serde_json::json!({ "type": "null-array" }),
             Self::Array(values) => {
                 serde_json::json!({ "type": "array", "value": values.iter().map(Self::to_spec).collect::<Vec<_>>() })
+            }
+            Self::Push(values) => {
+                serde_json::json!({ "type": "push", "value": values.iter().map(Self::to_spec).collect::<Vec<_>>() })
             }
             Self::Map(entries) => serde_json::json!({
                 "type": "map",
@@ -135,6 +147,14 @@ impl Reply {
                     replies.push(Self::from_spec(value)?);
                 }
                 Ok(Self::Array(replies))
+            }
+            "push" => {
+                let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `push` needs a `value` list")?;
+                let mut replies = Vec::with_capacity(values.len());
+                for value in values {
+                    replies.push(Self::from_spec(value)?);
+                }
+                Ok(Self::Push(replies))
             }
             "map" => {
                 let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `map` needs a `value` list")?;
@@ -271,7 +291,7 @@ fn parse_reply(
             }
             Ok(Some((Reply::Bulk(input[next..end].to_vec()), terminator)))
         }
-        b'*' | b'%' => {
+        b'*' | b'%' | b'>' => {
             let count = parse_count(header).ok_or("reply aggregate length is not canonical")?;
             if count < 0 {
                 return Ok(Some((Reply::NullArray, next)));
@@ -298,6 +318,9 @@ fn parse_reply(
                     entries.push((key, value));
                 }
                 Ok(Some((Reply::Map(entries), offset)))
+            }
+            else if kind == b'>' {
+                Ok(Some((Reply::Push(values), offset)))
             }
             else {
                 Ok(Some((Reply::Array(values), offset)))

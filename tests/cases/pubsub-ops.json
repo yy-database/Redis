@@ -1,0 +1,1769 @@
+{
+  "format": "redis.case/v1",
+  "table": "pubsub-ops",
+  "cases": [
+    {
+      "id": "pubsub.publish.no-subscribers",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBLISH",
+            "solo",
+            "nobody"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.channels-empty",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB",
+            "CHANNELS"
+          ],
+          "reply": {
+            "type": "array",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.numsub-empty",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB",
+            "NUMSUB"
+          ],
+          "reply": {
+            "type": "array",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.numpat-zero",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB",
+            "NUMPAT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.unknown-subcommand",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB",
+            "BOGUS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand 'BOGUS'. Try PUBSUB HELP."
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.channels-extra-args",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB",
+            "CHANNELS",
+            "a",
+            "b"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand or wrong number of arguments for 'CHANNELS'. Try PUBSUB HELP."
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.numpat-extra-args",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB",
+            "NUMPAT",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'pubsub|numpat' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.missing-subcommand",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBSUB"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'pubsub' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.subscribe-arity",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'subscribe' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.psubscribe-arity",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PSUBSCRIBE"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'psubscribe' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.error.publish-arity",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUBLISH",
+            "ch"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'publish' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.subscribe.single",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.subscribe.two-channels",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch",
+            "ch2"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104,
+                    50
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.subscribe.duplicate",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch",
+            "ch2"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104,
+                    50
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.subscribe.duplicate-pattern",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PSUBSCRIBE",
+            "p.*"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    46,
+                    42
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PSUBSCRIBE",
+            "p.*"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    46,
+                    42
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.unsubscribe.explicit",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch",
+            "ch2"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104,
+                    50
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "UNSUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.unsubscribe.unknown-name",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "UNSUBSCRIBE",
+            "nope"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    110,
+                    111,
+                    112,
+                    101
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.unsubscribe.idle",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "UNSUBSCRIBE"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "int",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.punsubscribe.idle",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUNSUBSCRIBE"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "int",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.unsubscribe.all",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "UNSUBSCRIBE"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.channels-after-subscribe",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "alpha"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    97,
+                    108,
+                    112,
+                    104,
+                    97
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "CHANNELS"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  97,
+                  108,
+                  112,
+                  104,
+                  97
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.channels-pattern",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "alpha",
+            "beta"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    97,
+                    108,
+                    112,
+                    104,
+                    97
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    98,
+                    101,
+                    116,
+                    97
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "CHANNELS",
+            "al*"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  97,
+                  108,
+                  112,
+                  104,
+                  97
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.channels-excludes-patterns",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PSUBSCRIBE",
+            "news.*"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    110,
+                    101,
+                    119,
+                    115,
+                    46,
+                    42
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "CHANNELS"
+          ],
+          "reply": {
+            "type": "array",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.numsub-after-subscribe",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "NUMSUB",
+            "ch",
+            "missing"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  99,
+                  104
+                ]
+              },
+              {
+                "type": "int",
+                "value": 1
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  109,
+                  105,
+                  115,
+                  115,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "type": "int",
+                "value": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.query.numpat-after-psubscribe",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PSUBSCRIBE",
+            "news.*"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    110,
+                    101,
+                    119,
+                    115,
+                    46,
+                    42
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "NUMPAT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp2.restricted-get",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "GET",
+            "plain"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Can't execute 'get': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp2.restricted-pubsub-subcommand",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "NUMPAT"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Can't execute 'pubsub|numpat': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp2.restricted-unknown-subcommand",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PUBSUB",
+            "BOGUS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand 'BOGUS'. Try PUBSUB HELP."
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp2.ping",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PING"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  112,
+                  111,
+                  110,
+                  103
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp3.ping",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "PING"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "PONG"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp3.command-allowed",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "GET",
+            "plain"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pubsub.reset",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SUBSCRIBE",
+            "ch"
+          ],
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    99,
+                    104
+                  ]
+                },
+                {
+                  "type": "int",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "argsText": [
+            "RESET"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "RESET"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "plain"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        }
+      ]
+    }
+  ]
+}

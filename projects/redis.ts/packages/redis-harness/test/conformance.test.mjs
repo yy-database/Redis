@@ -349,7 +349,12 @@ function runCase(entry) {
                     state.protocol = item.protocol;
                 }
                 const result = execute(store, state, item.argsText.map(value => Buffer.from(value)));
-                assert.deepEqual(result.reply, item.reply);
+                if (item.frames !== undefined) {
+                    assert.deepEqual(result.frames, item.frames);
+                }
+                else {
+                    assert.deepEqual(result.reply, item.reply);
+                }
                 if (item.close !== undefined) {
                     assert.equal(result.close === true, item.close);
                 }

@@ -2,7 +2,7 @@
 
 import { createServer } from 'node:net';
 import { BlockingHub } from './blocking.js';
-import { execute } from './commands.js';
+import { execute, PubSubHub } from './commands.js';
 import { decodeCommand, encodeReply, Store } from './native.js';
 import { error as replyError } from './reply.js';
 
@@ -19,11 +19,28 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
     const store = new Store(dataDir);
     const connections = new Set();
     const hub = new BlockingHub();
+    const pubsub = new PubSubHub();
     const listener = createServer(socket => {
         connections.add(socket);
-        const session = { db: 0, protocol: 2, queued: null, name: '', hub };
+        const session = { db: 0, protocol: 2, queued: null, name: '', hub, pubsub };
+        // Publishing runs synchronously on this loop, so a subscriber's push
+        // frame is written straight to its socket, after any ack frames of the
+        // command that produced it.
+        session.deliver = frame => {
+            if (!socket.destroyed) socket.write(encodeReply(frame, session.protocol));
+        };
+        pubsub.attach(session);
         let pending = Buffer.alloc(0);
         let blocked = null;
+        function write(result) {
+            if (result.frames !== undefined) {
+                for (const frame of result.frames) {
+                    socket.write(encodeReply(frame, session.protocol));
+                }
+                return;
+            }
+            socket.write(encodeReply(result.reply, session.protocol));
+        }
         function pump() {
             while (pending.length > 0 && blocked === null) {
                 let decoded;
@@ -55,7 +72,7 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
                     hub.wait(blocked);
                     return;
                 }
-                socket.write(encodeReply(result.reply, session.protocol));
+                write(result);
                 if (result.close) {
                     socket.end();
                     return;
@@ -68,6 +85,7 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
         });
         socket.on('close', () => {
             if (blocked !== null) hub.cancel(blocked);
+            pubsub.detach(session);
             connections.delete(socket);
         });
         socket.on('error', () => connections.delete(socket));
