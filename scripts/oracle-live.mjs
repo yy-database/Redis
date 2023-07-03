@@ -350,7 +350,7 @@ async function replayDispatch(link, entry, initialProtocol) {
         }
         if (step.frames === undefined) {
             const reply = await link.send(step.argsText);
-            const mismatch = compareReply(step.reply, reply);
+            const mismatch = compareReply(step.reply, reply, protocol);
             if (mismatch !== null) problems.push(`${step.argsText.join(' ')}: reply ${mismatch}`);
             if (step.argsText[0].toUpperCase() === 'RESET') protocol = 2;
             continue;
@@ -378,7 +378,7 @@ function compareFrame(expected, actual, protocol) {
         return `expected ${expected.value.length} element(s), read ${actual.value.length}`;
     }
     for (let index = 0; index < expected.value.length; index += 1) {
-        const inner = compareReply(expected.value[index], actual.value[index]);
+        const inner = compareReply(expected.value[index], actual.value[index], protocol);
         if (inner !== null) return `element ${index}: ${inner}`;
     }
     return null;
@@ -442,9 +442,11 @@ function decodeZSet(body) {
 }
 
 /** Compares one expected reply spec with the frame the real server sent. */
-function compareReply(expected, actual) {
+function compareReply(expected, actual, protocol = PROTOCOL) {
     if (expected.type === 'null-array') {
-        return actual.kind === 'null-array' ? null : `expected a null array, read ${describe(actual)}`;
+        // RESP3 has no null array, so the server answers `_` instead of `*-1`.
+        const kind = protocol >= 3 ? 'null' : 'null-array';
+        return actual.kind === kind ? null : `expected a ${kind === 'null' ? 'null' : 'null array'}, read ${describe(actual)}`;
     }
     if (expected.type === 'null') {
         return actual.kind === 'null' ? null : `expected null, read ${describe(actual)}`;
@@ -469,7 +471,7 @@ function compareReply(expected, actual) {
             return `expected ${expected.value.length} element(s), read ${actual.value.length}`;
         }
         for (let index = 0; index < expected.value.length; index += 1) {
-            const inner = compareReply(expected.value[index], actual.value[index]);
+            const inner = compareReply(expected.value[index], actual.value[index], protocol);
             if (inner !== null) return `element ${index}: ${inner}`;
         }
         return null;
