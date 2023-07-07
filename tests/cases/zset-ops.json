@@ -216,7 +216,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["ZRANGEBYLEX", "l1", "-", "+", "WITHSCORES"],
-      "reply": { "type": "error", "value": "ERR syntax error" },
+      "reply": { "type": "error", "value": "ERR syntax error, WITHSCORES not supported in combination with BYLEX" },
       "setup": [],
       "effect": []
     },

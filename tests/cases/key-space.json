@@ -763,7 +763,19 @@
       ],
       "reply": {
         "type": "array",
-        "value": []
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              117,
+              115,
+              101,
+              114,
+              58,
+              49
+            ]
+          }
+        ]
       },
       "setup": [
         {

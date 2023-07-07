@@ -631,7 +631,9 @@ function planHyperLogLog(store, session, name, args) {
             },
         };
     }
-    if (args.length < 3) return { error: wrongArity('pfmerge') };
+    // `PFMERGE` accepts only a destination and folds zero sources into it.
+    if (args.length < 2) return { error: wrongArity('pfmerge') };
+
     return {
         run: () => {
             const merged = Buffer.alloc(HLL_REGISTER_BYTES);
@@ -1155,7 +1157,7 @@ function plan(store, session, name, args) {
             if (args.length < 3 || args.length > 6) return { error: wrongArity('bitpos') };
             const target = text(args[2]);
             if (target !== '0' && target !== '1') {
-                return { error: replyError('ERR The bit argument must be 1 or 0') };
+                return { error: replyError('ERR The bit argument must be 1 or 0.') };
             }
             let bitUnit = false;
             if (args.length === 6) {
@@ -1397,7 +1399,8 @@ function plan(store, session, name, args) {
                     if (kind === null) return integer(-2);
                     const deadline = store.deadlineKind(session.db, SUFFIX[kind], args[1]);
                     if (deadline === null || deadline === undefined) return integer(-1);
-                    return integer(milliseconds ? deadline : Math.floor(deadline / 1000));
+                    // 真机 `EXPIRETIME` 按毫秒位四舍五入到秒（余数 >= 500 进位），不是截断。
+                    return integer(milliseconds ? deadline : Math.round(deadline / 1000));
                 },
             };
         }
@@ -1450,7 +1453,7 @@ export function globMatch(pattern, key) {
             }
             if (current === 0x5b) {
                 const matched = classMatch(pattern, patternIndex, key[keyIndex]);
-                if (matched !== null && matched[1]) {
+                if (matched[1]) {
                     patternIndex = matched[0];
                     keyIndex += 1;
                     continue;
@@ -1483,18 +1486,16 @@ export function globMatch(pattern, key) {
 
 /**
  * Matches one `[...]` class starting at `start`, returning the index past its `]` and
- * whether `byte` hit it, `null` when the class is never closed.
+ * whether `byte` hit it. An unterminated class ends with the pattern, like Redis.
  */
 function classMatch(pattern, start, byte) {
     let index = start + 1;
     const negated = pattern[index] === 0x5e;
     if (negated) index += 1;
     let matched = false;
-    let closed = false;
     while (index < pattern.length) {
         if (pattern[index] === 0x5d) {
             index += 1;
-            closed = true;
             break;
         }
         if (pattern[index] === 0x5c && index + 1 < pattern.length) {
@@ -1513,7 +1514,8 @@ function classMatch(pattern, start, byte) {
         if (pattern[index] === byte) matched = true;
         index += 1;
     }
-    if (!closed) return null;
+    // Redis ends an unterminated class at the end of the pattern, so
+    // `ks:user:[1` still matches `ks:user:1`.
     return [index, negated ? !matched : matched];
 }
 
@@ -2064,7 +2066,9 @@ function parseZRangeOptions(args, from, allowScores) {
     for (let index = from; index < args.length;) {
         const option = text(args[index]).toLowerCase();
         if (option === 'withscores') {
-            if (!allowScores) return { error: replyError('ERR syntax error') };
+            if (!allowScores) {
+                return { error: replyError('ERR syntax error, WITHSCORES not supported in combination with BYLEX') };
+            }
             withScores = true;
             index += 1;
             continue;
@@ -2254,7 +2258,7 @@ function planZSetAggregate(store, session, name, args) {
     const db = session.db;
     if (name === 'zunionstore' || name === 'zinterstore') {
         if (args.length < 4) return { error: wrongArity(name) };
-        const plan = parseZSetStorePlan(args);
+        const plan = parseZSetStorePlan(args, name);
         if (plan.error !== undefined) return { error: plan.error };
         const destination = args[1];
         const mode = name === 'zunionstore' ? 'union' : 'inter';
@@ -2272,7 +2276,7 @@ function planZSetAggregate(store, session, name, args) {
         if (keeps ? args.length < 4 : args.length < 3) return { error: wrongArity(name) };
         const numkeys = parseInteger(args[numkeysIndex]);
         if (numkeys === null || numkeys <= 0) {
-            return { error: replyError(`ERR at least 1 input key is needed for ${keeps ? 'ZDIFFSTORE' : 'ZDIFF'}`) };
+            return { error: replyError(`ERR at least 1 input key is needed for '${keeps ? 'zdiffstore' : 'zdiff'}' command`) };
         }
         if (args.length < numkeysIndex + 1 + numkeys) return { error: replyError('ERR syntax error') };
         const keys = args.slice(numkeysIndex + 1, numkeysIndex + 1 + numkeys);
@@ -2336,10 +2340,10 @@ function planZSetAggregate(store, session, name, args) {
 }
 
 /** Parses `numkeys` plus optional `WEIGHTS` and `AGGREGATE` for the sorted-set stores. */
-function parseZSetStorePlan(args) {
+function parseZSetStorePlan(args, name) {
     const numkeys = parseInteger(args[2]);
     if (numkeys === null || numkeys <= 0) {
-        return { error: replyError('ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE') };
+        return { error: replyError(`ERR at least 1 input key is needed for '${name}' command`) };
     }
     if (args.length < 3 + numkeys) return { error: replyError('ERR syntax error') };
     const keys = args.slice(3, 3 + numkeys);
@@ -2507,7 +2511,7 @@ function planSort(store, session, name, args) {
         return { error: replyError('ERR syntax error') };
     }
     if (readonly && options.store !== null) {
-        return { error: replyError('ERR SORT_RO does not support the STORE option') };
+        return { error: replyError('ERR syntax error') };
     }
     return {
         run: () => {

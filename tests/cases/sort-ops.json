@@ -1017,7 +1017,7 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR SORT_RO does not support the STORE option"
+        "value": "ERR syntax error"
       },
       "setup": [
         {

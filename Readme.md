@@ -213,6 +213,11 @@ Tests and gates:
   not map wasm.
 - **Request caps.** 64 MiB and 1,048,576 arguments per request. Larger requests
   are rejected and the connection is closed.
+- **HyperLogLog encoding (`oracle-limitation`).** `PFADD` always writes the dense
+  12304-byte representation, while real Redis keeps a small cardinality in the
+  sparse form (its `STRLEN` is 27 bytes for four distinct values and grows with
+  the registers). Cardinality estimates and `PFMERGE` semantics match the real
+  server, so only the stored byte layout differs.
 
 ## Format ownership
 

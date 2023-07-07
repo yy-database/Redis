@@ -843,8 +843,8 @@
         "dest"
       ],
       "reply": {
-        "type": "error",
-        "value": "ERR wrong number of arguments for 'pfmerge' command"
+        "type": "simple",
+        "value": "OK"
       },
       "setup": [],
       "effect": []

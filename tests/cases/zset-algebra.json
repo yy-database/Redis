@@ -920,7 +920,7 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR at least 1 input key is needed for ZUNIONSTORE/ZINTERSTORE"
+        "value": "ERR at least 1 input key is needed for 'zunionstore' command"
       },
       "setup": [],
       "effect": []
@@ -1029,7 +1029,7 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR at least 1 input key is needed for ZDIFF"
+        "value": "ERR at least 1 input key is needed for 'zdiff' command"
       },
       "setup": [],
       "effect": []

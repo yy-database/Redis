@@ -1444,7 +1444,7 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR The bit argument must be 1 or 0"
+        "value": "ERR The bit argument must be 1 or 0."
       },
       "setup": [],
       "effect": [
