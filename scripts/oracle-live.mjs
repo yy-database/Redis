@@ -279,7 +279,71 @@ function shape(frame) {
     return { kind: frame.kind, value: frame.value };
 }
 
+/**
+ * Confirms the gate can still go red before it reports anything green.
+ *
+ * A replay script that silently stops checking is worse than no script at all, so
+ * startup proves the three mechanisms it relies on: setup commands reach the
+ * server, an empty multibulk leaves no reply behind, `SELECT` scopes the
+ * following writes, and the comparator rejects a known mismatch.
+ */
+async function selfCheck() {
+    const problems = [];
+    const expect = (label, ok, detail) => {
+        if (!ok) problems.push(`${label}: ${detail}`);
+    };
+    const [probe] = await open(1);
+    await probe.send(['SELECT', '0']);
+    await probe.send(['FLUSHALL']);
+
+    // setup 步骤必须真的落到服务端，否则每个用例的前置状态都是假的。
+    await probe.send(['SELECT', '3']);
+    const key = 'gate:selfcheck';
+    const step = {
+        kind: '',
+        keyHex: Buffer.from(key).toString('hex'),
+        valueHex: Buffer.from('here').toString('hex'),
+    };
+    const setupReplies = [];
+    for (const command of setupCommands(step)) setupReplies.push(await probe.send(command));
+    const written = await probe.send(['GET', key]);
+    expect('setup applies', setupReplies.every(reply => reply.kind === 'simple' && reply.value === 'OK') && written.kind === 'bulk' && written.value === 'here', describe(written));
+
+    // db 切换必须隔离写入，回放时才能放心在每个用例开头 FLUSHALL + SELECT。
+    await probe.send(['SELECT', '0']);
+    const outside = await probe.send(['GET', key]);
+    expect('SELECT scopes writes', outside.kind === 'null', describe(outside));
+
+    // 没有 reply 的步骤是空多批量，服务端不回帧；紧跟的 PING 必须照常对上。
+    probe.write([]);
+    const afterSilent = await probe.send(['PING']);
+    expect('empty multibulk stays silent', afterSilent.kind === 'simple' && afterSilent.value === 'PONG', describe(afterSilent));
+
+    // QUIT 会断开连接，回放必须换一条链路继续。
+    const quit = await probe.send(['QUIT']);
+    expect('QUIT replies before closing', quit.kind === 'simple' && quit.value === 'OK', describe(quit));
+    probe.close();
+    const [reopened] = await open(1);
+    const afterQuit = await reopened.send(['PING']);
+    expect('connection reopens after close', afterQuit.kind === 'simple' && afterQuit.value === 'PONG', describe(afterQuit));
+    reopened.close();
+
+    // 已知会失败的探针：比较器若认不出故意写错的期望，整道门禁就是假的。
+    const acceptsMatch = compareReply({ type: 'simple', value: 'PONG' }, { kind: 'simple', value: 'PONG' });
+    expect('comparator accepts a match', acceptsMatch === null, String(acceptsMatch));
+    const rejectsMismatch = compareReply({ type: 'simple', value: 'PONG' }, { kind: 'simple', value: 'NOT-PONG' });
+    expect('comparator rejects a known mismatch', rejectsMismatch !== null, 'comparator returned null on a deliberate mismatch');
+
+    if (problems.length > 0) {
+        console.log('live oracle self-check failed, refusing to report results:');
+        for (const problem of problems) console.log(`  ${problem}`);
+        throw new Error('self-check failed');
+    }
+    console.log(`live oracle self-check: setup, silent step, close handling, db switch and comparator all behave`);
+}
+
 async function main() {
+    await selfCheck();
     if (TABLES.includes('pubsub-scenario')) {
         await pubsubScenario();
         return;
