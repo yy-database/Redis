@@ -31,12 +31,14 @@ extension). Neither binding owns a server loop or a process entry point.
 ## Supported commands
 
 Only the commands below are implemented. Anything else answers
-`ERR unsupported command`.
+`ERR unknown command '<name>'`, followed by `with args beginning with: ...` when
+arguments were sent.
 
 | Group | Commands |
 | ----- | -------- |
 | Connection and session | `PING` `ECHO` `QUIT` `HELLO` `SELECT` |
-| Client metadata | `CLIENT SETINFO` `CLIENT SETNAME` `CLIENT GETNAME` `CLIENT ID` |
+| Client metadata | `CLIENT SETINFO` `CLIENT SETNAME` `CLIENT GETNAME` `CLIENT ID` `CLIENT LIST` `CLIENT INFO` `CLIENT NO-EVICT` `CLIENT NO-TOUCH` `CLIENT UNPAUSE` `CLIENT KILL` |
+| Server introspection | `COMMAND` `COMMAND COUNT` `COMMAND INFO` `COMMAND DOCS` `INFO` `CONFIG GET` `CONFIG SET` `ACL WHOAMI` `ACL LIST` `ACL CAT` `ACL GETUSER` |
 | Transactions | `MULTI` `EXEC` `DISCARD` |
 | Strings | `GET` `SET` `SETNX` `SETEX` `GETSET` `GETDEL` `GETEX` `MGET` `MSET` `APPEND` `STRLEN` `TYPE` |
 | Counters | `INCR` `DECR` `INCRBY` `DECRBY` |
@@ -51,6 +53,9 @@ Supported options are equally narrow:
 - `EXPIRE` and its variants take exactly one integer argument. They do not accept
   `NX`, `XX`, `GT` or `LT`.
 - `SCAN` accepts `MATCH` and `COUNT`.
+- `QUIT` accepts any extra arguments, answers `OK` and closes the connection.
+- `CONFIG SET` only accepts the options in its whitelist. Everything else answers
+  `ERR Unknown option or number of arguments for CONFIG SET - '<name>'`.
 - `TYPE` answers `string` for a live key and `none` for a missing one. No other
   type exists.
 
@@ -62,20 +67,25 @@ HyperLogLog, geospatial indexes and pub/sub channels are not implemented.
 - RESP2 is the default. `HELLO 3` switches the connection to RESP3. Any other
   protocol number answers `NOPROTO unsupported protocol version`.
 - `HELLO` answers a seven-pair map: `server redis`, `version 7.4.0`,
-  `proto <2|3>`, `id 1`, `mode standalone`, `role master`, `modules []`. Under
+  `proto <2|3>`, `id <connection id>`, `mode standalone`, `role master`, `modules []`. Under
   RESP2 the map is flattened into a fourteen-element array. The `7.4.0` string is
   a compatibility label, not a claim that the command surface above matches
   Redis 7.4.0.
 - `HELLO` accepts only the optional protocol argument. It does not accept the
-  `AUTH` or `SETNAME` clauses. `CLIENT ID` always answers `1`.
+  `AUTH` or `SETNAME` clauses. `CLIENT ID` answers the connection's own id, which
+  increases per connection; `HELLO` reports the same id.
 - Null replies use `$-1` under RESP2 and `_` under RESP3. Maps use `%` under
   RESP3 and a flattened array under RESP2.
 - Requests must be RESP multibulk frames. A request is limited to 64 MiB and
   1,048,576 arguments. A framing violation answers
   `ERR Protocol error or request limit exceeded` and closes the connection.
 - Commands are planned before they run, so `MULTI` reports a malformed command at
-  queue time instead of queuing it. `EXEC` replays the valid queue in order with
-  no rollback. `WATCH` and `UNWATCH` are not implemented.
+  queue time instead of queuing it. A rejected queued command poisons the
+  transaction: `EXEC` answers `EXECABORT` and drops the whole queue. Otherwise
+  `EXEC` replays the valid queue in order with no rollback. `WATCH` and `UNWATCH`
+  are not implemented.
+- An empty multibulk request (`*0`) is ignored: it produces no reply and leaves
+  the connection open.
 
 ## Storage backend
 

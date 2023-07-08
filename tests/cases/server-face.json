@@ -1,0 +1,2485 @@
+{
+  "table": "server-face",
+  "source": "captured from Redis 8.10.3 on 127.0.0.1:6399",
+  "cases": [
+    {
+      "id": "dispatch.client.name",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "SETNAME",
+            "probe-name"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME"
+          ],
+          "reply": {
+            "bytes": [
+              112,
+              114,
+              111,
+              98,
+              101,
+              45,
+              110,
+              97,
+              109,
+              101
+            ],
+            "type": "bulk"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "SETNAME",
+            "two words"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Client names cannot contain spaces, newlines or special characters."
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME"
+          ],
+          "reply": {
+            "bytes": [
+              112,
+              114,
+              111,
+              98,
+              101,
+              45,
+              110,
+              97,
+              109,
+              101
+            ],
+            "type": "bulk"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "SETNAME",
+            "a\tb"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Client names cannot contain spaces, newlines or special characters."
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "SETNAME",
+            ""
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "SETNAME"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|setname' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.no-evict",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-EVICT",
+            "ON"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-EVICT",
+            "off"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-EVICT",
+            "MAYBE"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-EVICT"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|no-evict' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.no-touch",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-TOUCH",
+            "ON"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-TOUCH",
+            "bad"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "NO-TOUCH"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|no-touch' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.unpause",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "UNPAUSE"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "UNPAUSE",
+            "extra"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|unpause' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.kill-errors",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "ID",
+            "0"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR client-id should be greater than 0"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "ID",
+            "-1"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR client-id should be greater than 0"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "ID",
+            "abc"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR client-id should be greater than 0"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "ID",
+            "999999"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "BADFILTER",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|kill' command"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "SKIPME"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR No such client"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "TYPE",
+            "bogus"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Unknown client type 'bogus'"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "USER",
+            "ghost"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR No such user 'ghost'"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "MAXAGE",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR maxage is not an integer or out of range"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "ID",
+            "1",
+            "SKIPME",
+            "maybe"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "KILL",
+            "1.2.3.4:5"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR No such client"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.client.unknown-subcommand",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CLIENT",
+            "BOGUS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand 'BOGUS'. Try CLIENT HELP."
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "GETNAME",
+            "extra"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|getname' command"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "INFO",
+            "extra"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'client|info' command"
+          }
+        },
+        {
+          "argsText": [
+            "CLIENT",
+            "LIST",
+            "extra"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.command.info-get",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "COMMAND",
+            "INFO",
+            "GET"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "bytes": [
+                      103,
+                      101,
+                      116
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "type": "int",
+                    "value": 2
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "readonly"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "fast"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "@read"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@string"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@fast"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "bytes": [
+                              102,
+                              108,
+                              97,
+                              103,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "type": "simple",
+                                "value": "RO"
+                              },
+                              {
+                                "type": "simple",
+                                "value": "access"
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              98,
+                              101,
+                              103,
+                              105,
+                              110,
+                              95,
+                              115,
+                              101,
+                              97,
+                              114,
+                              99,
+                              104
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  105,
+                                  110,
+                                  100,
+                                  101,
+                                  120
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      105,
+                                      110,
+                                      100,
+                                      101,
+                                      120
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              102,
+                              105,
+                              110,
+                              100,
+                              95,
+                              107,
+                              101,
+                              121,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  114,
+                                  97,
+                                  110,
+                                  103,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      108,
+                                      97,
+                                      115,
+                                      116,
+                                      107,
+                                      101,
+                                      121
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  },
+                                  {
+                                    "bytes": [
+                                      107,
+                                      101,
+                                      121,
+                                      115,
+                                      116,
+                                      101,
+                                      112
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  },
+                                  {
+                                    "bytes": [
+                                      108,
+                                      105,
+                                      109,
+                                      105,
+                                      116
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "COMMAND",
+            "INFO",
+            "nosuchcmd"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "COMMAND",
+            "INFO",
+            "nosuchcmd",
+            "get"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "bytes": [
+                      103,
+                      101,
+                      116
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "type": "int",
+                    "value": 2
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "readonly"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "fast"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "@read"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@string"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@fast"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "bytes": [
+                              102,
+                              108,
+                              97,
+                              103,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "type": "simple",
+                                "value": "RO"
+                              },
+                              {
+                                "type": "simple",
+                                "value": "access"
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              98,
+                              101,
+                              103,
+                              105,
+                              110,
+                              95,
+                              115,
+                              101,
+                              97,
+                              114,
+                              99,
+                              104
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  105,
+                                  110,
+                                  100,
+                                  101,
+                                  120
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      105,
+                                      110,
+                                      100,
+                                      101,
+                                      120
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              102,
+                              105,
+                              110,
+                              100,
+                              95,
+                              107,
+                              101,
+                              121,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  114,
+                                  97,
+                                  110,
+                                  103,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      108,
+                                      97,
+                                      115,
+                                      116,
+                                      107,
+                                      101,
+                                      121
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  },
+                                  {
+                                    "bytes": [
+                                      107,
+                                      101,
+                                      121,
+                                      115,
+                                      116,
+                                      101,
+                                      112
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  },
+                                  {
+                                    "bytes": [
+                                      108,
+                                      105,
+                                      109,
+                                      105,
+                                      116
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "COMMAND",
+            "INFO",
+            "GET",
+            "SET"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "bytes": [
+                      103,
+                      101,
+                      116
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "type": "int",
+                    "value": 2
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "readonly"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "fast"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "@read"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@string"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@fast"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "bytes": [
+                              102,
+                              108,
+                              97,
+                              103,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "type": "simple",
+                                "value": "RO"
+                              },
+                              {
+                                "type": "simple",
+                                "value": "access"
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              98,
+                              101,
+                              103,
+                              105,
+                              110,
+                              95,
+                              115,
+                              101,
+                              97,
+                              114,
+                              99,
+                              104
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  105,
+                                  110,
+                                  100,
+                                  101,
+                                  120
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      105,
+                                      110,
+                                      100,
+                                      101,
+                                      120
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              102,
+                              105,
+                              110,
+                              100,
+                              95,
+                              107,
+                              101,
+                              121,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  114,
+                                  97,
+                                  110,
+                                  103,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      108,
+                                      97,
+                                      115,
+                                      116,
+                                      107,
+                                      101,
+                                      121
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  },
+                                  {
+                                    "bytes": [
+                                      107,
+                                      101,
+                                      121,
+                                      115,
+                                      116,
+                                      101,
+                                      112
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  },
+                                  {
+                                    "bytes": [
+                                      108,
+                                      105,
+                                      109,
+                                      105,
+                                      116
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  }
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "bytes": [
+                      115,
+                      101,
+                      116
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "type": "int",
+                    "value": -3
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "write"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "denyoom"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "int",
+                    "value": 1
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "simple",
+                        "value": "@write"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@string"
+                      },
+                      {
+                        "type": "simple",
+                        "value": "@slow"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "bytes": [
+                              110,
+                              111,
+                              116,
+                              101,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              82,
+                              87,
+                              32,
+                              97,
+                              110,
+                              100,
+                              32,
+                              65,
+                              67,
+                              67,
+                              69,
+                              83,
+                              83,
+                              32,
+                              100,
+                              117,
+                              101,
+                              32,
+                              116,
+                              111,
+                              32,
+                              116,
+                              104,
+                              101,
+                              32,
+                              111,
+                              112,
+                              116,
+                              105,
+                              111,
+                              110,
+                              97,
+                              108,
+                              32,
+                              96,
+                              71,
+                              69,
+                              84,
+                              96,
+                              32,
+                              97,
+                              114,
+                              103,
+                              117,
+                              109,
+                              101,
+                              110,
+                              116
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              102,
+                              108,
+                              97,
+                              103,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "type": "simple",
+                                "value": "RW"
+                              },
+                              {
+                                "type": "simple",
+                                "value": "access"
+                              },
+                              {
+                                "type": "simple",
+                                "value": "update"
+                              },
+                              {
+                                "type": "simple",
+                                "value": "variable_flags"
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              98,
+                              101,
+                              103,
+                              105,
+                              110,
+                              95,
+                              115,
+                              101,
+                              97,
+                              114,
+                              99,
+                              104
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  105,
+                                  110,
+                                  100,
+                                  101,
+                                  120
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      105,
+                                      110,
+                                      100,
+                                      101,
+                                      120
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "bytes": [
+                              102,
+                              105,
+                              110,
+                              100,
+                              95,
+                              107,
+                              101,
+                              121,
+                              115
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "array",
+                            "value": [
+                              {
+                                "bytes": [
+                                  116,
+                                  121,
+                                  112,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  114,
+                                  97,
+                                  110,
+                                  103,
+                                  101
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "bytes": [
+                                  115,
+                                  112,
+                                  101,
+                                  99
+                                ],
+                                "type": "bulk"
+                              },
+                              {
+                                "type": "array",
+                                "value": [
+                                  {
+                                    "bytes": [
+                                      108,
+                                      97,
+                                      115,
+                                      116,
+                                      107,
+                                      101,
+                                      121
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  },
+                                  {
+                                    "bytes": [
+                                      107,
+                                      101,
+                                      121,
+                                      115,
+                                      116,
+                                      101,
+                                      112
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 1
+                                  },
+                                  {
+                                    "bytes": [
+                                      108,
+                                      105,
+                                      109,
+                                      105,
+                                      116
+                                    ],
+                                    "type": "bulk"
+                                  },
+                                  {
+                                    "type": "int",
+                                    "value": 0
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": []
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.command.docs",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "COMMAND",
+            "DOCS",
+            "GET"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "bytes": [
+                  103,
+                  101,
+                  116
+                ],
+                "type": "bulk"
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "bytes": [
+                      115,
+                      117,
+                      109,
+                      109,
+                      97,
+                      114,
+                      121
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      82,
+                      101,
+                      116,
+                      117,
+                      114,
+                      110,
+                      115,
+                      32,
+                      116,
+                      104,
+                      101,
+                      32,
+                      115,
+                      116,
+                      114,
+                      105,
+                      110,
+                      103,
+                      32,
+                      118,
+                      97,
+                      108,
+                      117,
+                      101,
+                      32,
+                      111,
+                      102,
+                      32,
+                      97,
+                      32,
+                      107,
+                      101,
+                      121,
+                      46
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      115,
+                      105,
+                      110,
+                      99,
+                      101
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      49,
+                      46,
+                      48,
+                      46,
+                      48
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      103,
+                      114,
+                      111,
+                      117,
+                      112
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      115,
+                      116,
+                      114,
+                      105,
+                      110,
+                      103
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      99,
+                      111,
+                      109,
+                      112,
+                      108,
+                      101,
+                      120,
+                      105,
+                      116,
+                      121
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      79,
+                      40,
+                      49,
+                      41
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      97,
+                      114,
+                      103,
+                      117,
+                      109,
+                      101,
+                      110,
+                      116,
+                      115
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "bytes": [
+                              110,
+                              97,
+                              109,
+                              101
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              107,
+                              101,
+                              121
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              116,
+                              121,
+                              112,
+                              101
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              107,
+                              101,
+                              121
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              100,
+                              105,
+                              115,
+                              112,
+                              108,
+                              97,
+                              121,
+                              95,
+                              116,
+                              101,
+                              120,
+                              116
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              107,
+                              101,
+                              121
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "bytes": [
+                              107,
+                              101,
+                              121,
+                              95,
+                              115,
+                              112,
+                              101,
+                              99,
+                              95,
+                              105,
+                              110,
+                              100,
+                              101,
+                              120
+                            ],
+                            "type": "bulk"
+                          },
+                          {
+                            "type": "int",
+                            "value": 0
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "COMMAND",
+            "DOCS",
+            "nosuchcmd"
+          ],
+          "reply": {
+            "type": "array",
+            "value": []
+          }
+        },
+        {
+          "argsText": [
+            "COMMAND",
+            "BOGUS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand 'BOGUS'. Try COMMAND HELP."
+          }
+        },
+        {
+          "argsText": [
+            "COMMAND",
+            "COUNT",
+            "extra"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'command|count' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.info.sections",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "INFO",
+            "bogus"
+          ],
+          "reply": {
+            "bytes": [],
+            "type": "bulk"
+          }
+        },
+        {
+          "argsText": [
+            "INFO",
+            "nosuchsection"
+          ],
+          "reply": {
+            "bytes": [],
+            "type": "bulk"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.config.whitelist",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "CONFIG",
+            "GET",
+            "nosuchoption"
+          ],
+          "reply": {
+            "type": "array",
+            "value": []
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "nosuchoption",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Unknown option or number of arguments for CONFIG SET - 'nosuchoption'"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "nosuchoption",
+            "x",
+            "maxmemory",
+            "1mb"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Unknown option or number of arguments for CONFIG SET - 'nosuchoption'"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "maxmemory-policy",
+            "bogus"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR CONFIG SET failed (possibly related to argument 'maxmemory-policy') - argument(s) must be one of the following: volatile-lru, volatile-lfu, volatile-random, volatile-ttl, volatile-lrm, allkeys-lru, allkeys-lfu, allkeys-random, allkeys-lrm, noeviction"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "save",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR CONFIG SET failed (possibly related to argument 'save') - Invalid save parameters"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "databases",
+            "3"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR CONFIG SET failed (possibly related to argument 'databases') - can't set immutable config"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "maxmemory",
+            "100mb"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "GET",
+            "maxmemory"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "bytes": [
+                  109,
+                  97,
+                  120,
+                  109,
+                  101,
+                  109,
+                  111,
+                  114,
+                  121
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  49,
+                  48,
+                  52,
+                  56,
+                  53,
+                  55,
+                  54,
+                  48,
+                  48
+                ],
+                "type": "bulk"
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "maxmemory",
+            "0"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "SET",
+            "maxmemory-policy",
+            "noeviction"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "CONFIG",
+            "GET"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'config|get' command"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.acl.minimal",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "ACL",
+            "WHOAMI"
+          ],
+          "reply": {
+            "bytes": [
+              100,
+              101,
+              102,
+              97,
+              117,
+              108,
+              116
+            ],
+            "type": "bulk"
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "LIST"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "bytes": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  32,
+                  100,
+                  101,
+                  102,
+                  97,
+                  117,
+                  108,
+                  116,
+                  32,
+                  111,
+                  110,
+                  32,
+                  110,
+                  111,
+                  112,
+                  97,
+                  115,
+                  115,
+                  32,
+                  115,
+                  97,
+                  110,
+                  105,
+                  116,
+                  105,
+                  122,
+                  101,
+                  45,
+                  112,
+                  97,
+                  121,
+                  108,
+                  111,
+                  97,
+                  100,
+                  32,
+                  126,
+                  42,
+                  32,
+                  38,
+                  42,
+                  32,
+                  43,
+                  64,
+                  97,
+                  108,
+                  108
+                ],
+                "type": "bulk"
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "GETUSER",
+            "default"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "bytes": [
+                  102,
+                  108,
+                  97,
+                  103,
+                  115
+                ],
+                "type": "bulk"
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "bytes": [
+                      111,
+                      110
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      110,
+                      111,
+                      112,
+                      97,
+                      115,
+                      115
+                    ],
+                    "type": "bulk"
+                  },
+                  {
+                    "bytes": [
+                      115,
+                      97,
+                      110,
+                      105,
+                      116,
+                      105,
+                      122,
+                      101,
+                      45,
+                      112,
+                      97,
+                      121,
+                      108,
+                      111,
+                      97,
+                      100
+                    ],
+                    "type": "bulk"
+                  }
+                ]
+              },
+              {
+                "bytes": [
+                  112,
+                  97,
+                  115,
+                  115,
+                  119,
+                  111,
+                  114,
+                  100,
+                  115
+                ],
+                "type": "bulk"
+              },
+              {
+                "type": "array",
+                "value": []
+              },
+              {
+                "bytes": [
+                  99,
+                  111,
+                  109,
+                  109,
+                  97,
+                  110,
+                  100,
+                  115
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  43,
+                  64,
+                  97,
+                  108,
+                  108
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  107,
+                  101,
+                  121,
+                  115
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  126,
+                  42
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  99,
+                  104,
+                  97,
+                  110,
+                  110,
+                  101,
+                  108,
+                  115
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  38,
+                  42
+                ],
+                "type": "bulk"
+              },
+              {
+                "bytes": [
+                  115,
+                  101,
+                  108,
+                  101,
+                  99,
+                  116,
+                  111,
+                  114,
+                  115
+                ],
+                "type": "bulk"
+              },
+              {
+                "type": "array",
+                "value": []
+              }
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "GETUSER",
+            "ghost"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "GETUSER"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'acl|getuser' command"
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "CAT",
+            "nosuchcat"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Unknown category 'nosuchcat'"
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "CAT",
+            "string",
+            "read"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand or wrong number of arguments for 'CAT'. Try ACL HELP."
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "WHOAMI",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'acl|whoami' command"
+          }
+        },
+        {
+          "argsText": [
+            "ACL",
+            "BOGUS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR unknown subcommand 'BOGUS'. Try ACL HELP."
+          }
+        }
+      ]
+    }
+  ]
+}

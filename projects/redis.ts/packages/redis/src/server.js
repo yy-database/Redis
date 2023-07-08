@@ -8,6 +8,10 @@ import { error as replyError } from './reply.js';
 
 const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
 
+/** Run identifier reported by `INFO server`, one per process. */
+const RUN_ID = Array.from({ length: 40 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+const SERVER_STARTED_AT = Date.now();
+
 /**
  * Starts an emulated server bound to `host`, persisting through `.yyds` and `.yykv`.
  *
@@ -18,11 +22,54 @@ const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
 export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}) {
     const store = new Store(dataDir);
     const connections = new Set();
+    // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
+    const clients = new Map();
+    const stats = {
+        connections: 0,
+        commands: 0,
+        netInput: 0,
+        netOutput: 0,
+        reads: 0,
+        writes: 0,
+        expired: 0,
+        evicted: 0,
+        hits: 0,
+        misses: 0,
+        pubsubChannels: 0,
+        pubsubPatterns: 0,
+    };
+    let nextClientId = 1;
     const hub = new BlockingHub();
     const pubsub = new PubSubHub();
     const listener = createServer(socket => {
         connections.add(socket);
-        const session = { db: 0, protocol: 2, queued: null, name: '', hub, pubsub };
+        const session = {
+            id: nextClientId,
+            createdAt: Date.now(),
+            lastActivity: Date.now(),
+            commandCount: 0,
+            db: 0,
+            protocol: 2,
+            queued: null,
+            name: '',
+            hub,
+            pubsub,
+            clients,
+            stats,
+            runId: RUN_ID,
+            serverStartedAt: SERVER_STARTED_AT,
+            port: listener.address().port,
+            bind: host,
+            remoteAddress: { address: socket.remoteAddress, port: socket.remotePort },
+            localAddress: { address: socket.localAddress, port: socket.localPort },
+            fd: socket._handle?.fd >= 0 ? socket._handle.fd : nextClientId,
+            libName: '',
+            libVer: '',
+            kill: () => socket.destroy(),
+        };
+        nextClientId += 1;
+        clients.set(session.id, session);
+        stats.connections += 1;
         // Publishing runs synchronously on this loop, so a subscriber's push
         // frame is written straight to its socket, after any ack frames of the
         // command that produced it.
@@ -32,14 +79,20 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
         pubsub.attach(session);
         let pending = Buffer.alloc(0);
         let blocked = null;
+        function send(frame) {
+            const encoded = encodeReply(frame, session.protocol);
+            stats.netOutput += encoded.length;
+            socket.write(encoded);
+        }
         function write(result) {
             if (result.frames !== undefined) {
-                for (const frame of result.frames) {
-                    socket.write(encodeReply(frame, session.protocol));
-                }
+                for (const frame of result.frames) send(frame);
                 return;
             }
-            socket.write(encodeReply(result.reply, session.protocol));
+            if (result.reply === undefined) {
+                return;
+            }
+            send(result.reply);
         }
         function pump() {
             while (pending.length > 0 && blocked === null) {
@@ -48,7 +101,7 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
                     decoded = decodeCommand(pending);
                 }
                 catch {
-                    socket.write(encodeReply(replyError(PROTOCOL_ERROR), session.protocol));
+                    send(replyError(PROTOCOL_ERROR));
                     socket.destroy();
                     return;
                 }
@@ -65,7 +118,7 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
                         ...result.block,
                         deliver: reply => {
                             blocked = null;
-                            socket.write(encodeReply(reply, session.protocol));
+                            send(reply);
                             if (!socket.destroyed) pump();
                         },
                     };
@@ -80,6 +133,8 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
             }
         }
         socket.on('data', chunk => {
+            stats.netInput += chunk.length;
+            stats.reads += 1;
             pending = Buffer.concat([pending, chunk]);
             pump();
         });
@@ -87,8 +142,12 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
             if (blocked !== null) hub.cancel(blocked);
             pubsub.detach(session);
             connections.delete(socket);
+            clients.delete(session.id);
         });
-        socket.on('error', () => connections.delete(socket));
+        socket.on('error', () => {
+            connections.delete(socket);
+            clients.delete(session.id);
+        });
     });
     await new Promise((resolve, reject) => {
         listener.once('error', reject);

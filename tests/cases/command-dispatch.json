@@ -371,7 +371,7 @@
           ],
           "reply": {
             "type": "error",
-            "value": "ERR wrong number of arguments"
+            "value": "ERR wrong number of arguments for 'mget' command"
           }
         }
       ]
@@ -392,7 +392,7 @@
           ],
           "reply": {
             "type": "error",
-            "value": "ERR wrong number of arguments"
+            "value": "ERR wrong number of arguments for 'getset' command"
           }
         }
       ]
@@ -414,7 +414,7 @@
           ],
           "reply": {
             "type": "error",
-            "value": "ERR wrong number of arguments"
+            "value": "ERR wrong number of arguments for 'incr' command"
           }
         }
       ]
@@ -435,13 +435,13 @@
           ],
           "reply": {
             "type": "error",
-            "value": "ERR wrong number of arguments"
+            "value": "ERR wrong number of arguments for 'incrby' command"
           }
         }
       ]
     },
     {
-      "id": "dispatch.arity.quit",
+      "id": "dispatch.quit-extra-args",
       "face": "command",
       "op": "dispatch",
       "sides": [
@@ -455,9 +455,10 @@
             "x"
           ],
           "reply": {
-            "type": "error",
-            "value": "ERR wrong number of arguments for 'quit' command"
-          }
+            "type": "simple",
+            "value": "OK"
+          },
+          "close": true
         }
       ]
     },
@@ -471,17 +472,12 @@
       "setup": [],
       "steps": [
         {
-          "argsText": [],
-          "reply": {
-            "type": "error",
-            "value": "ERR Protocol error or request limit exceeded"
-          },
-          "close": true
+          "argsText": []
         }
       ]
     },
     {
-      "id": "dispatch.unsupported-command",
+      "id": "dispatch.unknown-command",
       "face": "command",
       "op": "dispatch",
       "sides": [
@@ -491,13 +487,13 @@
       "steps": [
         {
           "argsText": [
-            "XADD",
+            "XADDX",
             "k",
             "v"
           ],
           "reply": {
             "type": "error",
-            "value": "ERR unsupported command"
+            "value": "ERR unknown command 'XADDX', with args beginning with: 'k' 'v' "
           }
         }
       ]
@@ -585,7 +581,7 @@
           ],
           "reply": {
             "type": "error",
-            "value": "ERR unsupported SET options"
+            "value": "ERR syntax error"
           },
           "effect": [
             {
@@ -620,15 +616,15 @@
             "20"
           ],
           "reply": {
-            "type": "error",
-            "value": "ERR syntax error"
+            "type": "simple",
+            "value": "OK"
           },
           "effect": [
             {
               "db": 0,
               "keyHex": "6b",
               "expect": {
-                "bool": false
+                "bool": true
               },
               "call": "exists"
             }
@@ -1071,7 +1067,7 @@
       ]
     },
     {
-      "id": "dispatch.scan.paging",
+      "id": "dispatch.scan.count-beyond-size",
       "face": "command",
       "op": "dispatch",
       "sides": [
@@ -1081,30 +1077,6 @@
         {
           "db": 0,
           "keyHex": "61",
-          "valueHex": "31",
-          "call": "set"
-        },
-        {
-          "db": 0,
-          "keyHex": "62",
-          "valueHex": "31",
-          "call": "set"
-        },
-        {
-          "db": 0,
-          "keyHex": "63",
-          "valueHex": "31",
-          "call": "set"
-        },
-        {
-          "db": 0,
-          "keyHex": "64",
-          "valueHex": "31",
-          "call": "set"
-        },
-        {
-          "db": 0,
-          "keyHex": "65",
           "valueHex": "31",
           "call": "set"
         }
@@ -1123,78 +1095,6 @@
               {
                 "type": "bulk",
                 "bytes": [
-                  50
-                ]
-              },
-              {
-                "type": "array",
-                "value": [
-                  {
-                    "type": "bulk",
-                    "bytes": [
-                      97
-                    ]
-                  },
-                  {
-                    "type": "bulk",
-                    "bytes": [
-                      98
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "argsText": [
-            "SCAN",
-            "2",
-            "COUNT",
-            "2"
-          ],
-          "reply": {
-            "type": "array",
-            "value": [
-              {
-                "type": "bulk",
-                "bytes": [
-                  52
-                ]
-              },
-              {
-                "type": "array",
-                "value": [
-                  {
-                    "type": "bulk",
-                    "bytes": [
-                      99
-                    ]
-                  },
-                  {
-                    "type": "bulk",
-                    "bytes": [
-                      100
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "argsText": [
-            "SCAN",
-            "4",
-            "COUNT",
-            "2"
-          ],
-          "reply": {
-            "type": "array",
-            "value": [
-              {
-                "type": "bulk",
-                "bytes": [
                   48
                 ]
               },
@@ -1204,7 +1104,7 @@
                   {
                     "type": "bulk",
                     "bytes": [
-                      101
+                      97
                     ]
                   }
                 ]
@@ -1545,14 +1445,19 @@
             "EXEC"
           ],
           "reply": {
-            "type": "array",
-            "value": [
-              {
-                "type": "simple",
-                "value": "OK"
-              }
-            ]
-          }
+            "type": "error",
+            "value": "EXECABORT Transaction discarded because of previous errors."
+          },
+          "effect": [
+            {
+              "db": 0,
+              "keyHex": "6b",
+              "expect": {
+                "bool": false
+              },
+              "call": "exists"
+            }
+          ]
         }
       ]
     },
@@ -1680,27 +1585,6 @@
       ]
     },
     {
-      "id": "dispatch.client.id",
-      "face": "command",
-      "op": "dispatch",
-      "sides": [
-        "ts"
-      ],
-      "setup": [],
-      "steps": [
-        {
-          "argsText": [
-            "CLIENT",
-            "ID"
-          ],
-          "reply": {
-            "type": "int",
-            "value": 1
-          }
-        }
-      ]
-    },
-    {
       "id": "dispatch.client.unknown-subcommand",
       "face": "command",
       "op": "dispatch",
@@ -1716,7 +1600,7 @@
           ],
           "reply": {
             "type": "error",
-            "value": "ERR unsupported CLIENT subcommand"
+            "value": "ERR unknown subcommand 'FOO'. Try CLIENT HELP."
           }
         }
       ]

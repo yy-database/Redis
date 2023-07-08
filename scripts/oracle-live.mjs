@@ -288,15 +288,28 @@ async function main() {
         await blockingScenario();
         return;
     }
-    const socket = connect({ host: HOST, port: PORT });
-    await new Promise((resolve, reject) => {
-        socket.once('connect', resolve);
-        socket.once('error', reject);
-    });
-    const link = new Link(socket);
+    const openLink = async () => {
+        const socket = connect({ host: HOST, port: PORT });
+        await new Promise((resolve, reject) => {
+            socket.once('connect', resolve);
+            socket.once('error', reject);
+        });
+        const link = new Link(socket);
+        if (PROTOCOL !== 2) await link.send(['HELLO', String(PROTOCOL)]);
+        return link;
+    };
+    let link = await openLink();
     const banner = await link.send(['PING']);
-    if (PROTOCOL !== 2) await link.send(['HELLO', String(PROTOCOL)]);
 
+    // Each shared case starts from an empty store, so every database is cleared
+    // and each setup step runs in the database it declares.
+    const applySetup = async entry => {
+        for (const step of entry.setup ?? []) {
+            await link.send(['SELECT', String(step.db ?? entry.db ?? 0)]);
+            for (const command of setupCommands(step)) await link.send(command);
+        }
+        await link.send(['SELECT', String(entry.db ?? 0)]);
+    };
     const problems = [];
     let checked = 0;
     for (const table of TABLES.length > 0 ? TABLES : ['blocking-ops']) {
@@ -307,17 +320,21 @@ async function main() {
                 // connection to RESP2, so a case cannot leak into the next one.
                 await link.send(['RESET']);
                 await link.send(['SELECT', String(entry.db ?? 0)]);
-                await link.send(['FLUSHDB']);
+                await link.send(['FLUSHALL']);
+                await applySetup(entry);
                 const outcome = await replayDispatch(link, entry, 2);
                 checked += 1;
-                for (const mismatch of outcome) problems.push(`${table}/${entry.id}: ${mismatch}`);
+                for (const mismatch of outcome.problems) problems.push(`${table}/${entry.id}: ${mismatch}`);
+                // Cases that close the connection cannot reuse the link.
+                if (outcome.closed) {
+                    link.close();
+                    link = await openLink();
+                }
                 continue;
             }
             await link.send(['SELECT', String(entry.db ?? 0)]);
-            await link.send(['FLUSHDB']);
-            for (const step of entry.setup ?? []) {
-                for (const command of setupCommands(step)) await link.send(command);
-            }
+            await link.send(['FLUSHALL']);
+            await applySetup(entry);
             const reply = await link.send(entry.argsText);
             checked += 1;
             const mismatch = compareReply(entry.reply, reply);
@@ -343,16 +360,24 @@ async function main() {
 async function replayDispatch(link, entry, initialProtocol) {
     const problems = [];
     let protocol = initialProtocol;
+    let closed = false;
     for (const step of entry.steps) {
         if (step.protocol !== undefined && step.protocol !== protocol) {
             await link.send(['HELLO', String(step.protocol)]);
             protocol = step.protocol;
         }
         if (step.frames === undefined) {
+            if (step.reply === undefined) {
+                // A step without a reply is a request the server ignores, such as
+                // the empty multibulk that leaves no frame behind.
+                link.write(step.argsText);
+                continue;
+            }
             const reply = await link.send(step.argsText);
             const mismatch = compareReply(step.reply, reply, protocol);
             if (mismatch !== null) problems.push(`${step.argsText.join(' ')}: reply ${mismatch}`);
             if (step.argsText[0].toUpperCase() === 'RESET') protocol = 2;
+            if (step.close === true) closed = true;
             continue;
         }
         link.write(step.argsText);
@@ -362,7 +387,7 @@ async function replayDispatch(link, entry, initialProtocol) {
             if (mismatch !== null) problems.push(`${step.argsText.join(' ')} frame ${index}: ${mismatch}`);
         }
     }
-    return problems;
+    return { problems, closed };
 }
 
 /** Compares one push specification with a frame; RESP2 answers it as a plain array. */

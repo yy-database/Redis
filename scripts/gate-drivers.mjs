@@ -541,6 +541,52 @@ const EXPECTED = {
     pubsub_numsub_after: ['pub:alpha', 1, 'pub:beta', 0],
     pubsub_numpat_after: 0,
     pubsub_publish_after: 1,
+    client_getname_unset: null,
+    client_setname: true,
+    client_getname: 'driver-name',
+    client_setname_space: { error: 'Client names cannot contain spaces, newlines or special characters.' },
+    client_getname_kept: 'driver-name',
+    client_no_evict: true,
+    client_no_evict_bad: { error: 'syntax error' },
+    client_no_touch: true,
+    client_unpause: true,
+    client_id_positive: true,
+    client_list_fields: true,
+    client_list_addr: true,
+    client_list_age: true,
+    client_list_cmd: 'client|list',
+    client_list_resp: '2',
+    client_info_cmd: 'client|info',
+    client_kill_peer: 1,
+    client_kill_peer_closed: 'closed',
+    client_kill_peer_listed_after: false,
+    client_kill_self: 0,
+    client_kill_legacy_missing: { error: 'No such client' },
+    command_count_matches: true,
+    command_info_shape: true,
+    command_docs_summary: 'Returns the string value of a key.',
+    info_default_sections: true,
+    info_server_fields: true,
+    info_clients_fields: true,
+    info_memory_fields: true,
+    info_stats_fields: true,
+    info_keyspace_fields: true,
+    config_set_maxmemory: true,
+    config_get_maxmemory: '1048576',
+    config_set_unknown: { error: "Unknown option or number of arguments for CONFIG SET - 'nosuchoption'" },
+    config_set_policy: {
+        error: "CONFIG SET failed (possibly related to argument 'maxmemory-policy') - argument(s) must be one of the following: volatile-lru, volatile-lfu, volatile-random, volatile-ttl, volatile-lrm, allkeys-lru, allkeys-lfu, allkeys-random, allkeys-lrm, noeviction",
+    },
+    acl_whoami: 'default',
+    acl_list: ['user default on nopass sanitize-payload ~* &* +@all'],
+    acl_getuser_flags: ['on', 'nopass', 'sanitize-payload'],
+    acl_getuser_missing: null,
+    acl_cat_categories: [
+        'admin', 'array', 'bitmap', 'blocking', 'connection', 'dangerous', 'fast', 'geo',
+        'hash', 'hyperloglog', 'keyspace', 'list', 'pubsub', 'read', 'scripting', 'set',
+        'slow', 'sortedset', 'stream', 'string', 'transaction', 'write',
+    ],
+    acl_cat_unknown: { error: "Unknown category 'nosuchcat'" },
 };
 
 const NODE_DRIVER = `import { createClient } from 'redis';
@@ -1430,6 +1476,135 @@ out.pubsub_numpat_after = await client.sendCommand(['PUBSUB', 'NUMPAT']);
 out.pubsub_publish_after = await client.publish('pub:alpha', 'again');
 out.pubsub_events_resp3 = await drain(events3, 2);
 
+// Server face: CLIENT bookkeeping, COMMAND metadata, INFO sections, CONFIG
+// whitelist and the minimal ACL surface. Variable values (id, addr, age, cmd)
+// are checked for presence, format and self-consistency instead of frozen.
+const fieldOf = (line, name) => {
+    const match = new RegExp('(?:^| )' + name + '=([^ ]*)').exec(line);
+    return match === null ? null : match[1];
+};
+const sectionFields = (text, title) => {
+    const lines = text.split('\\r\\n');
+    const start = lines.indexOf('# ' + title);
+    const fields = new Map();
+    if (start === -1) return fields;
+    for (let index = start + 1; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (line.startsWith('# ') || line === '') break;
+        const split = line.indexOf(':');
+        fields.set(line.slice(0, split), line.slice(split + 1));
+    }
+    return fields;
+};
+const hasFields = (fields, names) => names.every(name => fields.has(name));
+
+out.client_getname_unset = await client.sendCommand(['CLIENT', 'GETNAME']);
+out.client_setname = (await client.sendCommand(['CLIENT', 'SETNAME', 'driver-name'])) === 'OK';
+out.client_getname = await client.sendCommand(['CLIENT', 'GETNAME']);
+await captureError('client_setname_space', () => client.sendCommand(['CLIENT', 'SETNAME', 'two words']));
+out.client_getname_kept = await client.sendCommand(['CLIENT', 'GETNAME']);
+out.client_no_evict = (await client.sendCommand(['CLIENT', 'NO-EVICT', 'ON'])) === 'OK';
+await captureError('client_no_evict_bad', () => client.sendCommand(['CLIENT', 'NO-EVICT', 'MAYBE']));
+out.client_no_touch = (await client.sendCommand(['CLIENT', 'NO-TOUCH', 'ON'])) === 'OK';
+out.client_unpause = (await client.sendCommand(['CLIENT', 'UNPAUSE'])) === 'OK';
+
+const selfId = await client.sendCommand(['CLIENT', 'ID']);
+out.client_id_positive = Number.isInteger(selfId) && selfId > 0;
+const selfLine = (await client.sendCommand(['CLIENT', 'LIST'])).split('\\n').find(line => line.includes('id=' + selfId + ' '));
+out.client_list_fields = selfLine === undefined ? false : [
+    'addr', 'laddr', 'fd', 'name', 'age', 'idle', 'flags', 'db', 'sub', 'psub', 'multi',
+    'watch', 'qbuf', 'qbuf-free', 'argv-mem', 'multi-mem', 'rbs', 'rbp', 'obl', 'oll',
+    'omem', 'omem-shared', 'omem-unshared', 'tot-mem', 'events', 'cmd', 'user', 'redir',
+    'resp', 'lib-name', 'lib-ver', 'io-thread', 'tot-net-in', 'tot-net-out', 'tot-cmds',
+    'read-events', 'avg-pipeline-len-sum', 'avg-pipeline-len-cnt',
+].every(name => fieldOf(selfLine, name) !== null);
+out.client_list_addr = selfLine === undefined ? null : /^[^:\\s]+:\\d+$/.test(fieldOf(selfLine, 'addr'));
+out.client_list_age = selfLine === undefined ? null : /^\\d+$/.test(fieldOf(selfLine, 'age')) && /^\\d+$/.test(fieldOf(selfLine, 'idle'));
+out.client_list_cmd = selfLine === undefined ? null : fieldOf(selfLine, 'cmd');
+out.client_list_resp = selfLine === undefined ? null : fieldOf(selfLine, 'resp');
+out.client_info_cmd = fieldOf(await client.sendCommand(['CLIENT', 'INFO']), 'cmd');
+
+const victim = createClient({
+    socket: { host: process.env.REDIS_HOST, port: Number(process.env.REDIS_PORT), reconnectStrategy: false },
+    RESP: 2,
+});
+await victim.connect();
+// The peer is killed below, so its socket error must not crash the driver.
+victim.on('error', () => {});
+const victimId = await victim.sendCommand(['CLIENT', 'ID']);
+out.client_kill_peer = await client.sendCommand(['CLIENT', 'KILL', 'ID', String(victimId)]);
+try {
+    await victim.sendCommand(['PING']);
+    out.client_kill_peer_closed = 'alive';
+}
+catch {
+    out.client_kill_peer_closed = 'closed';
+}
+out.client_kill_peer_listed_after = (await client.sendCommand(['CLIENT', 'LIST', 'ID', String(victimId)]))
+    .includes('id=' + victimId + ' ');
+out.client_kill_self = await client.sendCommand(['CLIENT', 'KILL', 'ID', String(selfId)]);
+await captureError('client_kill_legacy_missing', () => client.sendCommand(['CLIENT', 'KILL', '1.2.3.4:5']));
+
+const commandCount = await client.sendCommand(['COMMAND', 'COUNT']);
+const commandAll = await client.sendCommand(['COMMAND']);
+out.command_count_matches = commandCount === commandAll.length;
+const commandInfo = (await client.sendCommand(['COMMAND', 'INFO', 'get']))[0];
+out.command_info_shape = Array.isArray(commandInfo) && commandInfo.length === 10
+    && commandInfo[0] === 'get' && commandInfo[1] === 2
+    && Array.isArray(commandInfo[2]) && commandInfo[2].includes('readonly')
+    && Array.isArray(commandInfo[8]) && commandInfo[8].length >= 1;
+const commandDocs = await client.sendCommand(['COMMAND', 'DOCS', 'get']);
+const docsFlat = commandDocs[1];
+out.command_docs_summary = docsFlat[docsFlat.indexOf('summary') + 1];
+
+const info = await client.sendCommand(['INFO']);
+out.info_default_sections = ['# Server', '# Clients', '# Memory', '# Stats', '# Keyspace']
+    .every(title => info.includes(title));
+const serverFields = sectionFields(info, 'Server');
+out.info_server_fields = hasFields(serverFields, [
+    'redis_version', 'redis_git_sha1', 'redis_mode', 'os', 'arch_bits', 'process_id',
+    'run_id', 'tcp_port', 'uptime_in_seconds', 'hz', 'configured_hz', 'lru_clock',
+    'executable', 'config_file', 'io_threads_active', 'listener0',
+]);
+out.info_clients_fields = hasFields(sectionFields(info, 'Clients'), [
+    'connected_clients', 'cluster_connections', 'maxclients', 'blocked_clients',
+    'tracking_clients', 'pubsub_clients', 'watching_clients', 'clients_in_timeout_table',
+    'total_watched_keys', 'total_blocking_keys', 'total_blocking_keys_on_nokey',
+]);
+out.info_memory_fields = hasFields(sectionFields(info, 'Memory'), [
+    'used_memory', 'used_memory_human', 'used_memory_rss', 'used_memory_peak',
+    'used_memory_overhead', 'used_memory_dataset', 'maxmemory', 'maxmemory_policy',
+    'mem_fragmentation_ratio', 'mem_allocator',
+]);
+out.info_stats_fields = hasFields(sectionFields(info, 'Stats'), [
+    'total_connections_received', 'total_commands_processed', 'instantaneous_ops_per_sec',
+    'total_net_input_bytes', 'total_net_output_bytes', 'rejected_connections',
+    'expired_keys', 'evicted_keys', 'keyspace_hits', 'keyspace_misses',
+    'total_reads_processed', 'total_writes_processed', 'total_error_replies',
+]);
+const keyspaceFields = sectionFields(info, 'Keyspace');
+out.info_keyspace_fields = keyspaceFields.size === 0
+    ? true
+    : Array.from(keyspaceFields.values()).some(value => /^keys=\\d+,expires=\\d+,avg_ttl=\\d+(,subexpiry=\\d+)?$/.test(value));
+
+out.config_set_maxmemory = (await client.sendCommand(['CONFIG', 'SET', 'maxmemory', '1mb'])) === 'OK';
+out.config_get_maxmemory = (await client.sendCommand(['CONFIG', 'GET', 'maxmemory']))[1];
+await captureError('config_set_unknown', () => client.sendCommand(['CONFIG', 'SET', 'nosuchoption', 'x']));
+await captureError('config_set_policy', () => client.sendCommand(['CONFIG', 'SET', 'maxmemory-policy', 'bogus']));
+await client.sendCommand(['CONFIG', 'SET', 'maxmemory', '0']);
+await client.sendCommand(['CONFIG', 'SET', 'maxmemory-policy', 'noeviction']);
+
+out.acl_whoami = await client.sendCommand(['ACL', 'WHOAMI']);
+out.acl_list = await client.sendCommand(['ACL', 'LIST']);
+const aclUser = await client.sendCommand(['ACL', 'GETUSER', 'default']);
+out.acl_getuser_flags = aclUser[1];
+out.acl_getuser_missing = await client.sendCommand(['ACL', 'GETUSER', 'ghost']);
+out.acl_cat_categories = (await client.sendCommand(['ACL', 'CAT'])).sort();
+await captureError('acl_cat_unknown', () => client.sendCommand(['ACL', 'CAT', 'nosuchcat']));
+
+if (victim.isOpen) {
+    await victim.disconnect();
+}
 await sub2.quit();
 await sub3.quit();
 
@@ -1443,6 +1618,7 @@ process.stdout.write(JSON.stringify(out));
 
 const PYTHON_DRIVER = `import json
 import os
+import re
 import redis
 
 client = redis.Redis(
@@ -2404,6 +2580,148 @@ out['pubsub_numpat_after'] = client.execute_command('PUBSUB', 'NUMPAT')
 out['pubsub_publish_after'] = client.publish('pub:alpha', 'again')
 out['pubsub_events_resp3'] = resp3_first + drain(sub3, 1)
 
+def field_of(line, name):
+    match = re.search(r'(?:^| )' + re.escape(name) + r'=([^ ]*)', line)
+    return None if match is None else match.group(1)
+
+
+def section_fields(text, title):
+    lines = text.split('\\r\\n')
+    try:
+        start = lines.index('# ' + title)
+    except ValueError:
+        return {}
+    fields = {}
+    for line in lines[start + 1:]:
+        if line.startswith('# ') or line == '':
+            break
+        name, _, value = line.partition(':')
+        fields[name] = value
+    return fields
+
+
+def has_fields(fields, names):
+    return all(name in fields for name in names)
+
+
+out['client_getname_unset'] = client.execute_command('CLIENT', 'GETNAME')
+out['client_setname'] = client.execute_command('CLIENT', 'SETNAME', 'driver-name') == 'OK'
+out['client_getname'] = client.execute_command('CLIENT', 'GETNAME')
+capture_error('client_setname_space', lambda: client.execute_command('CLIENT', 'SETNAME', 'two words'))
+out['client_getname_kept'] = client.execute_command('CLIENT', 'GETNAME')
+out['client_no_evict'] = client.execute_command('CLIENT', 'NO-EVICT', 'ON') == 'OK'
+capture_error('client_no_evict_bad', lambda: client.execute_command('CLIENT', 'NO-EVICT', 'MAYBE'))
+out['client_no_touch'] = client.execute_command('CLIENT', 'NO-TOUCH', 'ON') == 'OK'
+out['client_unpause'] = client.execute_command('CLIENT', 'UNPAUSE') == 'OK'
+
+self_id = client.execute_command('CLIENT', 'ID')
+out['client_id_positive'] = isinstance(self_id, int) and self_id > 0
+self_line = next(
+    (line for line in client.execute_command('CLIENT', 'LIST').split('\\n') if f'id={self_id} ' in line),
+    None,
+)
+out['client_list_fields'] = False if self_line is None else all(
+    field_of(self_line, name) is not None for name in [
+        'addr', 'laddr', 'fd', 'name', 'age', 'idle', 'flags', 'db', 'sub', 'psub', 'multi',
+        'watch', 'qbuf', 'qbuf-free', 'argv-mem', 'multi-mem', 'rbs', 'rbp', 'obl', 'oll',
+        'omem', 'omem-shared', 'omem-unshared', 'tot-mem', 'events', 'cmd', 'user', 'redir',
+        'resp', 'lib-name', 'lib-ver', 'io-thread', 'tot-net-in', 'tot-net-out', 'tot-cmds',
+        'read-events', 'avg-pipeline-len-sum', 'avg-pipeline-len-cnt',
+    ]
+)
+out['client_list_addr'] = None if self_line is None else bool(
+    re.match(r'^[^:\\s]+:\\d+$', field_of(self_line, 'addr'))
+)
+out['client_list_age'] = None if self_line is None else bool(
+    re.match(r'^\\d+$', field_of(self_line, 'age')) and re.match(r'^\\d+$', field_of(self_line, 'idle'))
+)
+out['client_list_cmd'] = None if self_line is None else field_of(self_line, 'cmd')
+out['client_list_resp'] = None if self_line is None else field_of(self_line, 'resp')
+out['client_info_cmd'] = field_of(client.execute_command('CLIENT', 'INFO'), 'cmd')
+
+victim = redis.Redis(
+    host=os.environ['REDIS_HOST'],
+    port=int(os.environ['REDIS_PORT']),
+    decode_responses=True,
+    socket_timeout=1,
+)
+victim_id = victim.execute_command('CLIENT', 'ID')
+out['client_kill_peer'] = client.execute_command('CLIENT', 'KILL', 'ID', str(victim_id))
+try:
+    victim.ping()
+    out['client_kill_peer_closed'] = 'alive'
+except Exception:
+    out['client_kill_peer_closed'] = 'closed'
+out['client_kill_peer_listed_after'] = f'id={victim_id} ' in client.execute_command(
+    'CLIENT', 'LIST', 'ID', str(victim_id)
+)
+out['client_kill_self'] = client.execute_command('CLIENT', 'KILL', 'ID', str(self_id))
+capture_error('client_kill_legacy_missing', lambda: client.execute_command('CLIENT', 'KILL', '1.2.3.4:5'))
+victim.close()
+
+# redis-py parses COMMAND and INFO/CONFIG replies into shapes of its own, so
+# read the raw reply exactly as the server sent it.
+client.set_response_callback('COMMAND', lambda response, **options: response)
+client.set_response_callback('INFO', lambda response, **options: response)
+client.set_response_callback('CONFIG', lambda response, **options: response)
+
+command_count = client.execute_command('COMMAND', 'COUNT')
+command_all = client.execute_command('COMMAND')
+out['command_count_matches'] = command_count == len(command_all)
+command_info = client.execute_command('COMMAND', 'INFO', 'get')[0]
+out['command_info_shape'] = (
+    isinstance(command_info, list) and len(command_info) == 10
+    and command_info[0] == 'get' and command_info[1] == 2
+    and isinstance(command_info[2], list) and 'readonly' in command_info[2]
+    and isinstance(command_info[8], list) and len(command_info[8]) >= 1
+)
+command_docs = client.execute_command('COMMAND', 'DOCS', 'get')
+out['command_docs_summary'] = command_docs[1][command_docs[1].index('summary') + 1]
+
+info = client.execute_command('INFO')
+out['info_default_sections'] = all(
+    title in info for title in ['# Server', '# Clients', '# Memory', '# Stats', '# Keyspace']
+)
+out['info_server_fields'] = has_fields(section_fields(info, 'Server'), [
+    'redis_version', 'redis_git_sha1', 'redis_mode', 'os', 'arch_bits', 'process_id',
+    'run_id', 'tcp_port', 'uptime_in_seconds', 'hz', 'configured_hz', 'lru_clock',
+    'executable', 'config_file', 'io_threads_active', 'listener0',
+])
+out['info_clients_fields'] = has_fields(section_fields(info, 'Clients'), [
+    'connected_clients', 'cluster_connections', 'maxclients', 'blocked_clients',
+    'tracking_clients', 'pubsub_clients', 'watching_clients', 'clients_in_timeout_table',
+    'total_watched_keys', 'total_blocking_keys', 'total_blocking_keys_on_nokey',
+])
+out['info_memory_fields'] = has_fields(section_fields(info, 'Memory'), [
+    'used_memory', 'used_memory_human', 'used_memory_rss', 'used_memory_peak',
+    'used_memory_overhead', 'used_memory_dataset', 'maxmemory', 'maxmemory_policy',
+    'mem_fragmentation_ratio', 'mem_allocator',
+])
+out['info_stats_fields'] = has_fields(section_fields(info, 'Stats'), [
+    'total_connections_received', 'total_commands_processed', 'instantaneous_ops_per_sec',
+    'total_net_input_bytes', 'total_net_output_bytes', 'rejected_connections',
+    'expired_keys', 'evicted_keys', 'keyspace_hits', 'keyspace_misses',
+    'total_reads_processed', 'total_writes_processed', 'total_error_replies',
+])
+keyspace_fields = section_fields(info, 'Keyspace')
+out['info_keyspace_fields'] = True if not keyspace_fields else any(
+    re.match(r'^keys=\\d+,expires=\\d+,avg_ttl=\\d+(,subexpiry=\\d+)?$', value) for value in keyspace_fields.values()
+)
+
+out['config_set_maxmemory'] = client.execute_command('CONFIG', 'SET', 'maxmemory', '1mb') == 'OK'
+out['config_get_maxmemory'] = client.execute_command('CONFIG', 'GET', 'maxmemory')[1]
+capture_error('config_set_unknown', lambda: client.execute_command('CONFIG', 'SET', 'nosuchoption', 'x'))
+capture_error('config_set_policy', lambda: client.execute_command('CONFIG', 'SET', 'maxmemory-policy', 'bogus'))
+client.execute_command('CONFIG', 'SET', 'maxmemory', '0')
+client.execute_command('CONFIG', 'SET', 'maxmemory-policy', 'noeviction')
+
+out['acl_whoami'] = client.execute_command('ACL', 'WHOAMI')
+out['acl_list'] = client.execute_command('ACL', 'LIST')
+out['acl_getuser_flags'] = client.execute_command('ACL', 'GETUSER', 'default')[1]
+out['acl_getuser_missing'] = client.execute_command('ACL', 'GETUSER', 'ghost')
+out['acl_cat_categories'] = sorted(client.execute_command('ACL', 'CAT'))
+capture_error('acl_cat_unknown', lambda: client.execute_command('ACL', 'CAT', 'nosuchcat'))
+
 sub2.close()
 sub3.close()
 client3.close()
@@ -2416,19 +2734,27 @@ client.close()
 print(json.dumps(out))
 `;
 
+// redis-py reconnects transparently after the peer socket is destroyed, so the
+// victim observes a working connection instead of the closed socket node-redis
+// reports. Both are what the real server produces for each client library.
+const DRIVER_EXPECTED = {
+    'redis-py': { client_kill_peer_closed: 'alive' },
+};
+
 function assertSame(driver, actual) {
+    const expected = { ...EXPECTED, ...(DRIVER_EXPECTED[driver] ?? {}) };
     const problems = [];
-    for (const name of Object.keys(EXPECTED)) {
+    for (const name of Object.keys(expected)) {
         if (!(name in actual)) {
             problems.push(`${name}: missing from the driver output`);
             continue;
         }
-        if (JSON.stringify(actual[name]) !== JSON.stringify(EXPECTED[name])) {
-            problems.push(`${name}: expected ${JSON.stringify(EXPECTED[name])}, read ${JSON.stringify(actual[name])}`);
+        if (JSON.stringify(actual[name]) !== JSON.stringify(expected[name])) {
+            problems.push(`${name}: expected ${JSON.stringify(expected[name])}, read ${JSON.stringify(actual[name])}`);
         }
     }
     for (const name of Object.keys(actual)) {
-        if (!(name in EXPECTED)) {
+        if (!(name in expected)) {
             problems.push(`${name}: unexpected observation ${JSON.stringify(actual[name])}`);
         }
     }
