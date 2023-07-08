@@ -1865,9 +1865,22 @@ function planClient(session, args) {
     }
     const subcommand = text(args[1]).toLowerCase();
     switch (subcommand) {
-        case 'setinfo':
+        case 'setinfo': {
             if (args.length !== 4) return { error: wrongArity('client|setinfo') };
-            return { run: () => simple('OK') };
+            // The real server only knows the two library metadata attributes and rejects
+            // anything else, so the values can be surfaced by `CLIENT LIST`.
+            const attribute = text(args[2]).toUpperCase();
+            if (attribute !== 'LIB-NAME' && attribute !== 'LIB-VER') {
+                return { error: replyError(`ERR Unrecognized option '${text(args[2])}'`) };
+            }
+            return {
+                run: () => {
+                    if (attribute === 'LIB-NAME') session.libName = text(args[3]);
+                    else session.libVer = text(args[3]);
+                    return simple('OK');
+                },
+            };
+        }
         case 'setname': {
             if (args.length !== 3) return { error: wrongArity('client|setname') };
             const name = text(args[2]);
