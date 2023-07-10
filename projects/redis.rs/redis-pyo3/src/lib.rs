@@ -118,7 +118,7 @@ impl Store {
         self.node.set_deadline(db, key, expires_at).map_err(runtime)
     }
 
-    /// Returns the live value of one kind (`""`, `hash`, `list`, `set` or `zset`).
+    /// Returns the live value of one kind (`""`, `hash`, `list`, `set`, `zset` or `stream`).
     fn get_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<Vec<u8>>> {
         check_kind(kind)?;
         Ok(self.node.get_kind(db, kind, key).map(|record| record.value.clone()))

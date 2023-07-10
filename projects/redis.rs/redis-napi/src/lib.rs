@@ -146,7 +146,7 @@ impl Store {
         self.node.set_deadline(db, &key, expires_at).map_err(reason)
     }
 
-    /// Returns the live value of one kind (`""`, `hash`, `list`, `set` or `zset`).
+    /// Returns the live value of one kind (`""`, `hash`, `list`, `set`, `zset` or `stream`).
     #[napi]
     pub fn get_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<Buffer>, napi::Error> {
         check_kind(&kind)?;

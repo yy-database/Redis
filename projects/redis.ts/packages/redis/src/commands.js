@@ -20,9 +20,9 @@ const unknownCommand = args => {
 };
 
 /** Value kinds of one logical key, in probe order. */
-const KINDS = ['string', 'hash', 'list', 'set', 'zset'];
+const KINDS = ['string', 'hash', 'list', 'set', 'zset', 'stream'];
 /** Storage namespace suffix of each value kind. */
-const SUFFIX = { string: '', hash: 'hash', list: 'list', set: 'set', zset: 'zset' };
+const SUFFIX = { string: '', hash: 'hash', list: 'list', set: 'set', zset: 'zset', stream: 'stream' };
 const WRONG_TYPE = 'WRONGTYPE Operation against a key holding the wrong kind of value';
 
 const wrongType = () => replyError(WRONG_TYPE);
@@ -1295,6 +1295,14 @@ function plan(store, session, name, args) {
 
         case 'lpos':
             return planLpos(store, session, args);
+
+        case 'xadd':
+        case 'xlen':
+        case 'xrange':
+        case 'xrevrange':
+        case 'xdel':
+        case 'xtrim':
+            return planStream(store, session, name, args);
 
         case 'pfadd':
         case 'pfcount':
@@ -3558,6 +3566,454 @@ function lookupSortPattern(store, db, pattern, element) {
     if (fields === null) return null;
     const hit = fields.find(([candidate]) => candidate.equals(field));
     return hit === undefined ? null : hit[1];
+}
+
+/**
+ * One stream entry: a millisecond part, a sequence part and its field pairs.
+ *
+ * Streams are stored as one opaque value per key, the same shape hashes, lists,
+ * sets and sorted sets use. The body starts with the `u64` halves of the last id
+ * ever appended — `MAXLEN 0` empties the stream but never rewinds that id — then
+ * `u32 count` and, per entry, the two id halves, a `u32` field count and
+ * `u32`-framed field/value bytes. Consumer groups will extend this body in a
+ * later segment.
+ */
+const STREAM_NODE_SIZE = 100;
+const U64_MAX = (1n << 64n) - 1n;
+const STREAM_ID_ERROR = 'ERR Invalid stream ID specified as stream command argument';
+const STREAM_ID_EMPTY = 'ERR The ID specified in XADD must be greater than 0-0';
+const STREAM_ID_OLD = 'ERR The ID specified in XADD is equal or smaller than the target stream top item';
+
+function encodeStream(entries, last) {
+    let total = 16 + 4;
+    for (const entry of entries) {
+        total += 16 + 4;
+        for (const [field, value] of entry.fields) {
+            if (field.length > MAX_CHUNK || value.length > MAX_CHUNK) return null;
+            total += 4 + field.length + 4 + value.length;
+        }
+    }
+    const body = Buffer.allocUnsafe(total);
+    body.writeBigUInt64LE(last.ms, 0);
+    body.writeBigUInt64LE(last.seq, 8);
+    body.writeUInt32LE(entries.length, 16);
+    let offset = 20;
+    for (const entry of entries) {
+        body.writeBigUInt64LE(entry.ms, offset);
+        offset += 8;
+        body.writeBigUInt64LE(entry.seq, offset);
+        offset += 8;
+        body.writeUInt32LE(entry.fields.length, offset);
+        offset += 4;
+        for (const [field, value] of entry.fields) {
+            body.writeUInt32LE(field.length, offset);
+            offset += 4;
+            field.copy(body, offset);
+            offset += field.length;
+            body.writeUInt32LE(value.length, offset);
+            offset += 4;
+            value.copy(body, offset);
+            offset += value.length;
+        }
+    }
+    return body;
+}
+
+function decodeStream(body) {
+    if (body.length < 20) return null;
+    const last = { ms: body.readBigUInt64LE(0), seq: body.readBigUInt64LE(8) };
+    const count = body.readUInt32LE(16);
+    const entries = [];
+    let offset = 20;
+    for (let index = 0; index < count; index += 1) {
+        if (offset + 20 > body.length) return null;
+        const ms = body.readBigUInt64LE(offset);
+        offset += 8;
+        const seq = body.readBigUInt64LE(offset);
+        offset += 8;
+        const fieldCount = body.readUInt32LE(offset);
+        offset += 4;
+        const fields = [];
+        for (let pair = 0; pair < fieldCount; pair += 1) {
+            if (offset + 4 > body.length) return null;
+            const fieldLength = body.readUInt32LE(offset);
+            offset += 4;
+            if (offset + fieldLength + 4 > body.length) return null;
+            const field = body.subarray(offset, offset + fieldLength);
+            offset += fieldLength;
+            const valueLength = body.readUInt32LE(offset);
+            offset += 4;
+            if (offset + valueLength > body.length) return null;
+            const value = body.subarray(offset, offset + valueLength);
+            offset += valueLength;
+            fields.push([field, value]);
+        }
+        entries.push({ ms, seq, fields });
+    }
+    return offset === body.length ? { entries, last } : null;
+}
+
+/**
+ * Live stream state, `null` when the key is missing.
+ *
+ * `states.error` marks a corrupt body so callers answer `WRONGTYPE` the way the
+ * other collection readers do.
+ */
+function readStream(store, db, key) {
+    const body = store.getKind(db, SUFFIX.stream, key);
+    if (body === null || body === undefined) return null;
+    const decoded = decodeStream(body);
+    return decoded === null ? { error: true } : decoded;
+}
+
+function compareStreamIds(left, right) {
+    if (left.ms !== right.ms) return left.ms < right.ms ? -1 : 1;
+    if (left.seq !== right.seq) return left.seq < right.seq ? -1 : 1;
+    return 0;
+}
+
+/**
+ * Parses `ms`, `ms-seq` and the two infinity words.
+ *
+ * A bare `ms` means sequence `0` as a lower bound and `2^64-1` as an upper bound,
+ * which is how `XRANGE` selects a whole millisecond with `1526985054069 1526985054069`.
+ */
+function parseStreamId(raw, isEnd = false) {
+    const value = text(raw);
+    if (value === '-') return { ms: 0n, seq: 0n };
+    if (value === '+') return { ms: U64_MAX, seq: U64_MAX };
+    const match = /^(\d+)(?:-(\d+))?$/.exec(value);
+    if (match === null) return null;
+    const ms = BigInt(match[1]);
+    const seq = match[2] === undefined ? (isEnd ? U64_MAX : 0n) : BigInt(match[2]);
+    return ms > U64_MAX || seq > U64_MAX ? null : { ms, seq };
+}
+
+/** Parses one numeric id, `null` on words, overflow or malformed text. */
+function parseExplicitStreamId(raw) {
+    const match = /^(\d+)(?:-(\d+))?$/.exec(text(raw));
+    if (match === null) return null;
+    const ms = BigInt(match[1]);
+    const seq = match[2] === undefined ? 0n : BigInt(match[2]);
+    return ms > U64_MAX || seq > U64_MAX ? null : { ms, seq };
+}
+
+/** Parses one range bound, keeping the `(` exclusive prefix. */
+function parseStreamBound(raw, isEnd) {
+    const value = text(raw);
+    const exclusive = value.startsWith('(');
+    const body = exclusive ? value.slice(1) : value;
+    let id;
+    if (body === '-') {
+        if (exclusive) return null;
+        id = { ms: 0n, seq: 0n };
+    }
+    else if (body === '+') {
+        if (exclusive) return null;
+        id = { ms: U64_MAX, seq: U64_MAX };
+    }
+    else {
+        const match = /^(\d+)(?:-(\d+))?$/.exec(body);
+        if (match === null) return null;
+        const ms = BigInt(match[1]);
+        const seq = match[2] === undefined ? (isEnd ? U64_MAX : 0n) : BigInt(match[2]);
+        if (ms > U64_MAX || seq > U64_MAX) return null;
+        id = { ms, seq };
+    }
+    return { id, exclusive };
+}
+
+/**
+ * Mirrors `XADD` id resolution: `*`, `ms-*` and explicit ids.
+ *
+ * An explicit id must be above `0-0` and above the stream top id. Auto ids keep
+ * the sequence increasing and, on an empty stream, the very first id of
+ * millisecond zero is `0-1` rather than the reserved `0-0`.
+ */
+function resolveStreamId(token, last) {
+    if (token === '*') {
+        const now = BigInt(Date.now());
+        if (last === null) return { ms: now, seq: 0n };
+        if (now > last.ms) return { ms: now, seq: 0n };
+        if (last.seq >= U64_MAX) return { error: STREAM_ID_OLD };
+        return { ms: last.ms, seq: last.seq + 1n };
+    }
+    const auto = /^(\d+)-\*$/.exec(token);
+    if (auto !== null) {
+        const ms = BigInt(auto[1]);
+        if (ms > U64_MAX) return null;
+        let seq = last !== null && last.ms === ms ? last.seq + 1n : 0n;
+        if (ms === 0n && seq === 0n) seq = 1n;
+        if (seq > U64_MAX) return { error: STREAM_ID_OLD };
+        const autoId = { ms, seq };
+        if (last !== null && compareStreamIds(autoId, last) <= 0) return { error: STREAM_ID_OLD };
+        return autoId;
+    }
+    const id = parseExplicitStreamId(token);
+    if (id === null) return null;
+    if (id.ms === 0n && id.seq === 0n) return { error: STREAM_ID_EMPTY };
+    if (last !== null && compareStreamIds(id, last) <= 0) return { error: STREAM_ID_OLD };
+    return id;
+}
+
+/**
+ * Applies `MAXLEN` / `MINID` and reports how many entries were evicted.
+ *
+ * Exact thresholds trim entry by entry. Approximate ones only drop whole nodes of
+ * at most {@link STREAM_NODE_SIZE} entries, and `LIMIT` caps the evictions of one
+ * call (`0` means no cap). A small stream under `MAXLEN ~ 1` keeps everything
+ * because dropping its only node would go below the threshold.
+ */
+function trimStream(entries, maxlen, minid) {
+    let kept = entries;
+    let removed = 0;
+    if (maxlen !== null) {
+        if (!maxlen.approx) {
+            const excess = kept.length - maxlen.value;
+            if (excess > 0) {
+                kept = kept.slice(excess);
+                removed += excess;
+            }
+        }
+        else {
+            let budget = maxlen.limit === null || maxlen.limit === 0 ? Infinity : maxlen.limit;
+            while (kept.length > 0) {
+                const node = Math.min(STREAM_NODE_SIZE, kept.length);
+                if (kept.length - node < maxlen.value || node > budget) break;
+                kept = kept.slice(node);
+                removed += node;
+                budget -= node;
+            }
+        }
+    }
+    if (minid !== null) {
+        if (!minid.approx) {
+            const first = kept.findIndex(entry => compareStreamIds(entry, minid.id) >= 0);
+            const drop = first === -1 ? kept.length : first;
+            if (drop > 0) {
+                kept = kept.slice(drop);
+                removed += drop;
+            }
+        }
+        else {
+            let budget = minid.limit === null || minid.limit === 0 ? Infinity : minid.limit;
+            while (kept.length > 0) {
+                const node = Math.min(STREAM_NODE_SIZE, kept.length);
+                const last = kept[node - 1];
+                if (compareStreamIds(last, minid.id) >= 0 || node > budget) break;
+                kept = kept.slice(node);
+                removed += node;
+                budget -= node;
+            }
+        }
+    }
+    return { kept, removed };
+}
+
+const TRIM_INCOMPATIBLE = 'ERR syntax error, MAXLEN and MINID options at the same time are not compatible';
+const TRIM_LIMIT_WITHOUT_APPROX = 'ERR syntax error, LIMIT cannot be used without the special ~ option';
+const TRIM_LIMIT_NEGATIVE = 'ERR The LIMIT argument must be >= 0.';
+const TRIM_MAXLEN_NEGATIVE = 'ERR The MAXLEN argument must be >= 0.';
+
+/**
+ * Parses the `NOMKSTREAM` / `MAXLEN` / `MINID` prefix of `XADD` and `XTRIM`.
+ *
+ * `style` only changes one corner the real server reports differently: a trailing
+ * `LIMIT` without a value is an invalid id on `XADD` and a syntax error on
+ * `XTRIM`. Returns the first token index after the prefix.
+ */
+function parseTrimOptions(args, start, style) {
+    let nomkstream = false;
+    let maxlen = null;
+    let minid = null;
+    let index = start;
+    for (;;) {
+        const token = text(args[index] ?? '').toUpperCase();
+        if (token === 'NOMKSTREAM') {
+            if (style === 'xtrim') return { error: replyError('ERR syntax error') };
+            nomkstream = true;
+            index += 1;
+            continue;
+        }
+        if (token !== 'MAXLEN' && token !== 'MINID') break;
+        if (maxlen !== null || minid !== null) return { error: replyError(TRIM_INCOMPATIBLE) };
+        index += 1;
+        let approx = false;
+        const sign = text(args[index] ?? '');
+        if (sign === '~' || sign === '=') {
+            approx = sign === '~';
+            index += 1;
+        }
+        const raw = args[index];
+        index += 1;
+        let limit = null;
+        if (text(args[index] ?? '').toUpperCase() === 'LIMIT') {
+            if (!approx) return { error: replyError(TRIM_LIMIT_WITHOUT_APPROX) };
+            index += 1;
+            if (args[index] === undefined) {
+                return { error: replyError(style === 'xadd' ? STREAM_ID_ERROR : 'ERR syntax error') };
+            }
+            const parsed = parseInteger(text(args[index]));
+            index += 1;
+            if (parsed === null) return { error: integerError() };
+            if (parsed < 0) return { error: replyError(TRIM_LIMIT_NEGATIVE) };
+            limit = parsed;
+        }
+        if (token === 'MAXLEN') {
+            const value = parseInteger(text(raw ?? ''));
+            if (value === null) return { error: integerError() };
+            if (value < 0) return { error: replyError(TRIM_MAXLEN_NEGATIVE) };
+            maxlen = { approx, value, limit };
+        }
+        else {
+            const id = parseExplicitStreamId(raw ?? '');
+            if (id === null) return { error: replyError(STREAM_ID_ERROR) };
+            minid = { approx, id, limit };
+        }
+    }
+    return { nomkstream, maxlen, minid, index };
+}
+
+/**
+ * Plans `XADD`, `XLEN`, `XRANGE`, `XREVRANGE`, `XDEL` and `XTRIM`.
+ *
+ * Consumer groups land in a later slice, so `XGROUP`, `XACK`, `XPENDING` and
+ * `XCLAIM` still answer the unknown command error.
+ */
+function planStream(store, session, name, args) {
+    const db = session.db;
+    if (name === 'xlen') {
+        if (args.length !== 2) return { error: wrongArity('xlen') };
+        return {
+            run: () => {
+                const kind = kindOf(store, db, args[1]);
+                if (kind === null) return integer(0);
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, args[1]);
+                return stream === null || stream.error === true ? wrongType() : integer(stream.entries.length);
+            },
+        };
+    }
+    if (name === 'xrange' || name === 'xrevrange') {
+        const reverse = name === 'xrevrange';
+        if (args.length < 4) return { error: wrongArity(name) };
+        let count = null;
+        if (args.length !== 4) {
+            if (args.length !== 6 || text(args[4]).toUpperCase() !== 'COUNT') {
+                return { error: replyError('ERR syntax error') };
+            }
+            const parsed = parseInteger(text(args[5]));
+            if (parsed === null) return { error: integerError() };
+            count = parsed;
+        }
+        const low = parseStreamBound(args[reverse ? 3 : 2], false);
+        const high = parseStreamBound(args[reverse ? 2 : 3], true);
+        if (low === null || high === null) return { error: replyError(STREAM_ID_ERROR) };
+        if (low.exclusive && low.id.ms === U64_MAX && low.id.seq === U64_MAX) {
+            return { error: replyError('ERR invalid start ID for the interval') };
+        }
+        if (high.exclusive && high.id.ms === 0n && high.id.seq === 0n) {
+            return { error: replyError('ERR invalid end ID for the interval') };
+        }
+        return {
+            run: () => {
+                const kind = kindOf(store, db, args[1]);
+                if (kind === null) return array([]);
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, args[1]);
+                if (stream === null || stream.error === true) return wrongType();
+                if (count !== null && count <= 0) return nullArray();
+                const selected = [];
+                const ordered = reverse ? stream.entries.slice().reverse() : stream.entries;
+                for (const entry of ordered) {
+                    const lowSide = compareStreamIds(entry, low.id);
+                    const highSide = compareStreamIds(entry, high.id);
+                    if (low.exclusive ? lowSide <= 0 : lowSide < 0) continue;
+                    if (high.exclusive ? highSide >= 0 : highSide > 0) continue;
+                    selected.push(entry);
+                    if (count !== null && selected.length >= count) break;
+                }
+                return array(selected.map(entry => array([
+                    bulk(`${entry.ms}-${entry.seq}`),
+                    array(entry.fields.flatMap(([field, value]) => [bulk(field), bulk(value)])),
+                ])));
+            },
+        };
+    }
+
+    if (name === 'xdel') {
+        if (args.length < 3) return { error: wrongArity('xdel') };
+        const key = args[1];
+        const ids = args.slice(2);
+        return {
+            run: () => {
+                const kind = kindOf(store, db, key);
+                if (kind === null) return integer(0);
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, key);
+                if (stream === null || stream.error === true) return wrongType();
+                const targets = new Set();
+                for (const raw of ids) {
+                    const id = parseExplicitStreamId(raw);
+                    if (id === null) return replyError(STREAM_ID_ERROR);
+                    targets.add(`${id.ms}-${id.seq}`);
+                }
+                const kept = stream.entries.filter(entry => !targets.has(`${entry.ms}-${entry.seq}`));
+                const removed = stream.entries.length - kept.length;
+                if (removed > 0) rewriteKind(store, db, 'stream', key, encodeStream(kept, stream.last));
+                return integer(removed);
+            },
+        };
+    }
+
+    if (name === 'xtrim') {
+        if (args.length < 4) return { error: wrongArity('xtrim') };
+        const key = args[1];
+        const parsed = parseTrimOptions(args, 2, 'xtrim');
+        if (parsed.error !== undefined) return { error: parsed.error };
+        if (parsed.index !== args.length) return { error: replyError('ERR syntax error') };
+        if (parsed.maxlen === null && parsed.minid === null) return { error: replyError('ERR syntax error') };
+        const { maxlen, minid } = parsed;
+        return {
+            run: () => {
+                const kind = kindOf(store, db, key);
+                if (kind === null) return integer(0);
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, key);
+                if (stream === null || stream.error === true) return wrongType();
+                const { kept, removed } = trimStream(stream.entries, maxlen, minid);
+                if (removed > 0) rewriteKind(store, db, 'stream', key, encodeStream(kept, stream.last));
+                return integer(removed);
+            },
+        };
+    }
+
+    if (args.length < 5) return { error: wrongArity('xadd') };
+    const key = args[1];
+    const parsed = parseTrimOptions(args, 2, 'xadd');
+    if (parsed.error !== undefined) return { error: parsed.error };
+    const idToken = args[parsed.index];
+    const pairs = args.slice(parsed.index + 1);
+    if (idToken === undefined || pairs.length === 0 || pairs.length % 2 !== 0) return { error: wrongArity('xadd') };
+    return {
+        run: () => {
+            const kind = kindOf(store, db, key);
+            if (kind !== null && kind !== 'stream') return wrongType();
+            if (kind === null && parsed.nomkstream) return nullReply();
+            const stream = readStream(store, db, key);
+            if (stream !== null && stream.error === true) return wrongType();
+            const entries = stream === null ? [] : stream.entries;
+            const last = stream === null ? null : stream.last;
+            const id = resolveStreamId(text(idToken), last);
+            if (id === null) return replyError(STREAM_ID_ERROR);
+            if (id.error !== undefined) return replyError(id.error);
+            const fields = [];
+            for (let pair = 0; pair < pairs.length; pair += 2) fields.push([pairs[pair], pairs[pair + 1]]);
+            entries.push({ ms: id.ms, seq: id.seq, fields });
+            rewriteKind(store, db, 'stream', key, encodeStream(trimStream(entries, parsed.maxlen, parsed.minid).kept, id));
+            return bulk(`${id.ms}-${id.seq}`);
+        },
+    };
 }
 
 /**

@@ -1,0 +1,2884 @@
+{
+  "format": "redis.case/v1",
+  "table": "streams-ops",
+  "cases": [
+    {
+      "id": "command.xlen.existing",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XLEN",
+        "s"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xlen.missing",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XLEN",
+        "missing"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xlen.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XLEN",
+        "str"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737472",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.stream",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "s"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "stream"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.all",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  49,
+                  45,
+                  49
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      49
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  51,
+                  45,
+                  51
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      99
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      51
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+",
+        "COUNT",
+        "2"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  49,
+                  45,
+                  49
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      49
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+",
+        "COUNT",
+        "0"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.count-negative",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+",
+        "COUNT",
+        "-1"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.count-missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "missing",
+        "-",
+        "+",
+        "COUNT",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.exclusive-start",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "(1-1",
+        "+"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  51,
+                  45,
+                  51
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      99
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      51
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.exclusive-end",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "(3-3"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  49,
+                  45,
+                  49
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      49
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.bare-milliseconds",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "2",
+        "2"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.empty-bounds",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "-"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.reversed-bounds",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "+",
+        "+"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.missing",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "missing",
+        "-",
+        "+"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "str",
+        "-",
+        "+"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737472",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.bad-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "bad",
+        "+"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.bad-count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+",
+        "COUNT",
+        "bad"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.count-without-value",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+",
+        "COUNT"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.unknown-option",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "+",
+        "LIMIT",
+        "1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.arity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'xrange' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.exclusive-start-max",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "(18446744073709551615-18446744073709551615",
+        "+"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR invalid start ID for the interval"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.exclusive-end-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "-",
+        "(0-0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR invalid end ID for the interval"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrange.exclusive-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XRANGE",
+        "s",
+        "(-",
+        "+"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xrevrange.all",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREVRANGE",
+        "s",
+        "+",
+        "-"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  51,
+                  45,
+                  51
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      99
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      51
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  49,
+                  45,
+                  49
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      49
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrevrange.count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREVRANGE",
+        "s",
+        "+",
+        "-",
+        "COUNT",
+        "2"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  51,
+                  45,
+                  51
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      99
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      51
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrevrange.exclusive",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREVRANGE",
+        "s",
+        "(3-3",
+        "(1-1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  50,
+                  45,
+                  50
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      98
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      50
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xrevrange.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREVRANGE",
+        "s",
+        "+",
+        "-",
+        "COUNT",
+        "0"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.explicit-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          52,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0400000000000000000000000000000004000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033040000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.bare-milliseconds",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "5",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          53,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0500000000000000000000000000000004000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033050000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.auto-sequence",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "3-*",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          51,
+          45,
+          52
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0300000000000000040000000000000004000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033030000000000000004000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.auto-sequence-new-millisecond",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "6-*",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          54,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0600000000000000000000000000000004000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033060000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.nomkstream-missing",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "missing",
+        "NOMKSTREAM",
+        "*",
+        "f",
+        "v"
+      ],
+      "reply": {
+        "type": "null"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.nomkstream-existing",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "NOMKSTREAM",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          52,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0400000000000000000000000000000004000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033040000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.nomkstream-after-maxlen",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "missing",
+        "MAXLEN",
+        "1",
+        "NOMKSTREAM",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "null"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.zero-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "0-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR The ID specified in XADD must be greater than 0-0"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.stale-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "3-3",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR The ID specified in XADD is equal or smaller than the target stream top item"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.stale-auto-millisecond",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "1-*",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR The ID specified in XADD is equal or smaller than the target stream top item"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.invalid-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "abc",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.invalid-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "-",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.maxlen-exact",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "2",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          52,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0400000000000000000000000000000002000000030000000000000003000000000000000100000001000000630100000033040000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.maxlen-equals-sign",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "=",
+        "2",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          52,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0400000000000000000000000000000002000000030000000000000003000000000000000100000001000000630100000033040000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.maxlen-approx-small",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "~",
+        "1",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          52,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0400000000000000000000000000000004000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033040000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.minid-exact",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MINID",
+        "3-3",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          52,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0400000000000000000000000000000002000000030000000000000003000000000000000100000001000000630100000033040000000000000000000000000000000100000001000000640100000034"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.bad-maxlen",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "bogus",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.negative-maxlen",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "~",
+        "-1",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR The MAXLEN argument must be >= 0."
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.bad-minid",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MINID",
+        "bogus",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.limit-without-approx",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "=",
+        "1",
+        "LIMIT",
+        "2",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error, LIMIT cannot be used without the special ~ option"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.conflicting-trim",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "1",
+        "MINID",
+        "2",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error, MAXLEN and MINID options at the same time are not compatible"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.duplicate-trim",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "MAXLEN",
+        "1",
+        "MAXLEN",
+        "2",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error, MAXLEN and MINID options at the same time are not compatible"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.odd-fields",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "s",
+        "4-0",
+        "d"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'xadd' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "str",
+        "4-0",
+        "d",
+        "4"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737472",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.maxlen-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XADD",
+        "trim",
+        "MAXLEN",
+        "0",
+        "11-0",
+        "f",
+        "11"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          49,
+          49,
+          45,
+          48
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "expect": {
+            "bytes": "0b00000000000000000000000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xdel.single",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XDEL",
+        "s",
+        "2-2"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0300000000000000030000000000000002000000010000000000000001000000000000000100000001000000610100000031030000000000000003000000000000000100000001000000630100000033"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xdel.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XDEL",
+        "missing",
+        "bad"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xdel.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XDEL",
+        "str",
+        "1-1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737472",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xdel.bad-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XDEL",
+        "s",
+        "bad"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xdel.duplicate-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XDEL",
+        "s",
+        "1-1",
+        "1-1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "expect": {
+            "bytes": "0300000000000000030000000000000002000000020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xdel.arity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XDEL",
+        "s"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'xdel' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.maxlen-exact",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 9
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "expect": {
+            "bytes": "0a000000000000000000000000000000010000000a000000000000000000000000000000010000000100000066020000003130"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xtrim.minid-exact",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MINID",
+        "9"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 8
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "expect": {
+            "bytes": "0a000000000000000000000000000000020000000900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xtrim.maxlen-approx-no-node",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "~",
+        "1"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.maxlen-approx-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "~",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 10
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "expect": {
+            "bytes": "0a00000000000000000000000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xtrim.maxlen-approx-limit",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "~",
+        "1",
+        "LIMIT",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.minid-approx-node",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "big",
+        "MINID",
+        "~",
+        "101"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 100
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "valueHex": "ce000000000000000000000000000000ce0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a0000000000000000000000000000000100000001000000660200000031300b0000000000000000000000000000000100000001000000660200000031310c0000000000000000000000000000000100000001000000660200000031320d0000000000000000000000000000000100000001000000660200000031330e0000000000000000000000000000000100000001000000660200000031340f000000000000000000000000000000010000000100000066020000003135100000000000000000000000000000000100000001000000660200000031361100000000000000000000000000000001000000010000006602000000313712000000000000000000000000000000010000000100000066020000003138130000000000000000000000000000000100000001000000660200000031391400000000000000000000000000000001000000010000006602000000323015000000000000000000000000000000010000000100000066020000003231160000000000000000000000000000000100000001000000660200000032321700000000000000000000000000000001000000010000006602000000323318000000000000000000000000000000010000000100000066020000003234190000000000000000000000000000000100000001000000660200000032351a0000000000000000000000000000000100000001000000660200000032361b0000000000000000000000000000000100000001000000660200000032371c0000000000000000000000000000000100000001000000660200000032381d0000000000000000000000000000000100000001000000660200000032391e0000000000000000000000000000000100000001000000660200000033301f000000000000000000000000000000010000000100000066020000003331200000000000000000000000000000000100000001000000660200000033322100000000000000000000000000000001000000010000006602000000333322000000000000000000000000000000010000000100000066020000003334230000000000000000000000000000000100000001000000660200000033352400000000000000000000000000000001000000010000006602000000333625000000000000000000000000000000010000000100000066020000003337260000000000000000000000000000000100000001000000660200000033382700000000000000000000000000000001000000010000006602000000333928000000000000000000000000000000010000000100000066020000003430290000000000000000000000000000000100000001000000660200000034312a0000000000000000000000000000000100000001000000660200000034322b0000000000000000000000000000000100000001000000660200000034332c0000000000000000000000000000000100000001000000660200000034342d0000000000000000000000000000000100000001000000660200000034352e0000000000000000000000000000000100000001000000660200000034362f000000000000000000000000000000010000000100000066020000003437300000000000000000000000000000000100000001000000660200000034383100000000000000000000000000000001000000010000006602000000343932000000000000000000000000000000010000000100000066020000003530330000000000000000000000000000000100000001000000660200000035313400000000000000000000000000000001000000010000006602000000353235000000000000000000000000000000010000000100000066020000003533360000000000000000000000000000000100000001000000660200000035343700000000000000000000000000000001000000010000006602000000353538000000000000000000000000000000010000000100000066020000003536390000000000000000000000000000000100000001000000660200000035373a0000000000000000000000000000000100000001000000660200000035383b0000000000000000000000000000000100000001000000660200000035393c0000000000000000000000000000000100000001000000660200000036303d0000000000000000000000000000000100000001000000660200000036313e0000000000000000000000000000000100000001000000660200000036323f000000000000000000000000000000010000000100000066020000003633400000000000000000000000000000000100000001000000660200000036344100000000000000000000000000000001000000010000006602000000363542000000000000000000000000000000010000000100000066020000003636430000000000000000000000000000000100000001000000660200000036374400000000000000000000000000000001000000010000006602000000363845000000000000000000000000000000010000000100000066020000003639460000000000000000000000000000000100000001000000660200000037304700000000000000000000000000000001000000010000006602000000373148000000000000000000000000000000010000000100000066020000003732490000000000000000000000000000000100000001000000660200000037334a0000000000000000000000000000000100000001000000660200000037344b0000000000000000000000000000000100000001000000660200000037354c0000000000000000000000000000000100000001000000660200000037364d0000000000000000000000000000000100000001000000660200000037374e0000000000000000000000000000000100000001000000660200000037384f000000000000000000000000000000010000000100000066020000003739500000000000000000000000000000000100000001000000660200000038305100000000000000000000000000000001000000010000006602000000383152000000000000000000000000000000010000000100000066020000003832530000000000000000000000000000000100000001000000660200000038335400000000000000000000000000000001000000010000006602000000383455000000000000000000000000000000010000000100000066020000003835560000000000000000000000000000000100000001000000660200000038365700000000000000000000000000000001000000010000006602000000383758000000000000000000000000000000010000000100000066020000003838590000000000000000000000000000000100000001000000660200000038395a0000000000000000000000000000000100000001000000660200000039305b0000000000000000000000000000000100000001000000660200000039315c0000000000000000000000000000000100000001000000660200000039325d0000000000000000000000000000000100000001000000660200000039335e0000000000000000000000000000000100000001000000660200000039345f000000000000000000000000000000010000000100000066020000003935600000000000000000000000000000000100000001000000660200000039366100000000000000000000000000000001000000010000006602000000393762000000000000000000000000000000010000000100000066020000003938630000000000000000000000000000000100000001000000660200000039396400000000000000000000000000000001000000010000006603000000313030650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a000000000000000000000000000000010000000100000066030000003130366b000000000000000000000000000000010000000100000066030000003130376c000000000000000000000000000000010000000100000066030000003130386d000000000000000000000000000000010000000100000066030000003130396e000000000000000000000000000000010000000100000066030000003131306f0000000000000000000000000000000100000001000000660300000031313170000000000000000000000000000000010000000100000066030000003131327100000000000000000000000000000001000000010000006603000000313133720000000000000000000000000000000100000001000000660300000031313473000000000000000000000000000000010000000100000066030000003131357400000000000000000000000000000001000000010000006603000000313136750000000000000000000000000000000100000001000000660300000031313776000000000000000000000000000000010000000100000066030000003131387700000000000000000000000000000001000000010000006603000000313139780000000000000000000000000000000100000001000000660300000031323079000000000000000000000000000000010000000100000066030000003132317a000000000000000000000000000000010000000100000066030000003132327b000000000000000000000000000000010000000100000066030000003132337c000000000000000000000000000000010000000100000066030000003132347d000000000000000000000000000000010000000100000066030000003132357e000000000000000000000000000000010000000100000066030000003132367f0000000000000000000000000000000100000001000000660300000031323780000000000000000000000000000000010000000100000066030000003132388100000000000000000000000000000001000000010000006603000000313239820000000000000000000000000000000100000001000000660300000031333083000000000000000000000000000000010000000100000066030000003133318400000000000000000000000000000001000000010000006603000000313332850000000000000000000000000000000100000001000000660300000031333386000000000000000000000000000000010000000100000066030000003133348700000000000000000000000000000001000000010000006603000000313335880000000000000000000000000000000100000001000000660300000031333689000000000000000000000000000000010000000100000066030000003133378a000000000000000000000000000000010000000100000066030000003133388b000000000000000000000000000000010000000100000066030000003133398c000000000000000000000000000000010000000100000066030000003134308d000000000000000000000000000000010000000100000066030000003134318e000000000000000000000000000000010000000100000066030000003134328f0000000000000000000000000000000100000001000000660300000031343390000000000000000000000000000000010000000100000066030000003134349100000000000000000000000000000001000000010000006603000000313435920000000000000000000000000000000100000001000000660300000031343693000000000000000000000000000000010000000100000066030000003134379400000000000000000000000000000001000000010000006603000000313438950000000000000000000000000000000100000001000000660300000031343996000000000000000000000000000000010000000100000066030000003135309700000000000000000000000000000001000000010000006603000000313531980000000000000000000000000000000100000001000000660300000031353299000000000000000000000000000000010000000100000066030000003135339a000000000000000000000000000000010000000100000066030000003135349b000000000000000000000000000000010000000100000066030000003135359c000000000000000000000000000000010000000100000066030000003135369d000000000000000000000000000000010000000100000066030000003135379e000000000000000000000000000000010000000100000066030000003135389f00000000000000000000000000000001000000010000006603000000313539a000000000000000000000000000000001000000010000006603000000313630a100000000000000000000000000000001000000010000006603000000313631a200000000000000000000000000000001000000010000006603000000313632a300000000000000000000000000000001000000010000006603000000313633a400000000000000000000000000000001000000010000006603000000313634a500000000000000000000000000000001000000010000006603000000313635a600000000000000000000000000000001000000010000006603000000313636a700000000000000000000000000000001000000010000006603000000313637a800000000000000000000000000000001000000010000006603000000313638a900000000000000000000000000000001000000010000006603000000313639aa00000000000000000000000000000001000000010000006603000000313730ab00000000000000000000000000000001000000010000006603000000313731ac00000000000000000000000000000001000000010000006603000000313732ad00000000000000000000000000000001000000010000006603000000313733ae00000000000000000000000000000001000000010000006603000000313734af00000000000000000000000000000001000000010000006603000000313735b000000000000000000000000000000001000000010000006603000000313736b100000000000000000000000000000001000000010000006603000000313737b200000000000000000000000000000001000000010000006603000000313738b300000000000000000000000000000001000000010000006603000000313739b400000000000000000000000000000001000000010000006603000000313830b500000000000000000000000000000001000000010000006603000000313831b600000000000000000000000000000001000000010000006603000000313832b700000000000000000000000000000001000000010000006603000000313833b800000000000000000000000000000001000000010000006603000000313834b900000000000000000000000000000001000000010000006603000000313835ba00000000000000000000000000000001000000010000006603000000313836bb00000000000000000000000000000001000000010000006603000000313837bc00000000000000000000000000000001000000010000006603000000313838bd00000000000000000000000000000001000000010000006603000000313839be00000000000000000000000000000001000000010000006603000000313930bf00000000000000000000000000000001000000010000006603000000313931c000000000000000000000000000000001000000010000006603000000313932c100000000000000000000000000000001000000010000006603000000313933c200000000000000000000000000000001000000010000006603000000313934c300000000000000000000000000000001000000010000006603000000313935c400000000000000000000000000000001000000010000006603000000313936c500000000000000000000000000000001000000010000006603000000313937c600000000000000000000000000000001000000010000006603000000313938c700000000000000000000000000000001000000010000006603000000313939c800000000000000000000000000000001000000010000006603000000323030c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "expect": {
+            "bytes": "ce0000000000000000000000000000006a000000650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a000000000000000000000000000000010000000100000066030000003130366b000000000000000000000000000000010000000100000066030000003130376c000000000000000000000000000000010000000100000066030000003130386d000000000000000000000000000000010000000100000066030000003130396e000000000000000000000000000000010000000100000066030000003131306f0000000000000000000000000000000100000001000000660300000031313170000000000000000000000000000000010000000100000066030000003131327100000000000000000000000000000001000000010000006603000000313133720000000000000000000000000000000100000001000000660300000031313473000000000000000000000000000000010000000100000066030000003131357400000000000000000000000000000001000000010000006603000000313136750000000000000000000000000000000100000001000000660300000031313776000000000000000000000000000000010000000100000066030000003131387700000000000000000000000000000001000000010000006603000000313139780000000000000000000000000000000100000001000000660300000031323079000000000000000000000000000000010000000100000066030000003132317a000000000000000000000000000000010000000100000066030000003132327b000000000000000000000000000000010000000100000066030000003132337c000000000000000000000000000000010000000100000066030000003132347d000000000000000000000000000000010000000100000066030000003132357e000000000000000000000000000000010000000100000066030000003132367f0000000000000000000000000000000100000001000000660300000031323780000000000000000000000000000000010000000100000066030000003132388100000000000000000000000000000001000000010000006603000000313239820000000000000000000000000000000100000001000000660300000031333083000000000000000000000000000000010000000100000066030000003133318400000000000000000000000000000001000000010000006603000000313332850000000000000000000000000000000100000001000000660300000031333386000000000000000000000000000000010000000100000066030000003133348700000000000000000000000000000001000000010000006603000000313335880000000000000000000000000000000100000001000000660300000031333689000000000000000000000000000000010000000100000066030000003133378a000000000000000000000000000000010000000100000066030000003133388b000000000000000000000000000000010000000100000066030000003133398c000000000000000000000000000000010000000100000066030000003134308d000000000000000000000000000000010000000100000066030000003134318e000000000000000000000000000000010000000100000066030000003134328f0000000000000000000000000000000100000001000000660300000031343390000000000000000000000000000000010000000100000066030000003134349100000000000000000000000000000001000000010000006603000000313435920000000000000000000000000000000100000001000000660300000031343693000000000000000000000000000000010000000100000066030000003134379400000000000000000000000000000001000000010000006603000000313438950000000000000000000000000000000100000001000000660300000031343996000000000000000000000000000000010000000100000066030000003135309700000000000000000000000000000001000000010000006603000000313531980000000000000000000000000000000100000001000000660300000031353299000000000000000000000000000000010000000100000066030000003135339a000000000000000000000000000000010000000100000066030000003135349b000000000000000000000000000000010000000100000066030000003135359c000000000000000000000000000000010000000100000066030000003135369d000000000000000000000000000000010000000100000066030000003135379e000000000000000000000000000000010000000100000066030000003135389f00000000000000000000000000000001000000010000006603000000313539a000000000000000000000000000000001000000010000006603000000313630a100000000000000000000000000000001000000010000006603000000313631a200000000000000000000000000000001000000010000006603000000313632a300000000000000000000000000000001000000010000006603000000313633a400000000000000000000000000000001000000010000006603000000313634a500000000000000000000000000000001000000010000006603000000313635a600000000000000000000000000000001000000010000006603000000313636a700000000000000000000000000000001000000010000006603000000313637a800000000000000000000000000000001000000010000006603000000313638a900000000000000000000000000000001000000010000006603000000313639aa00000000000000000000000000000001000000010000006603000000313730ab00000000000000000000000000000001000000010000006603000000313731ac00000000000000000000000000000001000000010000006603000000313732ad00000000000000000000000000000001000000010000006603000000313733ae00000000000000000000000000000001000000010000006603000000313734af00000000000000000000000000000001000000010000006603000000313735b000000000000000000000000000000001000000010000006603000000313736b100000000000000000000000000000001000000010000006603000000313737b200000000000000000000000000000001000000010000006603000000313738b300000000000000000000000000000001000000010000006603000000313739b400000000000000000000000000000001000000010000006603000000313830b500000000000000000000000000000001000000010000006603000000313831b600000000000000000000000000000001000000010000006603000000313832b700000000000000000000000000000001000000010000006603000000313833b800000000000000000000000000000001000000010000006603000000313834b900000000000000000000000000000001000000010000006603000000313835ba00000000000000000000000000000001000000010000006603000000313836bb00000000000000000000000000000001000000010000006603000000313837bc00000000000000000000000000000001000000010000006603000000313838bd00000000000000000000000000000001000000010000006603000000313839be00000000000000000000000000000001000000010000006603000000313930bf00000000000000000000000000000001000000010000006603000000313931c000000000000000000000000000000001000000010000006603000000313932c100000000000000000000000000000001000000010000006603000000313933c200000000000000000000000000000001000000010000006603000000313934c300000000000000000000000000000001000000010000006603000000313935c400000000000000000000000000000001000000010000006603000000313936c500000000000000000000000000000001000000010000006603000000313937c600000000000000000000000000000001000000010000006603000000313938c700000000000000000000000000000001000000010000006603000000313939c800000000000000000000000000000001000000010000006603000000323030c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xtrim.minid-approx-drop",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "big",
+        "MINID",
+        "~",
+        "201"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 200
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "valueHex": "ce000000000000000000000000000000ce0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a0000000000000000000000000000000100000001000000660200000031300b0000000000000000000000000000000100000001000000660200000031310c0000000000000000000000000000000100000001000000660200000031320d0000000000000000000000000000000100000001000000660200000031330e0000000000000000000000000000000100000001000000660200000031340f000000000000000000000000000000010000000100000066020000003135100000000000000000000000000000000100000001000000660200000031361100000000000000000000000000000001000000010000006602000000313712000000000000000000000000000000010000000100000066020000003138130000000000000000000000000000000100000001000000660200000031391400000000000000000000000000000001000000010000006602000000323015000000000000000000000000000000010000000100000066020000003231160000000000000000000000000000000100000001000000660200000032321700000000000000000000000000000001000000010000006602000000323318000000000000000000000000000000010000000100000066020000003234190000000000000000000000000000000100000001000000660200000032351a0000000000000000000000000000000100000001000000660200000032361b0000000000000000000000000000000100000001000000660200000032371c0000000000000000000000000000000100000001000000660200000032381d0000000000000000000000000000000100000001000000660200000032391e0000000000000000000000000000000100000001000000660200000033301f000000000000000000000000000000010000000100000066020000003331200000000000000000000000000000000100000001000000660200000033322100000000000000000000000000000001000000010000006602000000333322000000000000000000000000000000010000000100000066020000003334230000000000000000000000000000000100000001000000660200000033352400000000000000000000000000000001000000010000006602000000333625000000000000000000000000000000010000000100000066020000003337260000000000000000000000000000000100000001000000660200000033382700000000000000000000000000000001000000010000006602000000333928000000000000000000000000000000010000000100000066020000003430290000000000000000000000000000000100000001000000660200000034312a0000000000000000000000000000000100000001000000660200000034322b0000000000000000000000000000000100000001000000660200000034332c0000000000000000000000000000000100000001000000660200000034342d0000000000000000000000000000000100000001000000660200000034352e0000000000000000000000000000000100000001000000660200000034362f000000000000000000000000000000010000000100000066020000003437300000000000000000000000000000000100000001000000660200000034383100000000000000000000000000000001000000010000006602000000343932000000000000000000000000000000010000000100000066020000003530330000000000000000000000000000000100000001000000660200000035313400000000000000000000000000000001000000010000006602000000353235000000000000000000000000000000010000000100000066020000003533360000000000000000000000000000000100000001000000660200000035343700000000000000000000000000000001000000010000006602000000353538000000000000000000000000000000010000000100000066020000003536390000000000000000000000000000000100000001000000660200000035373a0000000000000000000000000000000100000001000000660200000035383b0000000000000000000000000000000100000001000000660200000035393c0000000000000000000000000000000100000001000000660200000036303d0000000000000000000000000000000100000001000000660200000036313e0000000000000000000000000000000100000001000000660200000036323f000000000000000000000000000000010000000100000066020000003633400000000000000000000000000000000100000001000000660200000036344100000000000000000000000000000001000000010000006602000000363542000000000000000000000000000000010000000100000066020000003636430000000000000000000000000000000100000001000000660200000036374400000000000000000000000000000001000000010000006602000000363845000000000000000000000000000000010000000100000066020000003639460000000000000000000000000000000100000001000000660200000037304700000000000000000000000000000001000000010000006602000000373148000000000000000000000000000000010000000100000066020000003732490000000000000000000000000000000100000001000000660200000037334a0000000000000000000000000000000100000001000000660200000037344b0000000000000000000000000000000100000001000000660200000037354c0000000000000000000000000000000100000001000000660200000037364d0000000000000000000000000000000100000001000000660200000037374e0000000000000000000000000000000100000001000000660200000037384f000000000000000000000000000000010000000100000066020000003739500000000000000000000000000000000100000001000000660200000038305100000000000000000000000000000001000000010000006602000000383152000000000000000000000000000000010000000100000066020000003832530000000000000000000000000000000100000001000000660200000038335400000000000000000000000000000001000000010000006602000000383455000000000000000000000000000000010000000100000066020000003835560000000000000000000000000000000100000001000000660200000038365700000000000000000000000000000001000000010000006602000000383758000000000000000000000000000000010000000100000066020000003838590000000000000000000000000000000100000001000000660200000038395a0000000000000000000000000000000100000001000000660200000039305b0000000000000000000000000000000100000001000000660200000039315c0000000000000000000000000000000100000001000000660200000039325d0000000000000000000000000000000100000001000000660200000039335e0000000000000000000000000000000100000001000000660200000039345f000000000000000000000000000000010000000100000066020000003935600000000000000000000000000000000100000001000000660200000039366100000000000000000000000000000001000000010000006602000000393762000000000000000000000000000000010000000100000066020000003938630000000000000000000000000000000100000001000000660200000039396400000000000000000000000000000001000000010000006603000000313030650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a000000000000000000000000000000010000000100000066030000003130366b000000000000000000000000000000010000000100000066030000003130376c000000000000000000000000000000010000000100000066030000003130386d000000000000000000000000000000010000000100000066030000003130396e000000000000000000000000000000010000000100000066030000003131306f0000000000000000000000000000000100000001000000660300000031313170000000000000000000000000000000010000000100000066030000003131327100000000000000000000000000000001000000010000006603000000313133720000000000000000000000000000000100000001000000660300000031313473000000000000000000000000000000010000000100000066030000003131357400000000000000000000000000000001000000010000006603000000313136750000000000000000000000000000000100000001000000660300000031313776000000000000000000000000000000010000000100000066030000003131387700000000000000000000000000000001000000010000006603000000313139780000000000000000000000000000000100000001000000660300000031323079000000000000000000000000000000010000000100000066030000003132317a000000000000000000000000000000010000000100000066030000003132327b000000000000000000000000000000010000000100000066030000003132337c000000000000000000000000000000010000000100000066030000003132347d000000000000000000000000000000010000000100000066030000003132357e000000000000000000000000000000010000000100000066030000003132367f0000000000000000000000000000000100000001000000660300000031323780000000000000000000000000000000010000000100000066030000003132388100000000000000000000000000000001000000010000006603000000313239820000000000000000000000000000000100000001000000660300000031333083000000000000000000000000000000010000000100000066030000003133318400000000000000000000000000000001000000010000006603000000313332850000000000000000000000000000000100000001000000660300000031333386000000000000000000000000000000010000000100000066030000003133348700000000000000000000000000000001000000010000006603000000313335880000000000000000000000000000000100000001000000660300000031333689000000000000000000000000000000010000000100000066030000003133378a000000000000000000000000000000010000000100000066030000003133388b000000000000000000000000000000010000000100000066030000003133398c000000000000000000000000000000010000000100000066030000003134308d000000000000000000000000000000010000000100000066030000003134318e000000000000000000000000000000010000000100000066030000003134328f0000000000000000000000000000000100000001000000660300000031343390000000000000000000000000000000010000000100000066030000003134349100000000000000000000000000000001000000010000006603000000313435920000000000000000000000000000000100000001000000660300000031343693000000000000000000000000000000010000000100000066030000003134379400000000000000000000000000000001000000010000006603000000313438950000000000000000000000000000000100000001000000660300000031343996000000000000000000000000000000010000000100000066030000003135309700000000000000000000000000000001000000010000006603000000313531980000000000000000000000000000000100000001000000660300000031353299000000000000000000000000000000010000000100000066030000003135339a000000000000000000000000000000010000000100000066030000003135349b000000000000000000000000000000010000000100000066030000003135359c000000000000000000000000000000010000000100000066030000003135369d000000000000000000000000000000010000000100000066030000003135379e000000000000000000000000000000010000000100000066030000003135389f00000000000000000000000000000001000000010000006603000000313539a000000000000000000000000000000001000000010000006603000000313630a100000000000000000000000000000001000000010000006603000000313631a200000000000000000000000000000001000000010000006603000000313632a300000000000000000000000000000001000000010000006603000000313633a400000000000000000000000000000001000000010000006603000000313634a500000000000000000000000000000001000000010000006603000000313635a600000000000000000000000000000001000000010000006603000000313636a700000000000000000000000000000001000000010000006603000000313637a800000000000000000000000000000001000000010000006603000000313638a900000000000000000000000000000001000000010000006603000000313639aa00000000000000000000000000000001000000010000006603000000313730ab00000000000000000000000000000001000000010000006603000000313731ac00000000000000000000000000000001000000010000006603000000313732ad00000000000000000000000000000001000000010000006603000000313733ae00000000000000000000000000000001000000010000006603000000313734af00000000000000000000000000000001000000010000006603000000313735b000000000000000000000000000000001000000010000006603000000313736b100000000000000000000000000000001000000010000006603000000313737b200000000000000000000000000000001000000010000006603000000313738b300000000000000000000000000000001000000010000006603000000313739b400000000000000000000000000000001000000010000006603000000313830b500000000000000000000000000000001000000010000006603000000313831b600000000000000000000000000000001000000010000006603000000313832b700000000000000000000000000000001000000010000006603000000313833b800000000000000000000000000000001000000010000006603000000313834b900000000000000000000000000000001000000010000006603000000313835ba00000000000000000000000000000001000000010000006603000000313836bb00000000000000000000000000000001000000010000006603000000313837bc00000000000000000000000000000001000000010000006603000000313838bd00000000000000000000000000000001000000010000006603000000313839be00000000000000000000000000000001000000010000006603000000313930bf00000000000000000000000000000001000000010000006603000000313931c000000000000000000000000000000001000000010000006603000000313932c100000000000000000000000000000001000000010000006603000000313933c200000000000000000000000000000001000000010000006603000000313934c300000000000000000000000000000001000000010000006603000000313935c400000000000000000000000000000001000000010000006603000000313936c500000000000000000000000000000001000000010000006603000000313937c600000000000000000000000000000001000000010000006603000000313938c700000000000000000000000000000001000000010000006603000000313939c800000000000000000000000000000001000000010000006603000000323030c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "expect": {
+            "bytes": "ce00000000000000000000000000000006000000c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xtrim.maxlen-approx-node-206",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "big",
+        "MAXLEN",
+        "~",
+        "100"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 100
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "valueHex": "ce000000000000000000000000000000ce0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a0000000000000000000000000000000100000001000000660200000031300b0000000000000000000000000000000100000001000000660200000031310c0000000000000000000000000000000100000001000000660200000031320d0000000000000000000000000000000100000001000000660200000031330e0000000000000000000000000000000100000001000000660200000031340f000000000000000000000000000000010000000100000066020000003135100000000000000000000000000000000100000001000000660200000031361100000000000000000000000000000001000000010000006602000000313712000000000000000000000000000000010000000100000066020000003138130000000000000000000000000000000100000001000000660200000031391400000000000000000000000000000001000000010000006602000000323015000000000000000000000000000000010000000100000066020000003231160000000000000000000000000000000100000001000000660200000032321700000000000000000000000000000001000000010000006602000000323318000000000000000000000000000000010000000100000066020000003234190000000000000000000000000000000100000001000000660200000032351a0000000000000000000000000000000100000001000000660200000032361b0000000000000000000000000000000100000001000000660200000032371c0000000000000000000000000000000100000001000000660200000032381d0000000000000000000000000000000100000001000000660200000032391e0000000000000000000000000000000100000001000000660200000033301f000000000000000000000000000000010000000100000066020000003331200000000000000000000000000000000100000001000000660200000033322100000000000000000000000000000001000000010000006602000000333322000000000000000000000000000000010000000100000066020000003334230000000000000000000000000000000100000001000000660200000033352400000000000000000000000000000001000000010000006602000000333625000000000000000000000000000000010000000100000066020000003337260000000000000000000000000000000100000001000000660200000033382700000000000000000000000000000001000000010000006602000000333928000000000000000000000000000000010000000100000066020000003430290000000000000000000000000000000100000001000000660200000034312a0000000000000000000000000000000100000001000000660200000034322b0000000000000000000000000000000100000001000000660200000034332c0000000000000000000000000000000100000001000000660200000034342d0000000000000000000000000000000100000001000000660200000034352e0000000000000000000000000000000100000001000000660200000034362f000000000000000000000000000000010000000100000066020000003437300000000000000000000000000000000100000001000000660200000034383100000000000000000000000000000001000000010000006602000000343932000000000000000000000000000000010000000100000066020000003530330000000000000000000000000000000100000001000000660200000035313400000000000000000000000000000001000000010000006602000000353235000000000000000000000000000000010000000100000066020000003533360000000000000000000000000000000100000001000000660200000035343700000000000000000000000000000001000000010000006602000000353538000000000000000000000000000000010000000100000066020000003536390000000000000000000000000000000100000001000000660200000035373a0000000000000000000000000000000100000001000000660200000035383b0000000000000000000000000000000100000001000000660200000035393c0000000000000000000000000000000100000001000000660200000036303d0000000000000000000000000000000100000001000000660200000036313e0000000000000000000000000000000100000001000000660200000036323f000000000000000000000000000000010000000100000066020000003633400000000000000000000000000000000100000001000000660200000036344100000000000000000000000000000001000000010000006602000000363542000000000000000000000000000000010000000100000066020000003636430000000000000000000000000000000100000001000000660200000036374400000000000000000000000000000001000000010000006602000000363845000000000000000000000000000000010000000100000066020000003639460000000000000000000000000000000100000001000000660200000037304700000000000000000000000000000001000000010000006602000000373148000000000000000000000000000000010000000100000066020000003732490000000000000000000000000000000100000001000000660200000037334a0000000000000000000000000000000100000001000000660200000037344b0000000000000000000000000000000100000001000000660200000037354c0000000000000000000000000000000100000001000000660200000037364d0000000000000000000000000000000100000001000000660200000037374e0000000000000000000000000000000100000001000000660200000037384f000000000000000000000000000000010000000100000066020000003739500000000000000000000000000000000100000001000000660200000038305100000000000000000000000000000001000000010000006602000000383152000000000000000000000000000000010000000100000066020000003832530000000000000000000000000000000100000001000000660200000038335400000000000000000000000000000001000000010000006602000000383455000000000000000000000000000000010000000100000066020000003835560000000000000000000000000000000100000001000000660200000038365700000000000000000000000000000001000000010000006602000000383758000000000000000000000000000000010000000100000066020000003838590000000000000000000000000000000100000001000000660200000038395a0000000000000000000000000000000100000001000000660200000039305b0000000000000000000000000000000100000001000000660200000039315c0000000000000000000000000000000100000001000000660200000039325d0000000000000000000000000000000100000001000000660200000039335e0000000000000000000000000000000100000001000000660200000039345f000000000000000000000000000000010000000100000066020000003935600000000000000000000000000000000100000001000000660200000039366100000000000000000000000000000001000000010000006602000000393762000000000000000000000000000000010000000100000066020000003938630000000000000000000000000000000100000001000000660200000039396400000000000000000000000000000001000000010000006603000000313030650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a000000000000000000000000000000010000000100000066030000003130366b000000000000000000000000000000010000000100000066030000003130376c000000000000000000000000000000010000000100000066030000003130386d000000000000000000000000000000010000000100000066030000003130396e000000000000000000000000000000010000000100000066030000003131306f0000000000000000000000000000000100000001000000660300000031313170000000000000000000000000000000010000000100000066030000003131327100000000000000000000000000000001000000010000006603000000313133720000000000000000000000000000000100000001000000660300000031313473000000000000000000000000000000010000000100000066030000003131357400000000000000000000000000000001000000010000006603000000313136750000000000000000000000000000000100000001000000660300000031313776000000000000000000000000000000010000000100000066030000003131387700000000000000000000000000000001000000010000006603000000313139780000000000000000000000000000000100000001000000660300000031323079000000000000000000000000000000010000000100000066030000003132317a000000000000000000000000000000010000000100000066030000003132327b000000000000000000000000000000010000000100000066030000003132337c000000000000000000000000000000010000000100000066030000003132347d000000000000000000000000000000010000000100000066030000003132357e000000000000000000000000000000010000000100000066030000003132367f0000000000000000000000000000000100000001000000660300000031323780000000000000000000000000000000010000000100000066030000003132388100000000000000000000000000000001000000010000006603000000313239820000000000000000000000000000000100000001000000660300000031333083000000000000000000000000000000010000000100000066030000003133318400000000000000000000000000000001000000010000006603000000313332850000000000000000000000000000000100000001000000660300000031333386000000000000000000000000000000010000000100000066030000003133348700000000000000000000000000000001000000010000006603000000313335880000000000000000000000000000000100000001000000660300000031333689000000000000000000000000000000010000000100000066030000003133378a000000000000000000000000000000010000000100000066030000003133388b000000000000000000000000000000010000000100000066030000003133398c000000000000000000000000000000010000000100000066030000003134308d000000000000000000000000000000010000000100000066030000003134318e000000000000000000000000000000010000000100000066030000003134328f0000000000000000000000000000000100000001000000660300000031343390000000000000000000000000000000010000000100000066030000003134349100000000000000000000000000000001000000010000006603000000313435920000000000000000000000000000000100000001000000660300000031343693000000000000000000000000000000010000000100000066030000003134379400000000000000000000000000000001000000010000006603000000313438950000000000000000000000000000000100000001000000660300000031343996000000000000000000000000000000010000000100000066030000003135309700000000000000000000000000000001000000010000006603000000313531980000000000000000000000000000000100000001000000660300000031353299000000000000000000000000000000010000000100000066030000003135339a000000000000000000000000000000010000000100000066030000003135349b000000000000000000000000000000010000000100000066030000003135359c000000000000000000000000000000010000000100000066030000003135369d000000000000000000000000000000010000000100000066030000003135379e000000000000000000000000000000010000000100000066030000003135389f00000000000000000000000000000001000000010000006603000000313539a000000000000000000000000000000001000000010000006603000000313630a100000000000000000000000000000001000000010000006603000000313631a200000000000000000000000000000001000000010000006603000000313632a300000000000000000000000000000001000000010000006603000000313633a400000000000000000000000000000001000000010000006603000000313634a500000000000000000000000000000001000000010000006603000000313635a600000000000000000000000000000001000000010000006603000000313636a700000000000000000000000000000001000000010000006603000000313637a800000000000000000000000000000001000000010000006603000000313638a900000000000000000000000000000001000000010000006603000000313639aa00000000000000000000000000000001000000010000006603000000313730ab00000000000000000000000000000001000000010000006603000000313731ac00000000000000000000000000000001000000010000006603000000313732ad00000000000000000000000000000001000000010000006603000000313733ae00000000000000000000000000000001000000010000006603000000313734af00000000000000000000000000000001000000010000006603000000313735b000000000000000000000000000000001000000010000006603000000313736b100000000000000000000000000000001000000010000006603000000313737b200000000000000000000000000000001000000010000006603000000313738b300000000000000000000000000000001000000010000006603000000313739b400000000000000000000000000000001000000010000006603000000313830b500000000000000000000000000000001000000010000006603000000313831b600000000000000000000000000000001000000010000006603000000313832b700000000000000000000000000000001000000010000006603000000313833b800000000000000000000000000000001000000010000006603000000313834b900000000000000000000000000000001000000010000006603000000313835ba00000000000000000000000000000001000000010000006603000000313836bb00000000000000000000000000000001000000010000006603000000313837bc00000000000000000000000000000001000000010000006603000000313838bd00000000000000000000000000000001000000010000006603000000313839be00000000000000000000000000000001000000010000006603000000313930bf00000000000000000000000000000001000000010000006603000000313931c000000000000000000000000000000001000000010000006603000000313932c100000000000000000000000000000001000000010000006603000000313933c200000000000000000000000000000001000000010000006603000000313934c300000000000000000000000000000001000000010000006603000000313935c400000000000000000000000000000001000000010000006603000000313936c500000000000000000000000000000001000000010000006603000000313937c600000000000000000000000000000001000000010000006603000000313938c700000000000000000000000000000001000000010000006603000000313939c800000000000000000000000000000001000000010000006603000000323030c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "expect": {
+            "bytes": "ce0000000000000000000000000000006a000000650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a000000000000000000000000000000010000000100000066030000003130366b000000000000000000000000000000010000000100000066030000003130376c000000000000000000000000000000010000000100000066030000003130386d000000000000000000000000000000010000000100000066030000003130396e000000000000000000000000000000010000000100000066030000003131306f0000000000000000000000000000000100000001000000660300000031313170000000000000000000000000000000010000000100000066030000003131327100000000000000000000000000000001000000010000006603000000313133720000000000000000000000000000000100000001000000660300000031313473000000000000000000000000000000010000000100000066030000003131357400000000000000000000000000000001000000010000006603000000313136750000000000000000000000000000000100000001000000660300000031313776000000000000000000000000000000010000000100000066030000003131387700000000000000000000000000000001000000010000006603000000313139780000000000000000000000000000000100000001000000660300000031323079000000000000000000000000000000010000000100000066030000003132317a000000000000000000000000000000010000000100000066030000003132327b000000000000000000000000000000010000000100000066030000003132337c000000000000000000000000000000010000000100000066030000003132347d000000000000000000000000000000010000000100000066030000003132357e000000000000000000000000000000010000000100000066030000003132367f0000000000000000000000000000000100000001000000660300000031323780000000000000000000000000000000010000000100000066030000003132388100000000000000000000000000000001000000010000006603000000313239820000000000000000000000000000000100000001000000660300000031333083000000000000000000000000000000010000000100000066030000003133318400000000000000000000000000000001000000010000006603000000313332850000000000000000000000000000000100000001000000660300000031333386000000000000000000000000000000010000000100000066030000003133348700000000000000000000000000000001000000010000006603000000313335880000000000000000000000000000000100000001000000660300000031333689000000000000000000000000000000010000000100000066030000003133378a000000000000000000000000000000010000000100000066030000003133388b000000000000000000000000000000010000000100000066030000003133398c000000000000000000000000000000010000000100000066030000003134308d000000000000000000000000000000010000000100000066030000003134318e000000000000000000000000000000010000000100000066030000003134328f0000000000000000000000000000000100000001000000660300000031343390000000000000000000000000000000010000000100000066030000003134349100000000000000000000000000000001000000010000006603000000313435920000000000000000000000000000000100000001000000660300000031343693000000000000000000000000000000010000000100000066030000003134379400000000000000000000000000000001000000010000006603000000313438950000000000000000000000000000000100000001000000660300000031343996000000000000000000000000000000010000000100000066030000003135309700000000000000000000000000000001000000010000006603000000313531980000000000000000000000000000000100000001000000660300000031353299000000000000000000000000000000010000000100000066030000003135339a000000000000000000000000000000010000000100000066030000003135349b000000000000000000000000000000010000000100000066030000003135359c000000000000000000000000000000010000000100000066030000003135369d000000000000000000000000000000010000000100000066030000003135379e000000000000000000000000000000010000000100000066030000003135389f00000000000000000000000000000001000000010000006603000000313539a000000000000000000000000000000001000000010000006603000000313630a100000000000000000000000000000001000000010000006603000000313631a200000000000000000000000000000001000000010000006603000000313632a300000000000000000000000000000001000000010000006603000000313633a400000000000000000000000000000001000000010000006603000000313634a500000000000000000000000000000001000000010000006603000000313635a600000000000000000000000000000001000000010000006603000000313636a700000000000000000000000000000001000000010000006603000000313637a800000000000000000000000000000001000000010000006603000000313638a900000000000000000000000000000001000000010000006603000000313639aa00000000000000000000000000000001000000010000006603000000313730ab00000000000000000000000000000001000000010000006603000000313731ac00000000000000000000000000000001000000010000006603000000313732ad00000000000000000000000000000001000000010000006603000000313733ae00000000000000000000000000000001000000010000006603000000313734af00000000000000000000000000000001000000010000006603000000313735b000000000000000000000000000000001000000010000006603000000313736b100000000000000000000000000000001000000010000006603000000313737b200000000000000000000000000000001000000010000006603000000313738b300000000000000000000000000000001000000010000006603000000313739b400000000000000000000000000000001000000010000006603000000313830b500000000000000000000000000000001000000010000006603000000313831b600000000000000000000000000000001000000010000006603000000313832b700000000000000000000000000000001000000010000006603000000313833b800000000000000000000000000000001000000010000006603000000313834b900000000000000000000000000000001000000010000006603000000313835ba00000000000000000000000000000001000000010000006603000000313836bb00000000000000000000000000000001000000010000006603000000313837bc00000000000000000000000000000001000000010000006603000000313838bd00000000000000000000000000000001000000010000006603000000313839be00000000000000000000000000000001000000010000006603000000313930bf00000000000000000000000000000001000000010000006603000000313931c000000000000000000000000000000001000000010000006603000000313932c100000000000000000000000000000001000000010000006603000000313933c200000000000000000000000000000001000000010000006603000000313934c300000000000000000000000000000001000000010000006603000000313935c400000000000000000000000000000001000000010000006603000000313936c500000000000000000000000000000001000000010000006603000000313937c600000000000000000000000000000001000000010000006603000000313938c700000000000000000000000000000001000000010000006603000000313939c800000000000000000000000000000001000000010000006603000000323030c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xtrim.maxlen-approx-node-106",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "mid",
+        "MAXLEN",
+        "~",
+        "100"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "6d6964",
+          "valueHex": "6a0000000000000000000000000000006a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a0000000000000000000000000000000100000001000000660200000031300b0000000000000000000000000000000100000001000000660200000031310c0000000000000000000000000000000100000001000000660200000031320d0000000000000000000000000000000100000001000000660200000031330e0000000000000000000000000000000100000001000000660200000031340f000000000000000000000000000000010000000100000066020000003135100000000000000000000000000000000100000001000000660200000031361100000000000000000000000000000001000000010000006602000000313712000000000000000000000000000000010000000100000066020000003138130000000000000000000000000000000100000001000000660200000031391400000000000000000000000000000001000000010000006602000000323015000000000000000000000000000000010000000100000066020000003231160000000000000000000000000000000100000001000000660200000032321700000000000000000000000000000001000000010000006602000000323318000000000000000000000000000000010000000100000066020000003234190000000000000000000000000000000100000001000000660200000032351a0000000000000000000000000000000100000001000000660200000032361b0000000000000000000000000000000100000001000000660200000032371c0000000000000000000000000000000100000001000000660200000032381d0000000000000000000000000000000100000001000000660200000032391e0000000000000000000000000000000100000001000000660200000033301f000000000000000000000000000000010000000100000066020000003331200000000000000000000000000000000100000001000000660200000033322100000000000000000000000000000001000000010000006602000000333322000000000000000000000000000000010000000100000066020000003334230000000000000000000000000000000100000001000000660200000033352400000000000000000000000000000001000000010000006602000000333625000000000000000000000000000000010000000100000066020000003337260000000000000000000000000000000100000001000000660200000033382700000000000000000000000000000001000000010000006602000000333928000000000000000000000000000000010000000100000066020000003430290000000000000000000000000000000100000001000000660200000034312a0000000000000000000000000000000100000001000000660200000034322b0000000000000000000000000000000100000001000000660200000034332c0000000000000000000000000000000100000001000000660200000034342d0000000000000000000000000000000100000001000000660200000034352e0000000000000000000000000000000100000001000000660200000034362f000000000000000000000000000000010000000100000066020000003437300000000000000000000000000000000100000001000000660200000034383100000000000000000000000000000001000000010000006602000000343932000000000000000000000000000000010000000100000066020000003530330000000000000000000000000000000100000001000000660200000035313400000000000000000000000000000001000000010000006602000000353235000000000000000000000000000000010000000100000066020000003533360000000000000000000000000000000100000001000000660200000035343700000000000000000000000000000001000000010000006602000000353538000000000000000000000000000000010000000100000066020000003536390000000000000000000000000000000100000001000000660200000035373a0000000000000000000000000000000100000001000000660200000035383b0000000000000000000000000000000100000001000000660200000035393c0000000000000000000000000000000100000001000000660200000036303d0000000000000000000000000000000100000001000000660200000036313e0000000000000000000000000000000100000001000000660200000036323f000000000000000000000000000000010000000100000066020000003633400000000000000000000000000000000100000001000000660200000036344100000000000000000000000000000001000000010000006602000000363542000000000000000000000000000000010000000100000066020000003636430000000000000000000000000000000100000001000000660200000036374400000000000000000000000000000001000000010000006602000000363845000000000000000000000000000000010000000100000066020000003639460000000000000000000000000000000100000001000000660200000037304700000000000000000000000000000001000000010000006602000000373148000000000000000000000000000000010000000100000066020000003732490000000000000000000000000000000100000001000000660200000037334a0000000000000000000000000000000100000001000000660200000037344b0000000000000000000000000000000100000001000000660200000037354c0000000000000000000000000000000100000001000000660200000037364d0000000000000000000000000000000100000001000000660200000037374e0000000000000000000000000000000100000001000000660200000037384f000000000000000000000000000000010000000100000066020000003739500000000000000000000000000000000100000001000000660200000038305100000000000000000000000000000001000000010000006602000000383152000000000000000000000000000000010000000100000066020000003832530000000000000000000000000000000100000001000000660200000038335400000000000000000000000000000001000000010000006602000000383455000000000000000000000000000000010000000100000066020000003835560000000000000000000000000000000100000001000000660200000038365700000000000000000000000000000001000000010000006602000000383758000000000000000000000000000000010000000100000066020000003838590000000000000000000000000000000100000001000000660200000038395a0000000000000000000000000000000100000001000000660200000039305b0000000000000000000000000000000100000001000000660200000039315c0000000000000000000000000000000100000001000000660200000039325d0000000000000000000000000000000100000001000000660200000039335e0000000000000000000000000000000100000001000000660200000039345f000000000000000000000000000000010000000100000066020000003935600000000000000000000000000000000100000001000000660200000039366100000000000000000000000000000001000000010000006602000000393762000000000000000000000000000000010000000100000066020000003938630000000000000000000000000000000100000001000000660200000039396400000000000000000000000000000001000000010000006603000000313030650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a00000000000000000000000000000001000000010000006603000000313036"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.maxlen-approx-node-12",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "small",
+        "MAXLEN",
+        "~",
+        "5"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "736d616c6c",
+          "valueHex": "0c0000000000000000000000000000000c0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a0000000000000000000000000000000100000001000000660200000031300b0000000000000000000000000000000100000001000000660200000031310c000000000000000000000000000000010000000100000066020000003132"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.limit-budget",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "big",
+        "MAXLEN",
+        "~",
+        "100",
+        "LIMIT",
+        "50"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "626967",
+          "valueHex": "ce000000000000000000000000000000ce0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a0000000000000000000000000000000100000001000000660200000031300b0000000000000000000000000000000100000001000000660200000031310c0000000000000000000000000000000100000001000000660200000031320d0000000000000000000000000000000100000001000000660200000031330e0000000000000000000000000000000100000001000000660200000031340f000000000000000000000000000000010000000100000066020000003135100000000000000000000000000000000100000001000000660200000031361100000000000000000000000000000001000000010000006602000000313712000000000000000000000000000000010000000100000066020000003138130000000000000000000000000000000100000001000000660200000031391400000000000000000000000000000001000000010000006602000000323015000000000000000000000000000000010000000100000066020000003231160000000000000000000000000000000100000001000000660200000032321700000000000000000000000000000001000000010000006602000000323318000000000000000000000000000000010000000100000066020000003234190000000000000000000000000000000100000001000000660200000032351a0000000000000000000000000000000100000001000000660200000032361b0000000000000000000000000000000100000001000000660200000032371c0000000000000000000000000000000100000001000000660200000032381d0000000000000000000000000000000100000001000000660200000032391e0000000000000000000000000000000100000001000000660200000033301f000000000000000000000000000000010000000100000066020000003331200000000000000000000000000000000100000001000000660200000033322100000000000000000000000000000001000000010000006602000000333322000000000000000000000000000000010000000100000066020000003334230000000000000000000000000000000100000001000000660200000033352400000000000000000000000000000001000000010000006602000000333625000000000000000000000000000000010000000100000066020000003337260000000000000000000000000000000100000001000000660200000033382700000000000000000000000000000001000000010000006602000000333928000000000000000000000000000000010000000100000066020000003430290000000000000000000000000000000100000001000000660200000034312a0000000000000000000000000000000100000001000000660200000034322b0000000000000000000000000000000100000001000000660200000034332c0000000000000000000000000000000100000001000000660200000034342d0000000000000000000000000000000100000001000000660200000034352e0000000000000000000000000000000100000001000000660200000034362f000000000000000000000000000000010000000100000066020000003437300000000000000000000000000000000100000001000000660200000034383100000000000000000000000000000001000000010000006602000000343932000000000000000000000000000000010000000100000066020000003530330000000000000000000000000000000100000001000000660200000035313400000000000000000000000000000001000000010000006602000000353235000000000000000000000000000000010000000100000066020000003533360000000000000000000000000000000100000001000000660200000035343700000000000000000000000000000001000000010000006602000000353538000000000000000000000000000000010000000100000066020000003536390000000000000000000000000000000100000001000000660200000035373a0000000000000000000000000000000100000001000000660200000035383b0000000000000000000000000000000100000001000000660200000035393c0000000000000000000000000000000100000001000000660200000036303d0000000000000000000000000000000100000001000000660200000036313e0000000000000000000000000000000100000001000000660200000036323f000000000000000000000000000000010000000100000066020000003633400000000000000000000000000000000100000001000000660200000036344100000000000000000000000000000001000000010000006602000000363542000000000000000000000000000000010000000100000066020000003636430000000000000000000000000000000100000001000000660200000036374400000000000000000000000000000001000000010000006602000000363845000000000000000000000000000000010000000100000066020000003639460000000000000000000000000000000100000001000000660200000037304700000000000000000000000000000001000000010000006602000000373148000000000000000000000000000000010000000100000066020000003732490000000000000000000000000000000100000001000000660200000037334a0000000000000000000000000000000100000001000000660200000037344b0000000000000000000000000000000100000001000000660200000037354c0000000000000000000000000000000100000001000000660200000037364d0000000000000000000000000000000100000001000000660200000037374e0000000000000000000000000000000100000001000000660200000037384f000000000000000000000000000000010000000100000066020000003739500000000000000000000000000000000100000001000000660200000038305100000000000000000000000000000001000000010000006602000000383152000000000000000000000000000000010000000100000066020000003832530000000000000000000000000000000100000001000000660200000038335400000000000000000000000000000001000000010000006602000000383455000000000000000000000000000000010000000100000066020000003835560000000000000000000000000000000100000001000000660200000038365700000000000000000000000000000001000000010000006602000000383758000000000000000000000000000000010000000100000066020000003838590000000000000000000000000000000100000001000000660200000038395a0000000000000000000000000000000100000001000000660200000039305b0000000000000000000000000000000100000001000000660200000039315c0000000000000000000000000000000100000001000000660200000039325d0000000000000000000000000000000100000001000000660200000039335e0000000000000000000000000000000100000001000000660200000039345f000000000000000000000000000000010000000100000066020000003935600000000000000000000000000000000100000001000000660200000039366100000000000000000000000000000001000000010000006602000000393762000000000000000000000000000000010000000100000066020000003938630000000000000000000000000000000100000001000000660200000039396400000000000000000000000000000001000000010000006603000000313030650000000000000000000000000000000100000001000000660300000031303166000000000000000000000000000000010000000100000066030000003130326700000000000000000000000000000001000000010000006603000000313033680000000000000000000000000000000100000001000000660300000031303469000000000000000000000000000000010000000100000066030000003130356a000000000000000000000000000000010000000100000066030000003130366b000000000000000000000000000000010000000100000066030000003130376c000000000000000000000000000000010000000100000066030000003130386d000000000000000000000000000000010000000100000066030000003130396e000000000000000000000000000000010000000100000066030000003131306f0000000000000000000000000000000100000001000000660300000031313170000000000000000000000000000000010000000100000066030000003131327100000000000000000000000000000001000000010000006603000000313133720000000000000000000000000000000100000001000000660300000031313473000000000000000000000000000000010000000100000066030000003131357400000000000000000000000000000001000000010000006603000000313136750000000000000000000000000000000100000001000000660300000031313776000000000000000000000000000000010000000100000066030000003131387700000000000000000000000000000001000000010000006603000000313139780000000000000000000000000000000100000001000000660300000031323079000000000000000000000000000000010000000100000066030000003132317a000000000000000000000000000000010000000100000066030000003132327b000000000000000000000000000000010000000100000066030000003132337c000000000000000000000000000000010000000100000066030000003132347d000000000000000000000000000000010000000100000066030000003132357e000000000000000000000000000000010000000100000066030000003132367f0000000000000000000000000000000100000001000000660300000031323780000000000000000000000000000000010000000100000066030000003132388100000000000000000000000000000001000000010000006603000000313239820000000000000000000000000000000100000001000000660300000031333083000000000000000000000000000000010000000100000066030000003133318400000000000000000000000000000001000000010000006603000000313332850000000000000000000000000000000100000001000000660300000031333386000000000000000000000000000000010000000100000066030000003133348700000000000000000000000000000001000000010000006603000000313335880000000000000000000000000000000100000001000000660300000031333689000000000000000000000000000000010000000100000066030000003133378a000000000000000000000000000000010000000100000066030000003133388b000000000000000000000000000000010000000100000066030000003133398c000000000000000000000000000000010000000100000066030000003134308d000000000000000000000000000000010000000100000066030000003134318e000000000000000000000000000000010000000100000066030000003134328f0000000000000000000000000000000100000001000000660300000031343390000000000000000000000000000000010000000100000066030000003134349100000000000000000000000000000001000000010000006603000000313435920000000000000000000000000000000100000001000000660300000031343693000000000000000000000000000000010000000100000066030000003134379400000000000000000000000000000001000000010000006603000000313438950000000000000000000000000000000100000001000000660300000031343996000000000000000000000000000000010000000100000066030000003135309700000000000000000000000000000001000000010000006603000000313531980000000000000000000000000000000100000001000000660300000031353299000000000000000000000000000000010000000100000066030000003135339a000000000000000000000000000000010000000100000066030000003135349b000000000000000000000000000000010000000100000066030000003135359c000000000000000000000000000000010000000100000066030000003135369d000000000000000000000000000000010000000100000066030000003135379e000000000000000000000000000000010000000100000066030000003135389f00000000000000000000000000000001000000010000006603000000313539a000000000000000000000000000000001000000010000006603000000313630a100000000000000000000000000000001000000010000006603000000313631a200000000000000000000000000000001000000010000006603000000313632a300000000000000000000000000000001000000010000006603000000313633a400000000000000000000000000000001000000010000006603000000313634a500000000000000000000000000000001000000010000006603000000313635a600000000000000000000000000000001000000010000006603000000313636a700000000000000000000000000000001000000010000006603000000313637a800000000000000000000000000000001000000010000006603000000313638a900000000000000000000000000000001000000010000006603000000313639aa00000000000000000000000000000001000000010000006603000000313730ab00000000000000000000000000000001000000010000006603000000313731ac00000000000000000000000000000001000000010000006603000000313732ad00000000000000000000000000000001000000010000006603000000313733ae00000000000000000000000000000001000000010000006603000000313734af00000000000000000000000000000001000000010000006603000000313735b000000000000000000000000000000001000000010000006603000000313736b100000000000000000000000000000001000000010000006603000000313737b200000000000000000000000000000001000000010000006603000000313738b300000000000000000000000000000001000000010000006603000000313739b400000000000000000000000000000001000000010000006603000000313830b500000000000000000000000000000001000000010000006603000000313831b600000000000000000000000000000001000000010000006603000000313832b700000000000000000000000000000001000000010000006603000000313833b800000000000000000000000000000001000000010000006603000000313834b900000000000000000000000000000001000000010000006603000000313835ba00000000000000000000000000000001000000010000006603000000313836bb00000000000000000000000000000001000000010000006603000000313837bc00000000000000000000000000000001000000010000006603000000313838bd00000000000000000000000000000001000000010000006603000000313839be00000000000000000000000000000001000000010000006603000000313930bf00000000000000000000000000000001000000010000006603000000313931c000000000000000000000000000000001000000010000006603000000313932c100000000000000000000000000000001000000010000006603000000313933c200000000000000000000000000000001000000010000006603000000313934c300000000000000000000000000000001000000010000006603000000313935c400000000000000000000000000000001000000010000006603000000313936c500000000000000000000000000000001000000010000006603000000313937c600000000000000000000000000000001000000010000006603000000313938c700000000000000000000000000000001000000010000006603000000313939c800000000000000000000000000000001000000010000006603000000323030c900000000000000000000000000000001000000010000006603000000323031ca00000000000000000000000000000001000000010000006603000000323032cb00000000000000000000000000000001000000010000006603000000323033cc00000000000000000000000000000001000000010000006603000000323034cd00000000000000000000000000000001000000010000006603000000323035ce00000000000000000000000000000001000000010000006603000000323036"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.bad-maxlen",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "bogus"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.negative-maxlen",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "~",
+        "-1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR The MAXLEN argument must be >= 0."
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.bad-minid",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MINID",
+        "bogus"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.minid-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MINID",
+        "-"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.nomkstream",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "NOMKSTREAM",
+        "MAXLEN",
+        "1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.limit-without-approx",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "1",
+        "LIMIT",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error, LIMIT cannot be used without the special ~ option"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.trailing-token",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN",
+        "~",
+        "1",
+        "LIMIT",
+        "2",
+        "EXTRA"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "missing",
+        "MAXLEN",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "str",
+        "MAXLEN",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737472",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xtrim.arity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XTRIM",
+        "trim",
+        "MAXLEN"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'xtrim' command"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xadd.keeps-top-id-after-trim",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "7472696d",
+          "valueHex": "0a0000000000000000000000000000000a0000000100000000000000000000000000000001000000010000006601000000310200000000000000000000000000000001000000010000006601000000320300000000000000000000000000000001000000010000006601000000330400000000000000000000000000000001000000010000006601000000340500000000000000000000000000000001000000010000006601000000350600000000000000000000000000000001000000010000006601000000360700000000000000000000000000000001000000010000006601000000370800000000000000000000000000000001000000010000006601000000380900000000000000000000000000000001000000010000006601000000390a000000000000000000000000000000010000000100000066020000003130"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "XADD",
+            "trim",
+            "MAXLEN",
+            "0",
+            "11-0",
+            "f",
+            "11"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              49,
+              49,
+              45,
+              48
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "XADD",
+            "trim",
+            "5-0",
+            "f",
+            "x"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR The ID specified in XADD is equal or smaller than the target stream top item"
+          }
+        },
+        {
+          "argsText": [
+            "XLEN",
+            "trim"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.xadd.auto-id-from-zero",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "XADD",
+            "fresh",
+            "0-*",
+            "a",
+            "1"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              48,
+              45,
+              49
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "XADD",
+            "fresh",
+            "0-*",
+            "b",
+            "2"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              48,
+              45,
+              50
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "XADD",
+            "fresh",
+            "0-0",
+            "c",
+            "3"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR The ID specified in XADD must be greater than 0-0"
+          }
+        }
+      ]
+    }
+  ]
+}

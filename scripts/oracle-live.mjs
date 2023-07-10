@@ -497,6 +497,17 @@ function setupCommands(step) {
         for (const [member, score] of decodeZSet(body)) command.push(String(score), member.toString());
         commands.push(command);
     }
+    else if (step.kind === 'stream') {
+        const { last, entries } = decodeStream(body);
+        for (const entry of entries) {
+            const command = ['XADD', key, `${entry.ms}-${entry.seq}`];
+            for (const [field, value] of entry.fields) command.push(field, value);
+            commands.push(command);
+        }
+        if (entries.length === 0) commands.push(['XADD', key, '1-0', 'gate', 'seed'], ['XTRIM', key, 'MAXLEN', '0']);
+        const tail = entries.length === 0 ? '1-0' : `${entries[entries.length - 1].ms}-${entries[entries.length - 1].seq}`;
+        if (tail !== `${last.ms}-${last.seq}`) commands.push(['XSETID', key, `${last.ms}-${last.seq}`]);
+    }
     else throw new Error(`unsupported setup kind ${step.kind}`);
     if (step.expiresAt !== undefined) commands.push(['PEXPIREAT', key, String(step.expiresAt)]);
     return commands;
@@ -528,6 +539,36 @@ function decodeZSet(body) {
         offset += 8;
     }
     return entries;
+}
+
+/** Decodes the stream body: top id, then one id plus field pairs per entry. */
+function decodeStream(body) {
+    const last = { ms: body.readBigUInt64LE(0), seq: body.readBigUInt64LE(8) };
+    const count = body.readUInt32LE(16);
+    const entries = [];
+    let offset = 20;
+    for (let index = 0; index < count; index += 1) {
+        const ms = body.readBigUInt64LE(offset);
+        offset += 8;
+        const seq = body.readBigUInt64LE(offset);
+        offset += 8;
+        const fieldCount = body.readUInt32LE(offset);
+        offset += 4;
+        const fields = [];
+        for (let pair = 0; pair < fieldCount; pair += 1) {
+            const fieldLength = body.readUInt32LE(offset);
+            offset += 4;
+            const field = body.subarray(offset, offset + fieldLength).toString();
+            offset += fieldLength;
+            const valueLength = body.readUInt32LE(offset);
+            offset += 4;
+            const value = body.subarray(offset, offset + valueLength).toString();
+            offset += valueLength;
+            fields.push([field, value]);
+        }
+        entries.push({ ms, seq, fields });
+    }
+    return { last, entries };
 }
 
 /** Compares one expected reply spec with the frame the real server sent. */
@@ -590,6 +631,31 @@ async function checkEffect(link, step) {
         return reply.kind === 'int' && reply.value > 0 ? null : `PTTL expected a live expiry, read ${describe(reply)}`;
     }
     if (step.call !== 'get_kind') throw new Error(`unsupported effect step ${step.call}`);
+    if (step.kind === 'stream') {
+        const expected = decodeStream(Buffer.from(step.expect.bytes, 'hex'));
+        const reply = await link.send(['XRANGE', key, '-', '+']);
+        const read = reply.kind === 'array'
+            ? reply.value.map(entry => ({
+                id: entry.value[0].value,
+                fields: entry.value[1].value.map(item => item.value),
+            }))
+            : [];
+        const want = expected.entries.map(entry => ({
+            id: `${entry.ms}-${entry.seq}`,
+            fields: entry.fields.flatMap(([field, value]) => [field, value]),
+        }));
+        if (JSON.stringify(read) !== JSON.stringify(want)) {
+            return `XRANGE expected ${JSON.stringify(want)}, read ${JSON.stringify(read)}`;
+        }
+        const info = await link.send(['XINFO', 'STREAM', key]);
+        if (info.kind !== 'array') return `XINFO expected an array, read ${describe(info)}`;
+        let top = null;
+        for (let index = 0; index + 1 < info.value.length; index += 2) {
+            if (info.value[index].value === 'last-generated-id') top = info.value[index + 1].value;
+        }
+        const expectedTop = `${expected.last.ms}-${expected.last.seq}`;
+        return top === expectedTop ? null : `XINFO last-generated-id expected ${expectedTop}, read ${JSON.stringify(top)}`;
+    }
     const reply = await link.send(['LRANGE', key, '0', '-1']);
     if (step.expect === null) {
         return reply.kind === 'array' && reply.value.length === 0 ? null : `expected an empty list, read ${describe(reply)}`;

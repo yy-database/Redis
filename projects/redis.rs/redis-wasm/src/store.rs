@@ -21,7 +21,7 @@ pub const NAMESPACE_PREFIX: &str = "redis:db";
 /// The string kind keeps the database namespace so existing data needs no
 /// migration, while every other kind adds a suffix of its own. The namespaces
 /// never overlap, so the same logical key can only be read as one kind at a time.
-pub const KINDS: [&str; 5] = ["", "hash", "list", "set", "zset"];
+pub const KINDS: [&str; 6] = ["", "hash", "list", "set", "zset", "stream"];
 
 /// One `.yyds` catalog plus one `.yykv` shard on disk.
 ///
@@ -433,9 +433,9 @@ pub fn namespace(db: u8) -> String {
 /// Namespace label for one value kind inside a database.
 ///
 /// The string kind keeps the database namespace so existing data needs no
-/// migration, while `hash`, `list`, `set` and `zset` add a suffix of their own.
-/// The five namespaces never overlap, so the same logical key can only be read
-/// as one kind at a time.
+/// migration, while `hash`, `list`, `set`, `zset` and `stream` add a suffix of
+/// their own. The six namespaces never overlap, so the same logical key can only
+/// be read as one kind at a time.
 pub fn kind_namespace(db: u8, kind: &str) -> String {
     if kind.is_empty() {
         namespace(db)
