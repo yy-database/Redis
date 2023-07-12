@@ -25,7 +25,8 @@ if (target === undefined) {
 
 execFileSync('cargo', ['build', '--manifest-path', manifest, '-p', 'redis-napi'], { stdio: 'inherit' });
 
-const output = join(root, 'projects', 'redis.rs', 'target', 'debug', target.artifact);
+const targetDir = process.env.CARGO_TARGET_DIR ?? join(root, 'projects', 'redis.rs', 'target');
+const output = join(targetDir, 'debug', target.artifact);
 const destination = join(root, 'projects', 'redis.ts', 'platforms', `redis-${target.name}`, 'lib', `redis-${target.name}.node`);
 mkdirSync(dirname(destination), { recursive: true });
 copyFileSync(output, destination);
