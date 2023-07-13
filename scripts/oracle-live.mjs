@@ -631,6 +631,42 @@ async function checkEffect(link, step) {
         return reply.kind === 'int' && reply.value > 0 ? null : `PTTL expected a live expiry, read ${describe(reply)}`;
     }
     if (step.call !== 'get_kind') throw new Error(`unsupported effect step ${step.call}`);
+    if (step.kind === 'hash') {
+        const expected = step.expect === null
+            ? []
+            : decodeChunks(Buffer.from(step.expect.bytes, 'hex')).map(chunk => chunk.toString('utf8'));
+        const reply = await link.send(['HGETALL', key]);
+        const read = reply.kind === 'array' ? reply.value.map(frame => frame.value) : [];
+        return JSON.stringify(read) === JSON.stringify(expected)
+            ? null
+            : `HGETALL expected ${JSON.stringify(expected)}, read ${JSON.stringify(read)}`;
+    }
+    if (step.kind === 'set') {
+        const expected = step.expect === null
+            ? []
+            : decodeChunks(Buffer.from(step.expect.bytes, 'hex')).map(chunk => chunk.toString('utf8'));
+        // The real server returns members in its own order, so compare as a set.
+        expected.sort();
+        const reply = await link.send(['SMEMBERS', key]);
+        const read = reply.kind === 'array' ? reply.value.map(frame => frame.value) : [];
+        read.sort();
+        return JSON.stringify(read) === JSON.stringify(expected)
+            ? null
+            : `SMEMBERS expected ${JSON.stringify(expected)}, read ${JSON.stringify(read)}`;
+    }
+    if (step.kind === 'zset') {
+        const expected = step.expect === null ? [] : decodeZSet(Buffer.from(step.expect.bytes, 'hex'));
+        const reply = await link.send(['ZRANGE', key, '0', '-1', 'WITHSCORES']);
+        if (reply.kind !== 'array') return `ZRANGE expected an array, read ${describe(reply)}`;
+        const read = [];
+        for (let index = 0; index + 1 < reply.value.length; index += 2) {
+            read.push([reply.value[index].value, Number(reply.value[index + 1].value)]);
+        }
+        const want = expected.map(([member, score]) => [member.toString('utf8'), score]);
+        return JSON.stringify(read) === JSON.stringify(want)
+            ? null
+            : `ZRANGE expected ${JSON.stringify(want)}, read ${JSON.stringify(read)}`;
+    }
     if (step.kind === 'stream') {
         const expected = decodeStream(Buffer.from(step.expect.bytes, 'hex'));
         const reply = await link.send(['XRANGE', key, '-', '+']);
