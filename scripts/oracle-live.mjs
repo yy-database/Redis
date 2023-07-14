@@ -195,8 +195,68 @@ async function blockingScenario() {
     observed.timeout_frame = timedOut.kind;
     observed.timeout_elapsed_ms = Date.now() - started;
 
+    // XREAD parks on a stream and must return the entries appended after it parked.
+    const problems = [];
+    const expectRows = (name, rows, expected) => {
+        const actual = JSON.stringify(rows);
+        if (actual !== JSON.stringify(expected)) {
+            problems.push(`${name}: expected ${JSON.stringify(expected)}, read ${JSON.stringify(rows)}`);
+        }
+    };
+
+    await third.send(['XADD', 'xr', '1-1', 'seed', '1']);
+    const parkedRead = first.send(['XREAD', 'BLOCK', '0', 'STREAMS', 'xr', '$']);
+    await sleep(100);
+    await third.send(['XADD', 'xr', '2-2', 'next', '2']);
+    observed.xread_dollar = readStreamRows(await parkedRead);
+    expectRows('xread dollar', observed.xread_dollar, [{ key: 'xr', ids: ['2-2'] }]);
+
+    const parkedMulti = first.send(['XREAD', 'BLOCK', '0', 'STREAMS', 'm1', 'm2', '$', '$']);
+    await sleep(100);
+    await third.send(['XADD', 'm2', '1-1', 'k', 'v']);
+    observed.xread_multi = readStreamRows(await parkedMulti);
+    expectRows('xread multi', observed.xread_multi, [{ key: 'm2', ids: ['1-1'] }]);
+
+    const readTimeoutAt = Date.now();
+    observed.xread_timeout = readStreamRows(await first.send(['XREAD', 'BLOCK', '40', 'STREAMS', 'xmiss', '0']));
+    observed.xread_timeout_elapsed_ms = Date.now() - readTimeoutAt;
+    if (observed.xread_timeout.length !== 0) problems.push(`xread timeout returned rows ${JSON.stringify(observed.xread_timeout)}`);
+    if (observed.xread_timeout_elapsed_ms < 20) problems.push(`xread timeout returned after ${observed.xread_timeout_elapsed_ms}ms`);
+
+    const parkedTrimmed = first.send(['XREAD', 'BLOCK', '80', 'STREAMS', 'xtrimq', '0']);
+    await sleep(120);
+    await third.send(['XADD', 'xtrimq', 'MAXLEN', '0', '1-1', 'f', 'v']);
+    observed.xread_trimmed = readStreamRows(await parkedTrimmed);
+    expectRows('xread trimmed append', observed.xread_trimmed, []);
+
+    await third.send(['XADD', 'xs', '7-7', 'x', '1']);
+    const parkedSnapshot = first.send(['XREAD', 'BLOCK', '0', 'STREAMS', 'xs', '$']);
+    await sleep(100);
+    await third.send(['XADD', 'xs', '8-8', 'y', '2']);
+    observed.xread_snapshot = readStreamRows(await parkedSnapshot);
+    expectRows('xread dollar snapshot', observed.xread_snapshot, [{ key: 'xs', ids: ['8-8'] }]);
+
+    const plusAt = Date.now();
+    observed.xread_plus = readStreamRows(await first.send(['XREAD', 'BLOCK', '0', 'STREAMS', 'xr', '+']));
+    observed.xread_plus_elapsed_ms = Date.now() - plusAt;
+    expectRows('xread plus', observed.xread_plus, [{ key: 'xr', ids: ['2-2'] }]);
+    if (observed.xread_plus_elapsed_ms >= 100) problems.push(`xread plus parked for ${observed.xread_plus_elapsed_ms}ms`);
+
     for (const link of links) link.close();
     console.log(JSON.stringify(observed, null, 2));
+    if (problems.length > 0) {
+        for (const problem of problems) console.log(`blocking scenario: ${problem}`);
+        process.exitCode = 1;
+    }
+}
+
+/** Reads the `[key, entries]` rows of an `XREAD` reply. */
+function readStreamRows(frame) {
+    if (frame.kind !== 'array') return [];
+    return frame.value.map(row => ({
+        key: row.value[0].value,
+        ids: row.value[1].value.map(entry => entry.value[0].value),
+    }));
 }
 
 /** Reads a `[key, element]` pair from a blocking pop reply. */

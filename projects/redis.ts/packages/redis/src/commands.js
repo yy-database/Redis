@@ -1304,6 +1304,9 @@ function plan(store, session, name, args) {
         case 'xtrim':
             return planStream(store, session, name, args);
 
+        case 'xread':
+            return planXRead(store, session, args);
+
         case 'pfadd':
         case 'pfcount':
         case 'pfmerge':
@@ -3874,8 +3877,104 @@ function parseTrimOptions(args, start, style) {
     return { nomkstream, maxlen, minid, index };
 }
 
+const STREAM_UNBALANCED = "ERR Unbalanced 'xread' list of streams: for each stream key an ID, '+', or '$' must be specified.";
+const BLOCK_NOT_INTEGER = 'ERR timeout is not an integer or out of range';
+const BLOCK_NEGATIVE = 'ERR timeout is negative';
+
 /**
- * Plans `XADD`, `XLEN`, `XRANGE`, `XREVRANGE`, `XDEL` and `XTRIM`.
+ * Plans one `XREAD` call.
+ *
+ * `$` snapshots the last generated id and `+` snapshots the last entry id at the
+ * moment the command arrives, inclusive of that entry. Both are resolved before
+ * the command may park, so appends that wake a blocked reader cannot move the
+ * snapshot past the entries it should return.
+ */
+function planXRead(store, session, args) {
+    const db = session.db;
+    if (args.length < 4) return { error: wrongArity('xread') };
+    let count = null;
+    let timeoutMs = null;
+    let index = 1;
+    for (;;) {
+        const token = text(args[index] ?? '').toUpperCase();
+        if (token === 'COUNT') {
+            const value = args[index + 1] === undefined ? null : parseInteger(text(args[index + 1]));
+            if (value === null) return { error: integerError() };
+            count = value <= 0 ? null : value;
+            index += 2;
+            continue;
+        }
+        if (token === 'BLOCK') {
+            const value = args[index + 1] === undefined ? null : parseInteger(text(args[index + 1]));
+            if (value === null) return { error: replyError(BLOCK_NOT_INTEGER) };
+            if (value < 0) return { error: replyError(BLOCK_NEGATIVE) };
+            timeoutMs = value;
+            index += 2;
+            continue;
+        }
+        if (token === 'STREAMS') break;
+        return { error: replyError('ERR syntax error') };
+    }
+
+    const tokens = args.slice(index + 1);
+    if (tokens.length < 2) return { error: wrongArity('xread') };
+    if (tokens.length % 2 !== 0) return { error: replyError(STREAM_UNBALANCED) };
+    const half = tokens.length / 2;
+    const keys = tokens.slice(0, half);
+    const cursors = [];
+    for (let position = 0; position < half; position += 1) {
+        const raw = text(tokens[half + position]);
+        if (raw === '$' || raw === '+') {
+            const kind = kindOf(store, db, keys[position]);
+            const stream = kind === 'stream' ? readStream(store, db, keys[position]) : null;
+            const top = stream === null || stream.error === true
+                ? { ms: 0n, seq: 0n }
+                : raw === '+' && stream.entries.length > 0
+                    ? stream.entries[stream.entries.length - 1]
+                    : stream.last;
+            cursors.push({ id: { ms: top.ms, seq: top.seq }, inclusive: raw === '+' });
+            continue;
+        }
+        const id = parseExplicitStreamId(raw);
+        if (id === null) return { error: replyError(STREAM_ID_ERROR) };
+        cursors.push({ id, inclusive: false });
+    }
+
+    const attempt = () => {
+        const rows = [];
+        for (let position = 0; position < keys.length; position += 1) {
+            const key = keys[position];
+            const kind = kindOf(store, db, key);
+            if (kind !== null && kind !== 'stream') return wrongType();
+            if (kind === null) continue;
+            const stream = readStream(store, db, key);
+            if (stream === null || stream.error === true) return wrongType();
+            const cursor = cursors[position];
+            const selected = [];
+            for (const entry of stream.entries) {
+                const order = compareStreamIds(entry, cursor.id);
+                if (cursor.inclusive ? order < 0 : order <= 0) continue;
+                selected.push(entry);
+                if (count !== null && selected.length >= count) break;
+            }
+            if (selected.length === 0) continue;
+            rows.push(array([
+                bulk(key),
+                array(selected.map(entry => array([
+                    bulk(`${entry.ms}-${entry.seq}`),
+                    array(entry.fields.flatMap(([field, value]) => [bulk(field), bulk(value)])),
+                ]))),
+            ]));
+        }
+        return rows.length === 0 ? null : array(rows);
+    };
+
+    if (timeoutMs === null) return { run: () => attempt() ?? nullArray() };
+    return blockingPlan(db, keys, timeoutMs, attempt, nullArray());
+}
+
+/**
+ * Plans `XADD`, `XLEN`, `XRANGE`, `XREVRANGE`, `XDEL`, `XTRIM` and `XREAD`.
  *
  * Consumer groups land in a later slice, so `XGROUP`, `XACK`, `XPENDING` and
  * `XCLAIM` still answer the unknown command error.
@@ -4011,6 +4110,7 @@ function planStream(store, session, name, args) {
             for (let pair = 0; pair < pairs.length; pair += 2) fields.push([pairs[pair], pairs[pair + 1]]);
             entries.push({ ms: id.ms, seq: id.seq, fields });
             rewriteKind(store, db, 'stream', key, encodeStream(trimStream(entries, parsed.maxlen, parsed.minid).kept, id));
+            notifyPush(session, db, key);
             return bulk(`${id.ms}-${id.seq}`);
         },
     };

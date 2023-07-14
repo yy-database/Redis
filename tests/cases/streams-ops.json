@@ -2879,6 +2879,1993 @@
           }
         }
       ]
+    },
+    {
+      "id": "command.xread.from-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.count-one",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "1",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "0",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.count-negative",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "-1",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.after-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "1-1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.at-top",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "3-3"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.dollar",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "$"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.plus",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "+"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.plus-count-one",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "1",
+        "STREAMS",
+        "s",
+        "+"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.bare-millisecond",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.multi-one-data",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "t",
+        "2-2",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.multi-none",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "u",
+        "v",
+        "0",
+        "0"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xread.duplicate-keys",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "s",
+        "0",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.empty-stream-dollar",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "empty",
+        "$"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "656d707479",
+          "valueHex": "0900000000000000090000000000000000000000"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.empty-stream-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "empty",
+        "0"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "656d707479",
+          "valueHex": "0900000000000000090000000000000000000000"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "str",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "737472",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.invalid-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "x"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.minus-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "-"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.exclusive-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "(1-1"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.overflow-id",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "18446744073709551616-0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Invalid stream ID specified as stream command argument"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.unbalanced",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s",
+        "t",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR Unbalanced 'xread' list of streams: for each stream key an ID, '+', or '$' must be specified."
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.missing-ids",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "STREAMS",
+        "s"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'xread' command"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.syntax",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "BOGUS",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.count-not-integer",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "abc",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.block-not-integer",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "BLOCK",
+        "30.5",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR timeout is not an integer or out of range"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.block-negative",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "BLOCK",
+        "-1",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR timeout is negative"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.block-timeout",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "BLOCK",
+        "20",
+        "STREAMS",
+        "gone",
+        "0"
+      ],
+      "reply": {
+        "type": "null-array"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.xread.block-data-present",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "BLOCK",
+        "10",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          51,
+                          45,
+                          51
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              99
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              51
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.duplicate-count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "1",
+        "COUNT",
+        "2",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          50,
+                          45,
+                          50
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              98
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              50
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.xread.count-before-block",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "XREAD",
+        "COUNT",
+        "1",
+        "BLOCK",
+        "10",
+        "STREAMS",
+        "s",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115
+                ]
+              },
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "array",
+                    "value": [
+                      {
+                        "type": "bulk",
+                        "bytes": [
+                          49,
+                          45,
+                          49
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "value": [
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              97
+                            ]
+                          },
+                          {
+                            "type": "bulk",
+                            "bytes": [
+                              49
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "stream",
+          "keyHex": "73",
+          "valueHex": "0300000000000000030000000000000003000000010000000000000001000000000000000100000001000000610100000031020000000000000002000000000000000100000001000000620100000032030000000000000003000000000000000100000001000000630100000033"
+        }
+      ],
+      "effect": []
     }
   ]
 }
