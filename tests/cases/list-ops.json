@@ -158,7 +158,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["LMPOP", "3", "l1", "LEFT"],
-      "reply": { "type": "error", "value": "ERR Number of keys can't be greater than number of args" },
+      "reply": { "type": "error", "value": "ERR syntax error" },
       "setup": [],
       "effect": []
     },

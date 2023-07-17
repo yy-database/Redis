@@ -213,6 +213,73 @@ function session() {
     return { db: 0, protocol: 2, queued: null, name: '' };
 }
 
+/** Executes one scan-family command, returning its cursor and page tokens in hex. */
+function scanPage(store, entry, args) {
+    const result = execute(store, session(), args.map(value => Buffer.from(value)));
+    assert.equal(result.reply.type, 'array', `${entry.id}: expected a scan reply array`);
+    assert.equal(result.reply.value.length, 2, `${entry.id}: expected a cursor and an element array`);
+    const [cursorSpec, elementsSpec] = result.reply.value;
+    assert.equal(cursorSpec.type, 'bulk', `${entry.id}: expected a bulk cursor`);
+    const cursor = Buffer.from(cursorSpec.bytes).toString('utf8');
+    assert.match(cursor, /^\d+$/, `${entry.id}: expected a canonical cursor, read '${cursor}'`);
+    assert.equal(elementsSpec.type, 'array', `${entry.id}: expected an element array`);
+    const elements = elementsSpec.value.map(spec => {
+        assert.equal(spec.type, 'bulk', `${entry.id}: expected bulk elements`);
+        return Buffer.from(spec.bytes).toString('hex');
+    });
+    return { cursor, elements };
+}
+
+/** Checks one page against the declared universe and the no-repeat-in-page rule. */
+function checkScanPage(entry, page, label) {
+    const seen = new Set();
+    for (const element of page.elements) {
+        assert.ok(entry.scanContract.universe.includes(element), `${entry.id}: ${label} returned '${element}' outside the declared universe`);
+        assert.ok(!seen.has(element), `${entry.id}: ${label} repeated '${element}' inside one page`);
+        seen.add(element);
+    }
+}
+
+/**
+ * Asserts the cursor contract a live-compatible scan obeys.
+ *
+ * The exact cursor numbers are implementation details of the server's hash
+ * table, so only the semantics are checked: cursor 0 ends the iteration, every
+ * page stays inside the universe, and replaying from cursor 0 reaches every
+ * member exactly at least once (repeats across pages are allowed).
+ */
+function assertScanContract(entry, store) {
+    checkScanPage(entry, scanPage(store, entry, entry.argsText), 'the requested page');
+    const args = entry.argsText.slice();
+    const index = entry.scanContract.cursorIndex;
+    args[index] = '0';
+    const collected = new Set();
+    for (let step = 0; step < 1000; step += 1) {
+        const page = scanPage(store, entry, args);
+        checkScanPage(entry, page, 'a traversal page');
+        for (const element of page.elements) collected.add(element);
+        if (page.cursor === '0') {
+            for (const element of entry.scanContract.universe) {
+                assert.ok(collected.has(element), `${entry.id}: traversal from cursor 0 never returned '${element}'`);
+            }
+            return;
+        }
+        args[index] = page.cursor;
+    }
+    assert.fail(`${entry.id}: scan traversal never reached cursor 0`);
+}
+
+/** Compares one reply spec, honouring the case's unordered-set marker. */
+function assertReply(entry, observed) {
+    if (entry.replyUnordered !== true) {
+        assert.deepEqual(observed, entry.reply);
+        return;
+    }
+    assert.equal(observed.type, entry.reply.type, `${entry.id}: reply kind`);
+    const sorted = spec => spec.value.map(item => JSON.stringify(item)).sort();
+    assert.deepEqual(sorted(observed), sorted(entry.reply), `${entry.id}: unordered members`);
+}
+
 function runCase(entry) {
     switch (entry.op) {
         case 'encode_command': {
@@ -330,7 +397,12 @@ function runCase(entry) {
                 return { steps: [], replyErrorThrown: cause.message };
             }
             if (entry.sides === undefined || entry.sides.includes('ts')) {
-                assert.deepEqual(result.reply, entry.reply);
+                if (entry.scanContract === undefined) {
+                    assertReply(entry, result.reply);
+                }
+                else {
+                    assertScanContract(entry, store);
+                }
             }
             const steps = runSteps(store, entry.effect, directory);
             return { steps };

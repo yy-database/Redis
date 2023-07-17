@@ -129,6 +129,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SUNION", "a1", "a2"],
+      "replyUnordered": true,
       "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [99] }, { "type": "bulk", "bytes": [100] }] },
       "setup": [
         { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" },
@@ -142,6 +143,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SUNION", "a1", "a9"],
+      "replyUnordered": true,
       "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }] },
       "setup": [
         { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
@@ -455,7 +457,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SSCAN", "a1", "1", "COUNT", "1"],
-      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [48] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [98] }] }] },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 2, "universe": ["61", "62"] },
       "setup": [
         { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
       ],
@@ -467,7 +470,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SSCAN", "a1", "0", "MATCH", "a*", "COUNT", "2"],
-      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [50] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] }] },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 2, "universe": ["61"] },
       "setup": [
         { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "010000006101000000620100000063" }
       ],

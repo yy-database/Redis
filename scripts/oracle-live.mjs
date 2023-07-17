@@ -468,9 +468,16 @@ async function main() {
             await link.send(['SELECT', String(entry.db ?? 0)]);
             await link.send(['FLUSHALL']);
             await applySetup(entry);
+            if (entry.scanContract !== undefined) {
+                checked += 1;
+                for (const problem of await replayScanContract(link, entry)) {
+                    problems.push(`${table}/${entry.id}: ${problem}`);
+                }
+                continue;
+            }
             const reply = await link.send(entry.argsText);
             checked += 1;
-            const mismatch = compareReply(entry.reply, reply);
+            const mismatch = compareReply(entry.reply, reply, PROTOCOL, entry.replyUnordered === true);
             if (mismatch !== null) problems.push(`${table}/${entry.id}: reply ${mismatch}`);
             for (const step of entry.effect ?? []) {
                 const diff = await checkEffect(link, step);
@@ -640,8 +647,87 @@ function decodeStream(body) {
     return { last, entries };
 }
 
+/** Renders one expected reply spec the way {@link describe} renders a frame. */
+function describeSpec(spec) {
+    if (spec.type === 'bulk') return JSON.stringify(Buffer.from(spec.bytes).toString('utf8'));
+    if (spec.type === 'array') return `[${spec.value.map(describeSpec).join(', ')}]`;
+    if (spec.type === 'error') return `error ${JSON.stringify(spec.value)}`;
+    if (spec.type === 'simple') return `simple ${JSON.stringify(spec.value)}`;
+    if (spec.type === 'int') return `int ${JSON.stringify(spec.value)}`;
+    return spec.type;
+}
+
+/** Reads one scan page from the server, `{cursor, elements}` or `{problem}`. */
+async function readScanPage(link, entry, args) {
+    const reply = await link.send(args);
+    if (reply.kind !== 'array' || reply.value.length !== 2) {
+        return { problem: `expected a cursor and an element array, read ${describe(reply)}` };
+    }
+    const [cursorFrame, elementsFrame] = reply.value;
+    if (cursorFrame.kind !== 'bulk' || !/^\d+$/.test(cursorFrame.value)) {
+        return { problem: `expected a canonical cursor, read ${describe(cursorFrame)}` };
+    }
+    if (elementsFrame.kind !== 'array') {
+        return { problem: `expected an element array, read ${describe(elementsFrame)}` };
+    }
+    const elements = [];
+    for (const frame of elementsFrame.value) {
+        if (frame.kind !== 'bulk') return { problem: `expected bulk elements, read ${describe(frame)}` };
+        elements.push(Buffer.from(frame.value, 'utf8').toString('hex'));
+    }
+    return { cursor: cursorFrame.value, elements };
+}
+
+/**
+ * Replays one scan case as a cursor contract.
+ *
+ * The server's cursor numbers index its own hash table buckets, so only the
+ * semantics are comparable: every page stays inside the declared universe,
+ * cursor 0 ends the iteration, and replaying from cursor 0 reaches every member
+ * at least once (repeats across pages are allowed).
+ */
+async function replayScanContract(link, entry) {
+    const problems = [];
+    const checkPage = (page, label) => {
+        if (page.problem !== undefined) {
+            problems.push(`${label} ${page.problem}`);
+            return false;
+        }
+        const seen = new Set();
+        for (const element of page.elements) {
+            if (!entry.scanContract.universe.includes(element)) {
+                problems.push(`${label} returned '${element}' outside the declared universe`);
+            }
+            if (seen.has(element)) problems.push(`${label} repeated '${element}' inside one page`);
+            seen.add(element);
+        }
+        return true;
+    };
+    checkPage(await readScanPage(link, entry, entry.argsText), 'the requested page');
+    const args = entry.argsText.slice();
+    const index = entry.scanContract.cursorIndex;
+    args[index] = '0';
+    const collected = new Set();
+    for (let step = 0; step < 1000; step += 1) {
+        const page = await readScanPage(link, entry, args);
+        if (!checkPage(page, 'a traversal page')) break;
+        for (const element of page.elements) collected.add(element);
+        if (page.cursor === '0') {
+            for (const element of entry.scanContract.universe) {
+                if (!collected.has(element)) {
+                    problems.push(`traversal from cursor 0 never returned '${element}'`);
+                }
+            }
+            return problems;
+        }
+        args[index] = page.cursor;
+    }
+    problems.push('traversal never reached cursor 0');
+    return problems;
+}
+
 /** Compares one expected reply spec with the frame the real server sent. */
-function compareReply(expected, actual, protocol = PROTOCOL) {
+function compareReply(expected, actual, protocol = PROTOCOL, unordered = false) {
     if (expected.type === 'null-array') {
         // RESP3 has no null array, so the server answers `_` instead of `*-1`.
         const kind = protocol >= 3 ? 'null' : 'null-array';
@@ -666,6 +752,14 @@ function compareReply(expected, actual, protocol = PROTOCOL) {
     }
     if (expected.type === 'array') {
         if (actual.kind !== 'array') return `expected an array, read ${describe(actual)}`;
+        if (unordered) {
+            // Set-returning commands inherit the server's hash table order.
+            const wanted = expected.value.map(describeSpec).sort();
+            const seen = actual.value.map(describe).sort();
+            return JSON.stringify(wanted) === JSON.stringify(seen)
+                ? null
+                : `expected members ${JSON.stringify(wanted)}, read ${JSON.stringify(seen)}`;
+        }
         if (actual.value.length !== expected.value.length) {
             return `expected ${expected.value.length} element(s), read ${actual.value.length}`;
         }

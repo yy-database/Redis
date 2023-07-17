@@ -513,16 +513,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SCAN", "0", "COUNT", "2"],
-      "reply": {
-        "type": "array",
-        "value": [
-          { "type": "bulk", "bytes": [50] },
-          {
-            "type": "array",
-            "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [98] }]
-          }
-        ]
-      },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 1, "universe": ["61", "62", "63", "64", "65"] },
       "setup": [
         { "call": "set", "db": 0, "keyHex": "61", "valueHex": "76" },
         { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "62", "valueHex": "01000000660100000076" },
@@ -538,10 +530,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SCAN", "0", "MATCH", "c", "COUNT", "2"],
-      "reply": {
-        "type": "array",
-        "value": [{ "type": "bulk", "bytes": [50] }, { "type": "array", "value": [] }]
-      },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 1, "universe": ["63"] },
       "setup": [
         { "call": "set", "db": 0, "keyHex": "61", "valueHex": "76" },
         { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "62", "valueHex": "01000000660100000076" },
@@ -557,13 +547,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SCAN", "2", "MATCH", "c", "COUNT", "2"],
-      "reply": {
-        "type": "array",
-        "value": [
-          { "type": "bulk", "bytes": [52] },
-          { "type": "array", "value": [{ "type": "bulk", "bytes": [99] }] }
-        ]
-      },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 1, "universe": ["63"] },
       "setup": [
         { "call": "set", "db": 0, "keyHex": "61", "valueHex": "76" },
         { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "62", "valueHex": "01000000660100000076" },
@@ -579,13 +564,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["SCAN", "4", "COUNT", "2"],
-      "reply": {
-        "type": "array",
-        "value": [
-          { "type": "bulk", "bytes": [48] },
-          { "type": "array", "value": [{ "type": "bulk", "bytes": [101] }] }
-        ]
-      },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 1, "universe": ["61", "62", "63", "64", "65"] },
       "setup": [
         { "call": "set", "db": 0, "keyHex": "61", "valueHex": "76" },
         { "call": "set_kind", "db": 0, "kind": "hash", "keyHex": "62", "valueHex": "01000000660100000076" },

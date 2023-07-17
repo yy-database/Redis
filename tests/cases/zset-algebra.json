@@ -1048,7 +1048,7 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR numkeys should be greater than 0"
+        "value": "ERR at least 1 input key is needed for 'zintercard' command"
       },
       "setup": [],
       "effect": []
@@ -1092,7 +1092,7 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR value is not an integer or out of range"
+        "value": "ERR LIMIT can't be negative"
       },
       "setup": [],
       "effect": []

@@ -472,7 +472,8 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["ZSCAN", "z1", "0", "COUNT", "2"],
-      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [50] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }, { "type": "bulk", "bytes": [49] }, { "type": "bulk", "bytes": [98] }, { "type": "bulk", "bytes": [50] }] }] },
+      "oracleLimitation": "scan-cursor",
+      "scanContract": { "cursorIndex": 2, "universe": ["61", "31", "62", "32", "63", "33", "64", "34"] },
       "setup": [
         { "call": "set_kind", "db": 0, "kind": "zset", "keyHex": "7a31", "valueHex": "040000000100000061000000000000f03f010000006200000000000000400100000063000000000000084001000000640000000000001040" }
       ],
