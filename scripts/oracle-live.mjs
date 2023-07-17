@@ -436,9 +436,18 @@ async function main() {
     };
     const problems = [];
     let checked = 0;
+    let storeOnly = 0;
     for (const table of TABLES.length > 0 ? TABLES : ['blocking-ops']) {
         const payload = JSON.parse(readFileSync(join(ROOT, 'tests', 'cases', `${table}.json`), 'utf8'));
         for (const entry of payload.cases) {
+            if (entry.op === 'store') {
+                // Storage-only cases have no wire command to replay.
+                storeOnly += 1;
+                continue;
+            }
+            if (entry.op !== 'command' && entry.op !== 'dispatch') {
+                throw new Error(`${table}/${entry.id}: unsupported op ${entry.op}`);
+            }
             if (entry.op === 'dispatch') {
                 // `RESET` drops subscriptions in the real server and returns the
                 // connection to RESP2, so a case cannot leak into the next one.
@@ -477,7 +486,7 @@ async function main() {
         process.exitCode = 1;
         return;
     }
-    console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches`);
+    console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches, ${storeOnly} store-only case(s) skipped`);
 }
 
 /** Replays a multi-step dispatcher case, comparing replies and push frames. */
@@ -678,33 +687,78 @@ function describe(frame) {
 
 /** Replays one post-state check and compares it with the expectation. */
 async function checkEffect(link, step) {
+    if (step.call === 'size') {
+        const reply = await link.send(['DBSIZE']);
+        return reply.value === step.expect.int ? null : `DBSIZE expected ${step.expect.int}, read ${describe(reply)}`;
+    }
     const key = Buffer.from(step.keyHex, 'hex').toString('utf8');
     if (step.call === 'exists_kind') {
         const reply = await link.send(['TYPE', key]);
-        const expected = step.expect.bool
-            ? (step.kind === '' ? 'string' : step.kind)
-            : 'none';
-        return reply.value === expected ? null : `TYPE expected ${expected}, read ${describe(reply)}`;
+        const target = step.kind === '' ? 'string' : step.kind;
+        const present = reply.kind === 'simple' && reply.value === target;
+        return present === step.expect.bool
+            ? null
+            : `TYPE expected ${step.expect.bool ? target : `not ${target}`}, read ${describe(reply)}`;
     }
     if (step.call === 'deadline_kind') {
         const reply = await link.send(['PTTL', key]);
-        return reply.kind === 'int' && reply.value > 0 ? null : `PTTL expected a live expiry, read ${describe(reply)}`;
+        // A live expiry replaces the absolute deadline this repository stores.
+        const observed = reply.kind === 'int' && reply.value > 0;
+        const expected = step.expect !== null;
+        return observed === expected
+            ? null
+            : `PTTL expected ${expected ? 'a live expiry' : 'no deadline'}, read ${describe(reply)}`;
+    }
+    if (step.call === 'deadline_set') {
+        const reply = await link.send(['PTTL', key]);
+        const observed = reply.kind === 'int' && reply.value >= 0;
+        return observed === step.expect.bool
+            ? null
+            : `PTTL expected a deadline of ${step.expect.bool}, read ${describe(reply)}`;
+    }
+    if (step.call === 'get') {
+        const expected = Buffer.from(step.expect.bytes, 'hex').toString('utf8');
+        const reply = await link.send(['GET', key]);
+        return reply.kind === 'bulk' && reply.value === expected
+            ? null
+            : `GET expected ${JSON.stringify(expected)}, read ${describe(reply)}`;
     }
     if (step.call !== 'get_kind') throw new Error(`unsupported effect step ${step.call}`);
+    const target = step.kind === '' ? 'string' : step.kind;
+    const typeReply = await link.send(['TYPE', key]);
+    const live = typeReply.kind === 'simple' ? typeReply.value : 'none';
+    const expectedEmpty = step.expect == null || step.expect.bytes === undefined;
+    if (live !== target) {
+        // The shard keeps one namespace per kind, so another kind occupying the
+        // key is exactly the "this namespace is empty" case.
+        return expectedEmpty ? null : `expected a ${target} value, but the key holds ${live}`;
+    }
+    if (step.kind === '' || step.kind === 'string') {
+        const reply = await link.send(['GET', key]);
+        if (expectedEmpty) {
+            return reply.kind === 'null' ? null : `GET expected a missing string, read ${describe(reply)}`;
+        }
+        const expected = Buffer.from(step.expect.bytes, 'hex').toString('utf8');
+        return reply.kind === 'bulk' && reply.value === expected
+            ? null
+            : `GET expected ${JSON.stringify(expected)}, read ${describe(reply)}`;
+    }
     if (step.kind === 'hash') {
-        const expected = step.expect === null
-            ? []
-            : decodeChunks(Buffer.from(step.expect.bytes, 'hex')).map(chunk => chunk.toString('utf8'));
+        const expected = expectedEmpty ? [] : (decodeChunks(Buffer.from(step.expect.bytes, 'hex')) ?? []).map(chunk => chunk.toString('utf8'));
         const reply = await link.send(['HGETALL', key]);
         const read = reply.kind === 'array' ? reply.value.map(frame => frame.value) : [];
-        return JSON.stringify(read) === JSON.stringify(expected)
+        // Field order is a hash-table detail in the real server, so compare pairs.
+        const pairs = flat => {
+            const out = [];
+            for (let index = 0; index + 1 < flat.length; index += 2) out.push([flat[index], flat[index + 1]]);
+            return out.sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0));
+        };
+        return JSON.stringify(pairs(read)) === JSON.stringify(pairs(expected))
             ? null
             : `HGETALL expected ${JSON.stringify(expected)}, read ${JSON.stringify(read)}`;
     }
     if (step.kind === 'set') {
-        const expected = step.expect === null
-            ? []
-            : decodeChunks(Buffer.from(step.expect.bytes, 'hex')).map(chunk => chunk.toString('utf8'));
+        const expected = expectedEmpty ? [] : (decodeChunks(Buffer.from(step.expect.bytes, 'hex')) ?? []).map(chunk => chunk.toString('utf8'));
         // The real server returns members in its own order, so compare as a set.
         expected.sort();
         const reply = await link.send(['SMEMBERS', key]);
@@ -715,19 +769,27 @@ async function checkEffect(link, step) {
             : `SMEMBERS expected ${JSON.stringify(expected)}, read ${JSON.stringify(read)}`;
     }
     if (step.kind === 'zset') {
-        const expected = step.expect === null ? [] : decodeZSet(Buffer.from(step.expect.bytes, 'hex'));
+        const expected = expectedEmpty ? [] : decodeZSet(Buffer.from(step.expect.bytes, 'hex'));
         const reply = await link.send(['ZRANGE', key, '0', '-1', 'WITHSCORES']);
         if (reply.kind !== 'array') return `ZRANGE expected an array, read ${describe(reply)}`;
         const read = [];
         for (let index = 0; index + 1 < reply.value.length; index += 2) {
             read.push([reply.value[index].value, Number(reply.value[index + 1].value)]);
         }
-        const want = expected.map(([member, score]) => [member.toString('utf8'), score]);
-        return JSON.stringify(read) === JSON.stringify(want)
+        const ordered = list => list.sort((left, right) => (left[1] - right[1])
+            || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0));
+        const want = ordered(expected.map(([member, score]) => [member.toString('utf8'), score]));
+        return JSON.stringify(ordered(read)) === JSON.stringify(want)
             ? null
             : `ZRANGE expected ${JSON.stringify(want)}, read ${JSON.stringify(read)}`;
     }
     if (step.kind === 'stream') {
+        if (expectedEmpty) {
+            const reply = await link.send(['XRANGE', key, '-', '+']);
+            return reply.kind === 'array' && reply.value.length === 0
+                ? null
+                : `XRANGE expected no entries, read ${describe(reply)}`;
+        }
         const expected = decodeStream(Buffer.from(step.expect.bytes, 'hex'));
         const reply = await link.send(['XRANGE', key, '-', '+']);
         const read = reply.kind === 'array'
