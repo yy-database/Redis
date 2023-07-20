@@ -1425,6 +1425,24 @@ function plan(store, session, name, args) {
         case 'xread':
             return planXRead(store, session, args);
 
+        case 'xgroup':
+            return planXGroup(store, session, args);
+
+        case 'xack':
+            return planXAck(store, session, args);
+
+        case 'xpending':
+            return planXPending(store, session, args);
+
+        case 'xclaim':
+            return planXClaim(store, session, args);
+
+        case 'xautoclaim':
+            return planXAutoClaim(store, session, args);
+
+        case 'xinfo':
+            return planXInfo(store, session, args);
+
         case 'pfadd':
         case 'pfcount':
         case 'pfmerge':
@@ -3696,22 +3714,62 @@ function lookupSortPattern(store, db, pattern, element) {
  * sets and sorted sets use. The body starts with the `u64` halves of the last id
  * ever appended — `MAXLEN 0` empties the stream but never rewinds that id — then
  * `u32 count` and, per entry, the two id halves, a `u32` field count and
- * `u32`-framed field/value bytes. Consumer groups will extend this body in a
- * later segment.
+ * `u32`-framed field/value bytes. An optional trailer carries the append and
+ * deletion counters plus every consumer group and its pending entries.
  */
 const STREAM_NODE_SIZE = 100;
 const U64_MAX = (1n << 64n) - 1n;
 const STREAM_ID_ERROR = 'ERR Invalid stream ID specified as stream command argument';
 const STREAM_ID_EMPTY = 'ERR The ID specified in XADD must be greater than 0-0';
 const STREAM_ID_OLD = 'ERR The ID specified in XADD is equal or smaller than the target stream top item';
+/** Marks the optional trailer that carries counters and consumer-group state. */
+const STREAM_TRAILER = 0x5354524d;
+const ZERO_ID = { ms: 0n, seq: 0n };
 
-function encodeStream(entries, last) {
+/** Bytes one consumer group adds to the stream trailer. */
+function groupByteLength(group) {
+    let total = 4 + group.name.length + 16 + 8 + 4;
+    for (const consumer of group.consumers) {
+        if (consumer.name.length > MAX_CHUNK) return null;
+        total += 4 + consumer.name.length + 24 + 4;
+        for (const pending of consumer.pending) {
+            total += 16 + 8 + 8;
+        }
+    }
+    return total;
+}
+
+/**
+ * Encodes one stream body.
+ *
+ * `meta.entriesAdded` counts every append ever accepted, including entries later
+ * removed by `XDEL` or `XTRIM`. `meta.maxDeleted` tracks the largest id `XDEL`
+ * actually removed. Consumer groups are only appended when one exists or the
+ * counters no longer match the surviving entries, so an append-only stream keeps
+ * the compact legacy layout.
+ */
+function encodeStream(entries, last, meta = null) {
+    const entriesAdded = meta === null ? entries.length : meta.entriesAdded;
+    const maxDeleted = meta === null ? ZERO_ID : meta.maxDeleted;
+    const groups = meta === null ? [] : meta.groups;
+    const trailer = entriesAdded !== entries.length
+        || maxDeleted.ms !== 0n
+        || maxDeleted.seq !== 0n
+        || groups.length > 0;
     let total = 16 + 4;
     for (const entry of entries) {
         total += 16 + 4;
         for (const [field, value] of entry.fields) {
             if (field.length > MAX_CHUNK || value.length > MAX_CHUNK) return null;
             total += 4 + field.length + 4 + value.length;
+        }
+    }
+    if (trailer) {
+        total += 4 + 8 + 16 + 4;
+        for (const group of groups) {
+            const size = groupByteLength(group);
+            if (size === null) return null;
+            total += size;
         }
     }
     const body = Buffer.allocUnsafe(total);
@@ -3735,6 +3793,56 @@ function encodeStream(entries, last) {
             offset += 4;
             value.copy(body, offset);
             offset += value.length;
+        }
+    }
+    if (!trailer) return body;
+
+    body.writeUInt32LE(STREAM_TRAILER, offset);
+    offset += 4;
+    body.writeBigUInt64LE(BigInt(entriesAdded), offset);
+    offset += 8;
+    body.writeBigUInt64LE(maxDeleted.ms, offset);
+    offset += 8;
+    body.writeBigUInt64LE(maxDeleted.seq, offset);
+    offset += 8;
+    body.writeUInt32LE(groups.length, offset);
+    offset += 4;
+    for (const group of groups) {
+        body.writeUInt32LE(group.name.length, offset);
+        offset += 4;
+        group.name.copy(body, offset);
+        offset += group.name.length;
+        body.writeBigUInt64LE(group.lastId.ms, offset);
+        offset += 8;
+        body.writeBigUInt64LE(group.lastId.seq, offset);
+        offset += 8;
+        body.writeBigUInt64LE(group.entriesRead === null ? U64_MAX : BigInt(group.entriesRead), offset);
+        offset += 8;
+        body.writeUInt32LE(group.consumers.length, offset);
+        offset += 4;
+        for (const consumer of group.consumers) {
+            body.writeUInt32LE(consumer.name.length, offset);
+            offset += 4;
+            consumer.name.copy(body, offset);
+            offset += consumer.name.length;
+            body.writeBigUInt64LE(BigInt(consumer.seenTime), offset);
+            offset += 8;
+            body.writeBigUInt64LE(consumer.activeTime < 0 ? U64_MAX : BigInt(consumer.activeTime), offset);
+            offset += 8;
+            body.writeBigUInt64LE(BigInt(consumer.deliveryTime), offset);
+            offset += 8;
+            body.writeUInt32LE(consumer.pending.length, offset);
+            offset += 4;
+            for (const pending of consumer.pending) {
+                body.writeBigUInt64LE(pending.ms, offset);
+                offset += 8;
+                body.writeBigUInt64LE(pending.seq, offset);
+                offset += 8;
+                body.writeBigUInt64LE(BigInt(pending.deliveryTime), offset);
+                offset += 8;
+                body.writeBigUInt64LE(BigInt(pending.deliveryCount), offset);
+                offset += 8;
+            }
         }
     }
     return body;
@@ -3771,7 +3879,68 @@ function decodeStream(body) {
         }
         entries.push({ ms, seq, fields });
     }
-    return offset === body.length ? { entries, last } : null;
+    if (offset === body.length) {
+        return { entries, last, entriesAdded: entries.length, maxDeleted: ZERO_ID, groups: [] };
+    }
+    if (offset + 4 > body.length || body.readUInt32LE(offset) !== STREAM_TRAILER) return null;
+    offset += 4;
+    if (offset + 8 + 16 + 4 > body.length) return null;
+    const entriesAdded = Number(body.readBigUInt64LE(offset));
+    offset += 8;
+    const maxDeleted = { ms: body.readBigUInt64LE(offset), seq: body.readBigUInt64LE(offset + 8) };
+    offset += 16;
+    const groupCount = body.readUInt32LE(offset);
+    offset += 4;
+    const groups = [];
+    for (let index = 0; index < groupCount; index += 1) {
+        if (offset + 4 > body.length) return null;
+        const nameLength = body.readUInt32LE(offset);
+        offset += 4;
+        if (offset + nameLength + 24 + 4 > body.length) return null;
+        const name = body.subarray(offset, offset + nameLength);
+        offset += nameLength;
+        const lastId = { ms: body.readBigUInt64LE(offset), seq: body.readBigUInt64LE(offset + 8) };
+        offset += 16;
+        const rawEntriesRead = body.readBigUInt64LE(offset);
+        offset += 8;
+        const entriesRead = rawEntriesRead === U64_MAX ? null : Number(rawEntriesRead);
+        const consumerCount = body.readUInt32LE(offset);
+        offset += 4;
+        const consumers = [];
+        for (let slot = 0; slot < consumerCount; slot += 1) {
+            if (offset + 4 > body.length) return null;
+            const consumerLength = body.readUInt32LE(offset);
+            offset += 4;
+            if (offset + consumerLength + 24 + 4 > body.length) return null;
+            const consumerName = body.subarray(offset, offset + consumerLength);
+            offset += consumerLength;
+            const seenTime = Number(body.readBigUInt64LE(offset));
+            offset += 8;
+            const rawActive = body.readBigUInt64LE(offset);
+            offset += 8;
+            const activeTime = rawActive === U64_MAX ? -1 : Number(rawActive);
+            const deliveryTime = Number(body.readBigUInt64LE(offset));
+            offset += 8;
+            const pendingCount = body.readUInt32LE(offset);
+            offset += 4;
+            const pending = [];
+            for (let entry = 0; entry < pendingCount; entry += 1) {
+                if (offset + 32 > body.length) return null;
+                const ms = body.readBigUInt64LE(offset);
+                offset += 8;
+                const seq = body.readBigUInt64LE(offset);
+                offset += 8;
+                const delivered = Number(body.readBigUInt64LE(offset));
+                offset += 8;
+                const deliveryCount = Number(body.readBigUInt64LE(offset));
+                offset += 8;
+                pending.push({ ms, seq, deliveryTime: delivered, deliveryCount });
+            }
+            consumers.push({ name: consumerName, seenTime, activeTime, deliveryTime, pending });
+        }
+        groups.push({ name, lastId, entriesRead, consumers });
+    }
+    return offset === body.length ? { entries, last, entriesAdded, maxDeleted, groups } : null;
 }
 
 /**
@@ -3791,6 +3960,100 @@ function compareStreamIds(left, right) {
     if (left.ms !== right.ms) return left.ms < right.ms ? -1 : 1;
     if (left.seq !== right.seq) return left.seq < right.seq ? -1 : 1;
     return 0;
+}
+
+/** Stream metadata needed to re-encode the body after any mutation. */
+const streamMeta = stream => ({
+    entriesAdded: stream.entriesAdded,
+    maxDeleted: stream.maxDeleted,
+    groups: stream.groups,
+});
+
+const idText = id => `${id.ms}-${id.seq}`;
+
+function findEntry(stream, id) {
+    return stream.entries.find(entry => entry.ms === id.ms && entry.seq === id.seq);
+}
+
+function findGroup(stream, name) {
+    return stream.groups.find(group => group.name.equals(name));
+}
+
+function findConsumer(group, name) {
+    return group.consumers.find(consumer => consumer.name.equals(name));
+}
+
+/** Looks a consumer up and creates it on first use, the way every group command does. */
+function ensureConsumer(group, name, now) {
+    const existing = findConsumer(group, name);
+    if (existing !== undefined) {
+        existing.seenTime = now;
+        return existing;
+    }
+    const consumer = {
+        name,
+        seenTime: now,
+        activeTime: -1,
+        deliveryTime: now,
+        pending: [],
+    };
+    group.consumers.push(consumer);
+    return consumer;
+}
+
+/** Removes one entry from a consumer's pending list, answering whether it was there. */
+function removePending(consumer, id) {
+    const index = consumer.pending.findIndex(pending => pending.ms === id.ms && pending.seq === id.seq);
+    if (index < 0) return null;
+    return consumer.pending.splice(index, 1)[0];
+}
+
+/** Every pending entry of a group, ordered by id the way the radix tree walks them. */
+function pendingList(group) {
+    const rows = [];
+    for (const consumer of group.consumers) {
+        for (const pending of consumer.pending) rows.push({ consumer, pending });
+    }
+    rows.sort((left, right) => compareStreamIds(left.pending, right.pending));
+    return rows;
+}
+
+function pendingCount(group) {
+    let total = 0;
+    for (const consumer of group.consumers) total += consumer.pending.length;
+    return total;
+}
+
+/** Groups and consumers live in radix trees, so their listings are byte-ordered. */
+const byName = (left, right) => Buffer.compare(left.name, right.name);
+
+/**
+ * Lag as the server reports it.
+ *
+ * A group that never moved past `0-0` reports the surviving entry count. A known
+ * `entries-read` wins and counts appends that are no longer in the stream. An
+ * unknown counter with a group parked before the stream top cannot be computed.
+ */
+function groupLag(stream, group) {
+    if (group.lastId.ms === 0n && group.lastId.seq === 0n) return stream.entries.length;
+    if (group.entriesRead !== null) {
+        const lag = stream.entriesAdded - group.entriesRead;
+        return lag < 0 ? 0 : lag;
+    }
+    return compareStreamIds(group.lastId, stream.last) >= 0 ? 0 : null;
+}
+
+const consumerIdle = (consumer, now) => Math.max(0, now - consumer.deliveryTime);
+const consumerInactive = (consumer, now) => consumer.activeTime < 0
+    ? -1
+    : Math.max(0, now - consumer.activeTime);
+
+/** One entry as the wire shape: id plus a flat field/value array. */
+function entryReply(entry) {
+    return array([
+        bulk(idText(entry)),
+        array(entry.fields.flatMap(([field, value]) => [bulk(field), bulk(value)])),
+    ]);
 }
 
 /**
@@ -4175,9 +4438,20 @@ function planStream(store, session, name, args) {
                     if (id === null) return replyError(STREAM_ID_ERROR);
                     targets.add(`${id.ms}-${id.seq}`);
                 }
-                const kept = stream.entries.filter(entry => !targets.has(`${entry.ms}-${entry.seq}`));
-                const removed = stream.entries.length - kept.length;
-                if (removed > 0) rewriteKind(store, db, 'stream', key, encodeStream(kept, stream.last));
+                const removedEntries = stream.entries.filter(entry => targets.has(`${entry.ms}-${entry.seq}`));
+                const removed = removedEntries.length;
+                if (removed > 0) {
+                    const kept = stream.entries.filter(entry => !targets.has(`${entry.ms}-${entry.seq}`));
+                    let maxDeleted = stream.maxDeleted;
+                    for (const entry of removedEntries) {
+                        if (compareStreamIds(entry, maxDeleted) > 0) maxDeleted = { ms: entry.ms, seq: entry.seq };
+                    }
+                    rewriteKind(store, db, 'stream', key, encodeStream(kept, stream.last, {
+                        entriesAdded: stream.entriesAdded,
+                        maxDeleted,
+                        groups: stream.groups,
+                    }));
+                }
                 return integer(removed);
             },
         };
@@ -4199,7 +4473,7 @@ function planStream(store, session, name, args) {
                 const stream = readStream(store, db, key);
                 if (stream === null || stream.error === true) return wrongType();
                 const { kept, removed } = trimStream(stream.entries, maxlen, minid);
-                if (removed > 0) rewriteKind(store, db, 'stream', key, encodeStream(kept, stream.last));
+                if (removed > 0) rewriteKind(store, db, 'stream', key, encodeStream(kept, stream.last, streamMeta(stream)));
                 return integer(removed);
             },
         };
@@ -4227,11 +4501,681 @@ function planStream(store, session, name, args) {
             const fields = [];
             for (let pair = 0; pair < pairs.length; pair += 2) fields.push([pairs[pair], pairs[pair + 1]]);
             entries.push({ ms: id.ms, seq: id.seq, fields });
-            rewriteKind(store, db, 'stream', key, encodeStream(trimStream(entries, parsed.maxlen, parsed.minid).kept, id));
+            const kept = trimStream(entries, parsed.maxlen, parsed.minid).kept;
+            rewriteKind(store, db, 'stream', key, encodeStream(kept, id, {
+                entriesAdded: (stream === null ? 0 : stream.entriesAdded) + 1,
+                maxDeleted: stream === null ? ZERO_ID : stream.maxDeleted,
+                groups: stream === null ? [] : stream.groups,
+            }));
             notifyPush(session, db, key);
             return bulk(`${id.ms}-${id.seq}`);
         },
     };
+}
+
+const STREAM_REQUIRES_KEY = 'ERR The XGROUP subcommand requires the key to exist. Note that for CREATE you may want to use the MKSTREAM option to create an empty stream automatically.';
+const BUSYGROUP = 'BUSYGROUP Consumer Group name already exists';
+const groupHelp = sub => replyError(`ERR unknown subcommand or wrong number of arguments for '${sub}'. Try XGROUP HELP.`);
+const groupNoGroup = (group, key) => replyError(`NOGROUP No such consumer group '${group}' for key name '${key}'`);
+const commandNoGroup = (key, group) => replyError(`NOGROUP No such key '${key}' or consumer group '${group}'`);
+
+/** Decoded stream or the reply a group command owes a missing or wrong-typed key. */
+function streamState(store, db, key) {
+    const kind = kindOf(store, db, key);
+    if (kind === null) return { missing: true };
+    if (kind !== 'stream') return { error: wrongType() };
+    const stream = readStream(store, db, key);
+    return stream === null || stream.error === true ? { error: wrongType() } : { stream };
+}
+
+/** Reads `ENTRIESREAD n` from the tail of `CREATE` / `SETID`. */
+function parseEntriesRead(args, start) {
+    let value = null;
+    let provided = false;
+    let index = start;
+    while (index < args.length) {
+        if (text(args[index]).toUpperCase() !== 'ENTRIESREAD') {
+            return { error: groupHelp(text(args[1])) };
+        }
+        if (args[index + 1] === undefined) return { error: groupHelp(text(args[1])) };
+        const parsed = parseInteger(text(args[index + 1]));
+        if (parsed === null) return { error: integerError() };
+        value = parsed;
+        provided = true;
+        index += 2;
+    }
+    return { value, provided, index };
+}
+
+/**
+ * Plans `XGROUP CREATE|SETID|DESTROY|CREATECONSUMER|DELCONSUMER`.
+ *
+ * The group's last-delivered id may move forwards and backwards with `SETID`,
+ * while `ENTRIESREAD` is clamped to the number of appends the stream accepted.
+ */
+function planXGroup(store, session, args) {
+    const db = session.db;
+    if (args.length < 2) return { error: wrongArity('xgroup') };
+    const sub = text(args[1]).toUpperCase();
+    if (sub === 'CREATE') {
+        if (args.length < 5) return { error: wrongArity('xgroup|create') };
+        const key = args[2];
+        const groupName = args[3];
+        const idToken = text(args[4]);
+        if (idToken !== '$' && parseExplicitStreamId(idToken) === null) {
+            return { error: replyError(STREAM_ID_ERROR) };
+        }
+        let mkstream = false;
+        let entriesRead = null;
+        let entriesReadProvided = false;
+        for (let index = 5; index < args.length; index += 1) {
+            const token = text(args[index]).toUpperCase();
+            if (token === 'MKSTREAM') {
+                mkstream = true;
+                continue;
+            }
+            if (token === 'ENTRIESREAD') {
+                if (args[index + 1] === undefined) return { error: groupHelp(text(args[1])) };
+                const parsed = parseInteger(text(args[index + 1]));
+                if (parsed === null) return { error: integerError() };
+                entriesRead = parsed;
+                entriesReadProvided = true;
+                index += 1;
+                continue;
+            }
+            return { error: groupHelp(text(args[1])) };
+        }
+        return {
+            run: () => {
+                const state = streamState(store, db, key);
+                if (state.error !== undefined) return state.error;
+                let stream;
+                if (state.missing) {
+                    if (!mkstream) return replyError(STREAM_REQUIRES_KEY);
+                    stream = {
+                        entries: [],
+                        last: { ms: 0n, seq: 0n },
+                        entriesAdded: 0,
+                        maxDeleted: ZERO_ID,
+                        groups: [],
+                    };
+                }
+                else {
+                    stream = state.stream;
+                }
+                if (findGroup(stream, groupName) !== undefined) return replyError(BUSYGROUP);
+                const lastId = idToken === '$'
+                    ? { ms: stream.last.ms, seq: stream.last.seq }
+                    : parseExplicitStreamId(idToken);
+                stream.groups.push({
+                    name: groupName,
+                    lastId,
+                    entriesRead: entriesReadProvided
+                        ? Math.min(Math.max(entriesRead, 0), stream.entriesAdded)
+                        : null,
+                    consumers: [],
+                });
+                rewriteKind(store, db, 'stream', key, encodeStream(stream.entries, stream.last, streamMeta(stream)));
+                return simple('OK');
+            },
+        };
+    }
+    if (sub === 'CREATECONSUMER') {
+        if (args.length !== 5) return { error: wrongArity('xgroup|createconsumer') };
+        const key = args[2];
+        const groupName = args[3];
+        const consumerName = args[4];
+        return {
+            run: () => {
+                const state = streamState(store, db, key);
+                if (state.missing) return replyError(STREAM_REQUIRES_KEY);
+                if (state.error !== undefined) return state.error;
+                const group = findGroup(state.stream, groupName);
+                if (group === undefined) return groupNoGroup(text(groupName), text(key));
+                if (findConsumer(group, consumerName) !== undefined) return integer(0);
+                ensureConsumer(group, consumerName, Date.now());
+                rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+                return integer(1);
+            },
+        };
+    }
+    if (sub === 'DELCONSUMER') {
+        if (args.length !== 5) return { error: wrongArity('xgroup|delconsumer') };
+        const key = args[2];
+        const groupName = args[3];
+        const consumerName = args[4];
+        return {
+            run: () => {
+                const state = streamState(store, db, key);
+                if (state.missing) return replyError(STREAM_REQUIRES_KEY);
+                if (state.error !== undefined) return state.error;
+                const group = findGroup(state.stream, groupName);
+                if (group === undefined) return groupNoGroup(text(groupName), text(key));
+                const index = group.consumers.findIndex(consumer => consumer.name.equals(consumerName));
+                if (index < 0) return integer(0);
+                const [consumer] = group.consumers.splice(index, 1);
+                rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+                return integer(consumer.pending.length);
+            },
+        };
+    }
+    if (sub === 'DESTROY') {
+        if (args.length !== 4) return { error: wrongArity('xgroup|destroy') };
+        const key = args[2];
+        const groupName = args[3];
+        return {
+            run: () => {
+                const state = streamState(store, db, key);
+                if (state.missing) return replyError(STREAM_REQUIRES_KEY);
+                if (state.error !== undefined) return state.error;
+                const index = state.stream.groups.findIndex(group => group.name.equals(groupName));
+                if (index < 0) return integer(0);
+                state.stream.groups.splice(index, 1);
+                rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+                return integer(1);
+            },
+        };
+    }
+    if (sub === 'SETID') {
+        if (args.length < 5) return { error: wrongArity('xgroup|setid') };
+        const key = args[2];
+        const groupName = args[3];
+        const idToken = text(args[4]);
+        if (idToken !== '$' && parseExplicitStreamId(idToken) === null) {
+            return { error: replyError(STREAM_ID_ERROR) };
+        }
+        const options = parseEntriesRead(args, 5);
+        if (options.error !== undefined) return { error: options.error };
+        return {
+            run: () => {
+                const state = streamState(store, db, key);
+                if (state.missing) return replyError(STREAM_REQUIRES_KEY);
+                if (state.error !== undefined) return state.error;
+                const group = findGroup(state.stream, groupName);
+                if (group === undefined) return groupNoGroup(text(groupName), text(key));
+                group.lastId = idToken === '$'
+                    ? { ms: state.stream.last.ms, seq: state.stream.last.seq }
+                    : parseExplicitStreamId(idToken);
+                group.entriesRead = options.provided
+                    ? Math.min(Math.max(options.value, 0), state.stream.entriesAdded)
+                    : null;
+                rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+                return simple('OK');
+            },
+        };
+    }
+    return { error: replyError(`ERR unknown subcommand '${text(args[1])}'. Try XGROUP HELP.`) };
+}
+
+/**
+ * Plans `XACK`.
+ *
+ * The server acknowledges silently against a missing key or group, but every id
+ * is validated before anything leaves the pending list.
+ */
+function planXAck(store, session, args) {
+    const db = session.db;
+    if (args.length < 3) return { error: wrongArity('xack') };
+    const key = args[1];
+    const groupName = args[2];
+    const ids = [];
+    for (const raw of args.slice(3)) {
+        const id = parseExplicitStreamId(raw);
+        if (id === null) return { error: replyError(STREAM_ID_ERROR) };
+        ids.push(id);
+    }
+    return {
+        run: () => {
+            const state = streamState(store, db, key);
+            if (state.missing) return integer(0);
+            if (state.error !== undefined) return state.error;
+            const group = findGroup(state.stream, groupName);
+            if (group === undefined) return integer(0);
+            let removed = 0;
+            const seen = new Set();
+            for (const id of ids) {
+                const textId = idText(id);
+                if (seen.has(textId)) continue;
+                seen.add(textId);
+                for (const consumer of group.consumers) {
+                    if (removePending(consumer, id) !== null) {
+                        removed += 1;
+                        break;
+                    }
+                }
+            }
+            if (removed > 0) {
+                rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+            }
+            return integer(removed);
+        },
+    };
+}
+
+/**
+ * Plans `XPENDING` in both shapes.
+ *
+ * The summary always carries four elements. The extended form keeps the idle
+ * milliseconds live and accepts the same exclusive `(` bounds as `XRANGE`.
+ */
+function planXPending(store, session, args) {
+    const db = session.db;
+    if (args.length < 3) return { error: wrongArity('xpending') };
+    const key = args[1];
+    const groupName = args[2];
+    if (args.length === 3) {
+        return {
+            run: () => {
+                const state = streamState(store, db, key);
+                if (state.error !== undefined) return state.error;
+                if (state.missing) return commandNoGroup(text(key), text(groupName));
+                const group = findGroup(state.stream, groupName);
+                if (group === undefined) return commandNoGroup(text(key), text(groupName));
+                const rows = pendingList(group);
+                if (rows.length === 0) {
+                    return array([integer(0), nullReply(), nullReply(), nullArray()]);
+                }
+                const counts = group.consumers
+                    .filter(consumer => consumer.pending.length > 0)
+                    .sort(byName)
+                    .map(consumer => array([bulk(consumer.name), bulk(String(consumer.pending.length))]));
+                return array([
+                    integer(rows.length),
+                    bulk(idText(rows[0].pending)),
+                    bulk(idText(rows[rows.length - 1].pending)),
+                    array(counts),
+                ]);
+            },
+        };
+    }
+    if (args.length < 6) return { error: replyError('ERR syntax error') };
+    const low = parseStreamBound(args[3], false);
+    const high = parseStreamBound(args[4], true);
+    if (low === null || high === null) return { error: replyError(STREAM_ID_ERROR) };
+    const count = parseInteger(text(args[5]));
+    if (count === null) return { error: integerError() };
+    const consumerName = args[6];
+    return {
+        run: () => {
+            const state = streamState(store, db, key);
+            if (state.error !== undefined) return state.error;
+            if (state.missing) return commandNoGroup(text(key), text(groupName));
+            const group = findGroup(state.stream, groupName);
+            if (group === undefined) return commandNoGroup(text(key), text(groupName));
+            if (count <= 0) return array([]);
+            const now = Date.now();
+            const rows = [];
+            for (const row of pendingList(group)) {
+                if (consumerName !== undefined && !row.consumer.name.equals(consumerName)) continue;
+                const lowSide = compareStreamIds(row.pending, low.id);
+                const highSide = compareStreamIds(row.pending, high.id);
+                if (low.exclusive ? lowSide <= 0 : lowSide < 0) continue;
+                if (high.exclusive ? highSide >= 0 : highSide > 0) continue;
+                rows.push(array([
+                    bulk(idText(row.pending)),
+                    bulk(row.consumer.name),
+                    integer(consumerIdle(row.consumer, now)),
+                    integer(row.pending.deliveryCount),
+                ]));
+                if (rows.length >= count) break;
+            }
+            return array(rows);
+        },
+    };
+}
+
+/**
+ * Plans `XCLAIM`.
+ *
+ * A claim moves one pending entry between consumers, or creates it with `FORCE`.
+ * `JUSTID` suppresses the delivery counter bump. `LASTID` only moves the group
+ * forward.
+ */
+function planXClaim(store, session, args) {
+    const db = session.db;
+    if (args.length < 6) return { error: wrongArity('xclaim') };
+    const key = args[1];
+    const groupName = args[2];
+    const consumerName = args[3];
+    const minIdle = parseInteger(text(args[4]));
+    if (minIdle === null) return { error: replyError('ERR Invalid min-idle-time argument for XCLAIM') };
+    const minimum = Math.max(0, minIdle);
+    const ids = [];
+    let force = false;
+    let justid = false;
+    let idle = null;
+    let time = null;
+    let retrycount = null;
+    let lastid = null;
+    for (let index = 5; index < args.length; index += 1) {
+        const token = text(args[index]);
+        const upper = token.toUpperCase();
+        if (upper === 'FORCE') {
+            force = true;
+            continue;
+        }
+        if (upper === 'JUSTID') {
+            justid = true;
+            continue;
+        }
+        if (upper === 'IDLE' || upper === 'TIME' || upper === 'RETRYCOUNT' || upper === 'LASTID') {
+            if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
+            const value = args[index + 1];
+            index += 1;
+            if (upper === 'LASTID') {
+                const parsed = parseExplicitStreamId(value);
+                if (parsed === null) return { error: replyError(STREAM_ID_ERROR) };
+                lastid = parsed;
+                continue;
+            }
+            const parsed = parseInteger(text(value));
+            if (parsed === null) {
+                return { error: replyError(`ERR Invalid ${upper} option argument for XCLAIM`) };
+            }
+            if (upper === 'IDLE') idle = Math.max(0, parsed);
+            else if (upper === 'TIME') time = parsed;
+            else retrycount = Math.max(0, parsed);
+            continue;
+        }
+        const id = parseExplicitStreamId(token);
+        if (id === null) return { error: replyError(`ERR Unrecognized XCLAIM option '${token}'`) };
+        ids.push(id);
+    }
+    if (ids.length === 0) return { error: wrongArity('xclaim') };
+    return {
+        run: () => {
+            const state = streamState(store, db, key);
+            if (state.missing) return commandNoGroup(text(key), text(groupName));
+            if (state.error !== undefined) return state.error;
+            const group = findGroup(state.stream, groupName);
+            if (group === undefined) return commandNoGroup(text(key), text(groupName));
+            const now = Date.now();
+            const consumer = ensureConsumer(group, consumerName, now);
+            const deliveries = [];
+            for (const id of ids) {
+                const entry = findEntry(state.stream, id);
+                if (entry === undefined) continue;
+                const row = pendingList(group).find(item => item.pending.ms === id.ms && item.pending.seq === id.seq);
+                let count;
+                if (row !== undefined) {
+                    if (now - row.pending.deliveryTime < minimum) continue;
+                    removePending(row.consumer, id);
+                    count = row.pending.deliveryCount;
+                }
+                else {
+                    if (!force) continue;
+                    count = 1;
+                }
+                consumer.pending.push({
+                    ms: id.ms,
+                    seq: id.seq,
+                    deliveryTime: idle !== null ? Math.max(0, now - idle) : (time !== null ? time : now),
+                    deliveryCount: retrycount !== null ? retrycount : count + (justid ? 0 : 1),
+                });
+                deliveries.push(justid ? bulk(idText(id)) : entryReply(entry));
+            }
+            if (deliveries.length > 0) {
+                consumer.activeTime = now;
+                consumer.deliveryTime = now;
+            }
+            if (lastid !== null && compareStreamIds(lastid, group.lastId) > 0) {
+                group.lastId = { ms: lastid.ms, seq: lastid.seq };
+            }
+            rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+            return array(deliveries);
+        },
+    };
+}
+
+/**
+ * Plans `XAUTOCLAIM`.
+ *
+ * The scan starts at the first pending id at or above the cursor, drops pending
+ * entries whose message is gone, and stops after claiming `COUNT` entries. The
+ * returned cursor is the next id it did not examine, or `0-0` at the end.
+ */
+function planXAutoClaim(store, session, args) {
+    const db = session.db;
+    if (args.length < 6) return { error: wrongArity('xautoclaim') };
+    const key = args[1];
+    const groupName = args[2];
+    const consumerName = args[3];
+    const minIdle = parseInteger(text(args[4]));
+    if (minIdle === null) return { error: replyError('ERR Invalid min-idle-time argument for XAUTOCLAIM') };
+    const minimum = Math.max(0, minIdle);
+    const start = parseExplicitStreamId(args[5]);
+    if (start === null) return { error: replyError(STREAM_ID_ERROR) };
+    let count = 100;
+    let justid = false;
+    for (let index = 6; index < args.length; index += 1) {
+        const token = text(args[index]).toUpperCase();
+        if (token === 'JUSTID') {
+            justid = true;
+            continue;
+        }
+        if (token === 'COUNT') {
+            if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
+            const parsed = parseInteger(text(args[index + 1]));
+            if (parsed === null || parsed <= 0) return { error: replyError("ERR COUNT must be > 0") };
+            count = parsed;
+            index += 1;
+            continue;
+        }
+        return { error: replyError('ERR syntax error') };
+    }
+    return {
+        run: () => {
+            const state = streamState(store, db, key);
+            if (state.missing) return commandNoGroup(text(key), text(groupName));
+            if (state.error !== undefined) return state.error;
+            const group = findGroup(state.stream, groupName);
+            if (group === undefined) return commandNoGroup(text(key), text(groupName));
+            const now = Date.now();
+            const consumer = ensureConsumer(group, consumerName, now);
+            const list = pendingList(group);
+            let position = list.findIndex(row => compareStreamIds(row.pending, start) >= 0);
+            if (position < 0) position = list.length;
+            const claimed = [];
+            const deleted = [];
+            let claimedCount = 0;
+            while (position < list.length && claimedCount < count) {
+                const row = list[position];
+                const entry = findEntry(state.stream, row.pending);
+                if (entry === undefined) {
+                    removePending(row.consumer, row.pending);
+                    deleted.push(bulk(idText(row.pending)));
+                    position += 1;
+                    continue;
+                }
+                if (now - row.pending.deliveryTime < minimum) {
+                    position += 1;
+                    continue;
+                }
+                const deliveryCount = justid ? row.pending.deliveryCount : row.pending.deliveryCount + 1;
+                removePending(row.consumer, row.pending);
+                consumer.pending.push({
+                    ms: row.pending.ms,
+                    seq: row.pending.seq,
+                    deliveryTime: now,
+                    deliveryCount,
+                });
+                claimed.push(justid ? bulk(idText(row.pending)) : entryReply(entry));
+                claimedCount += 1;
+                position += 1;
+            }
+            if (claimedCount > 0) {
+                consumer.activeTime = now;
+                consumer.deliveryTime = now;
+            }
+            const cursor = position < list.length ? bulk(idText(list[position].pending)) : bulk('0-0');
+            rewriteKind(store, db, 'stream', key, encodeStream(state.stream.entries, state.stream.last, streamMeta(state.stream)));
+            return array([cursor, array(claimed), array(deleted)]);
+        },
+    };
+}
+
+/** Fixed metadata the server reports about its idempotency bookkeeping. */
+function streamInfoPairs(stream) {
+    const keys = stream.entries.length === 0
+        ? 0
+        : Math.ceil(stream.entries.length / STREAM_NODE_SIZE);
+    return [
+        ['length', integer(stream.entries.length)],
+        ['radix-tree-keys', integer(keys)],
+        ['radix-tree-nodes', integer(keys <= 1 ? 1 : keys * 2 - 1)],
+        ['last-generated-id', bulk(idText(stream.last))],
+        ['max-deleted-entry-id', bulk(idText(stream.maxDeleted))],
+        ['entries-added', integer(stream.entriesAdded)],
+        ['recorded-first-entry-id', bulk(stream.entries.length === 0 ? '0-0' : idText(stream.entries[0]))],
+        ['idmp-duration', integer(100)],
+        ['idmp-maxsize', integer(100)],
+        ['pids-tracked', integer(0)],
+        ['iids-tracked', integer(0)],
+        ['iids-added', integer(0)],
+        ['iids-duplicates', integer(0)],
+        ['groups', integer(stream.groups.length)],
+    ];
+}
+
+/** Flattens name/value pairs into the RESP2 array shape the server emits. */
+function flatPairs(pairs) {
+    return array(pairs.flatMap(([name, value]) => [bulk(name), value]));
+}
+
+function groupFullMap(stream, group) {
+    const rows = pendingList(group);
+    const lag = groupLag(stream, group);
+    return flatPairs([
+        ['name', bulk(group.name)],
+        ['last-delivered-id', bulk(idText(group.lastId))],
+        ['entries-read', group.entriesRead === null ? nullReply() : integer(group.entriesRead)],
+        ['lag', lag === null ? nullReply() : integer(lag)],
+        ['pel-count', integer(rows.length)],
+        ['nacked-count', integer(0)],
+        ['pending', array(rows.map(row => array([
+            bulk(idText(row.pending)),
+            bulk(row.consumer.name),
+            integer(row.pending.deliveryTime),
+            integer(row.pending.deliveryCount),
+        ])))],
+        ['consumers', array(group.consumers.slice().sort(byName).map(consumer => flatPairs([
+            ['name', bulk(consumer.name)],
+            ['seen-time', integer(consumer.seenTime)],
+            ['active-time', integer(consumer.activeTime)],
+            ['pel-count', integer(consumer.pending.length)],
+            ['pending', array(consumer.pending.slice()
+                .sort((left, right) => compareStreamIds(left, right))
+                .map(pending => array([
+                    bulk(idText(pending)),
+                    integer(pending.deliveryTime),
+                    integer(pending.deliveryCount),
+                ])))],
+        ])))],
+    ]);
+}
+
+/**
+ * Plans `XINFO STREAM|GROUPS|CONSUMERS`.
+ *
+ * The shapes follow the live reply frames: one flat map for `STREAM`, a map per
+ * group or consumer for the other two, and `FULL` adds the entries and the
+ * nested group state.
+ */
+function planXInfo(store, session, args) {
+    const db = session.db;
+    if (args.length < 2) return { error: wrongArity('xinfo') };
+    const sub = text(args[1]).toUpperCase();
+    const unknown = () => replyError(`ERR unknown subcommand '${text(args[1])}'. Try XINFO HELP.`);
+    const malformed = () => replyError(`ERR unknown subcommand or wrong number of arguments for '${text(args[1])}'. Try XINFO HELP.`);
+    if (sub === 'STREAM') {
+        if (args.length < 3) return { error: wrongArity('xinfo|stream') };
+        const key = args[2];
+        let full = false;
+        let count = null;
+        if (args.length >= 4) {
+            if (text(args[3]).toUpperCase() !== 'FULL') return { error: malformed() };
+            full = true;
+            if (args.length === 5 || args.length > 6) return { error: malformed() };
+            if (args.length === 6) {
+                if (text(args[4]).toUpperCase() !== 'COUNT') return { error: malformed() };
+                const parsed = parseInteger(text(args[5]));
+                if (parsed === null) return { error: integerError() };
+                count = parsed;
+            }
+        }
+        return {
+            run: () => {
+                const kind = kindOf(store, db, key);
+                if (kind === null) return replyError('ERR no such key');
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, key);
+                if (stream === null || stream.error === true) return wrongType();
+                const entries = count !== null && count > 0
+                    ? stream.entries.slice(0, count)
+                    : stream.entries;
+                const pairs = streamInfoPairs(stream);
+                if (full) {
+                    // FULL reports the group list itself instead of the group count.
+                    pairs.pop();
+                    pairs.push(['entries', array(entries.map(entryReply))]);
+                    pairs.push(['groups', array(stream.groups.slice().sort(byName).map(group => groupFullMap(stream, group)))]);
+                }
+                else {
+                    pairs.push(['first-entry', entries.length === 0 ? nullReply() : entryReply(stream.entries[0])]);
+                    pairs.push(['last-entry', entries.length === 0 ? nullReply() : entryReply(stream.entries[stream.entries.length - 1])]);
+                }
+                return flatPairs(pairs);
+            },
+        };
+    }
+    if (sub === 'GROUPS') {
+        if (args.length !== 3) return { error: wrongArity('xinfo|groups') };
+        const key = args[2];
+        return {
+            run: () => {
+                const kind = kindOf(store, db, key);
+                if (kind === null) return replyError('ERR no such key');
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, key);
+                if (stream === null || stream.error === true) return wrongType();
+                return array(stream.groups.slice().sort(byName).map(group => {
+                    const lag = groupLag(stream, group);
+                    return flatPairs([
+                        ['name', bulk(group.name)],
+                        ['consumers', integer(group.consumers.length)],
+                        ['pending', integer(pendingCount(group))],
+                        ['last-delivered-id', bulk(idText(group.lastId))],
+                        ['entries-read', group.entriesRead === null ? nullReply() : integer(group.entriesRead)],
+                        ['lag', lag === null ? nullReply() : integer(lag)],
+                    ]);
+                }));
+            },
+        };
+    }
+    if (sub === 'CONSUMERS') {
+        if (args.length !== 4) return { error: wrongArity('xinfo|consumers') };
+        const key = args[2];
+        const groupName = args[3];
+        return {
+            run: () => {
+                const kind = kindOf(store, db, key);
+                if (kind === null) return replyError('ERR no such key');
+                if (kind !== 'stream') return wrongType();
+                const stream = readStream(store, db, key);
+                if (stream === null || stream.error === true) return wrongType();
+                const group = findGroup(stream, groupName);
+                if (group === undefined) return groupNoGroup(text(groupName), text(key));
+                const now = Date.now();
+                return array(group.consumers.slice().sort(byName).map(consumer => flatPairs([
+                    ['name', bulk(consumer.name)],
+                    ['pending', integer(consumer.pending.length)],
+                    ['idle', integer(consumerIdle(consumer, now))],
+                    ['inactive', integer(consumerInactive(consumer, now))],
+                ])));
+            },
+        };
+    }
+    return { error: unknown() };
 }
 
 /**
