@@ -1,0 +1,43 @@
+name: Check TypeScript
+
+# pnpm install, native binding, TypeScript floors, install-state, oracle and drivers.
+# Python: check-python.yml. Rust workspace: check-rust.yml.
+# Publish: publish-npm.yml on v* tags.
+on:
+  push:
+    branches: [dev, master]
+  pull_request:
+    branches: [dev, master]
+  workflow_call:
+
+jobs:
+  typescript:
+    name: pnpm packages
+    runs-on: ubuntu-latest
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2026-07-20
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: projects/redis.rs
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Native binding
+        run: node scripts/build-platforms.mjs
+      - name: TypeScript acceptance
+        run: pnpm gate:test-count:ts
+      - name: TypeScript installed-state gate
+        run: pnpm gate:install:ts
+      - name: Cross implementation oracle
+        run: pnpm gate:oracle
+      - name: Real driver conformance
+        run: pnpm gate:drivers
