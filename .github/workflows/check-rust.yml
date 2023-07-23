@@ -44,6 +44,6 @@ jobs:
         with:
           workspaces: projects/redis.rs
       - name: Build
-        run: cargo build --release --manifest-path projects/redis.rs/Cargo.toml --workspace
+        run: cargo build --release --manifest-path projects/redis.rs/Cargo.toml --workspace --exclude redis-napi --exclude redis-pyo3
       - name: Tests
-        run: cargo test --release --manifest-path projects/redis.rs/Cargo.toml --workspace --all-targets
+        run: cargo test --release --manifest-path projects/redis.rs/Cargo.toml --workspace --all-targets --exclude redis-napi --exclude redis-pyo3
