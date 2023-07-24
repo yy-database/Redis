@@ -8,5 +8,5 @@ pub mod resp;
 pub mod store;
 
 pub use format::{FormatError, Record, Records};
-pub use resp::{decode_command, decode_reply, encode_command, encode_reply, Reply, Request};
+pub use resp::{Reply, Request, decode_command, decode_reply, encode_command, encode_reply};
 pub use store::{Node, RenameOutcome};

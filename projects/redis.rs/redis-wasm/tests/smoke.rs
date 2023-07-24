@@ -6,7 +6,7 @@
 use std::io;
 
 use redis_wasm::format::Record;
-use redis_wasm::resp::{decode_command, encode_command, encode_reply, Reply};
+use redis_wasm::resp::{Reply, decode_command, encode_command, encode_reply};
 use redis_wasm::store::Node;
 
 fn temporary_dir(name: &str) -> std::path::PathBuf {

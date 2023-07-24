@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use database_formats::yy::yykv::{self, InlineValue, Key, ObjectRef, Record as UpstreamRecord, StoredValue};
-use redis_wasm::format::{decode_shard, encode_shard, Record, Records};
+use redis_wasm::format::{Record, Records, decode_shard, encode_shard};
 
 /// Next revision above every fixture record, as the shard contract requires.
 const NEXT_REVISION: u64 = 4;
@@ -65,7 +65,10 @@ fn both_writers_produce_the_same_bytes_and_read_each_other() {
     let upstream = upstream_records();
     let local_bytes = encode_shard(&local, NEXT_REVISION).expect("local encode");
     let upstream_bytes = yykv::encode_snapshot(&upstream, NEXT_REVISION).expect("upstream encode");
-    assert_eq!(local_bytes, upstream_bytes, "both writers must emit the same snapshot bytes");
+    assert_eq!(
+        local_bytes, upstream_bytes,
+        "both writers must emit the same snapshot bytes"
+    );
 
     let decoded = yykv::decode_snapshot_strict(&local_bytes).expect("upstream reads the local snapshot");
     assert_eq!(decoded.next_revision, NEXT_REVISION);
@@ -83,7 +86,9 @@ fn object_backed_snapshots_are_rejected() {
         key.clone(),
         UpstreamRecord {
             key,
-            value: StoredValue::Object(ObjectRef { hash_hex: "ab".to_owned() }),
+            value: StoredValue::Object(ObjectRef {
+                hash_hex: "ab".to_owned(),
+            }),
             revision: 1,
             expires_at: None,
         },

@@ -35,7 +35,11 @@ fn reason(error: impl ToString) -> napi::Error {
 
 /// Rejects a value kind the shard does not name.
 fn check_kind(kind: &str) -> std::result::Result<(), napi::Error> {
-    if redis_wasm::store::KINDS.contains(&kind) { Ok(()) } else { Err(reason(format!("unknown value kind `{kind}`"))) }
+    if redis_wasm::store::KINDS.contains(&kind) {
+        Ok(())
+    } else {
+        Err(reason(format!("unknown value kind `{kind}`")))
+    }
 }
 
 /// Parses one command from the front of `input`, or `null` when more bytes are needed.
@@ -105,7 +109,9 @@ impl Store {
     /// Opens the storage directory, creating the catalog and an empty shard when absent.
     #[napi(constructor)]
     pub fn new(data_dir: String) -> std::result::Result<Self, napi::Error> {
-        Ok(Self { node: Node::open(data_dir).map_err(reason)? })
+        Ok(Self {
+            node: Node::open(data_dir).map_err(reason)?,
+        })
     }
 
     /// Returns the live value for one key.
@@ -117,7 +123,11 @@ impl Store {
     /// Inserts or replaces a value with an optional absolute deadline in epoch milliseconds.
     #[napi]
     pub fn set(
-        &mut self, db: u8, key: Buffer, value: Buffer, expires_at: Option<i64>,
+        &mut self,
+        db: u8,
+        key: Buffer,
+        value: Buffer,
+        expires_at: Option<i64>,
     ) -> std::result::Result<(), napi::Error> {
         self.node.set(db, &key, &value, expires_at).map_err(reason)
     }
@@ -150,13 +160,21 @@ impl Store {
     #[napi]
     pub fn get_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<Buffer>, napi::Error> {
         check_kind(&kind)?;
-        Ok(self.node.get_kind(db, &kind, &key).map(|record| Buffer::from(record.value.clone())))
+        Ok(self
+            .node
+            .get_kind(db, &kind, &key)
+            .map(|record| Buffer::from(record.value.clone())))
     }
 
     /// Inserts or replaces one kind with an optional absolute deadline in epoch milliseconds.
     #[napi]
     pub fn set_kind(
-        &mut self, db: u8, kind: String, key: Buffer, value: Buffer, expires_at: Option<i64>,
+        &mut self,
+        db: u8,
+        kind: String,
+        key: Buffer,
+        value: Buffer,
+        expires_at: Option<i64>,
     ) -> std::result::Result<(), napi::Error> {
         check_kind(&kind)?;
         self.node.set_kind(db, &kind, &key, &value, expires_at).map_err(reason)
@@ -186,7 +204,11 @@ impl Store {
     /// Sets or clears the deadline of a live kind.
     #[napi]
     pub fn expire_kind(
-        &mut self, db: u8, kind: String, key: Buffer, expires_at: Option<i64>,
+        &mut self,
+        db: u8,
+        kind: String,
+        key: Buffer,
+        expires_at: Option<i64>,
     ) -> std::result::Result<bool, napi::Error> {
         check_kind(&kind)?;
         self.node.set_deadline_kind(db, &kind, &key, expires_at).map_err(reason)
@@ -195,9 +217,16 @@ impl Store {
     /// Moves one key, carrying its deadline. `if_absent` implements `RENAMENX`.
     #[napi]
     pub fn rename(
-        &mut self, db: u8, source: Buffer, destination: Buffer, if_absent: Option<bool>,
+        &mut self,
+        db: u8,
+        source: Buffer,
+        destination: Buffer,
+        if_absent: Option<bool>,
     ) -> std::result::Result<String, napi::Error> {
-        let outcome = self.node.rename(db, &source, &destination, if_absent.unwrap_or(false)).map_err(reason)?;
+        let outcome = self
+            .node
+            .rename(db, &source, &destination, if_absent.unwrap_or(false))
+            .map_err(reason)?;
         Ok(match outcome {
             RenameOutcome::Renamed => "renamed",
             RenameOutcome::Missing => "missing",
@@ -209,7 +238,10 @@ impl Store {
     /// Appends bytes to a live value, preserving its deadline.
     #[napi]
     pub fn append(&mut self, db: u8, key: Buffer, suffix: Buffer) -> std::result::Result<u32, napi::Error> {
-        self.node.append(db, &key, &suffix).map(|length| length as u32).map_err(reason)
+        self.node
+            .append(db, &key, &suffix)
+            .map(|length| length as u32)
+            .map_err(reason)
     }
 
     /// Live keys of one database in ascending byte order.
@@ -220,13 +252,15 @@ impl Store {
 
     /// Inserts or replaces many values with one durable commit.
     #[napi]
-    pub fn set_many(
-        &mut self, db: u8, keys: Vec<Buffer>, values: Vec<Buffer>,
-    ) -> std::result::Result<(), napi::Error> {
+    pub fn set_many(&mut self, db: u8, keys: Vec<Buffer>, values: Vec<Buffer>) -> std::result::Result<(), napi::Error> {
         if keys.len() != values.len() {
             return Err(reason("`keys` and `values` must carry the same number of entries"));
         }
-        let entries = keys.into_iter().zip(values).map(|(key, value)| (key.to_vec(), value.to_vec())).collect::<Vec<_>>();
+        let entries = keys
+            .into_iter()
+            .zip(values)
+            .map(|(key, value)| (key.to_vec(), value.to_vec()))
+            .collect::<Vec<_>>();
         self.node.set_many(db, &entries).map_err(reason)
     }
 
@@ -241,8 +275,14 @@ impl Store {
     pub fn incr_by(&mut self, db: u8, key: Buffer, delta: i64) -> std::result::Result<Increment, napi::Error> {
         let outcome = self.node.incr_by(db, &key, delta).map_err(reason)?;
         Ok(match outcome {
-            Ok(value) => Increment { value: Some(value), error: None },
-            Err(error) => Increment { value: None, error: Some(error) },
+            Ok(value) => Increment {
+                value: Some(value),
+                error: None,
+            },
+            Err(error) => Increment {
+                value: None,
+                error: Some(error),
+            },
         })
     }
 

@@ -16,7 +16,11 @@ fn runtime(error: impl ToString) -> PyErr {
 
 /// Rejects a value kind the shard does not name.
 fn check_kind(kind: &str) -> PyResult<()> {
-    if redis_wasm::store::KINDS.contains(&kind) { Ok(()) } else { Err(PyValueError::new_err(format!("unknown value kind `{kind}`"))) }
+    if redis_wasm::store::KINDS.contains(&kind) {
+        Ok(())
+    } else {
+        Err(PyValueError::new_err(format!("unknown value kind `{kind}`")))
+    }
 }
 
 /// Parses one command from the front of `input`.
@@ -83,7 +87,9 @@ impl Store {
     /// Opens the storage directory, creating the catalog and an empty shard when absent.
     #[new]
     fn new(data_dir: String) -> PyResult<Self> {
-        Ok(Self { node: Node::open(data_dir).map_err(runtime)? })
+        Ok(Self {
+            node: Node::open(data_dir).map_err(runtime)?,
+        })
     }
 
     /// Returns the live value for one key.

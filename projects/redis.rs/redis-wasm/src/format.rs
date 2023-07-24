@@ -9,8 +9,8 @@
 
 use std::collections::BTreeMap;
 
-use database_formats::yy::yykv::{self, InlineValue, Key, Record as SnapshotRecord, StoredValue};
 use database_formats::yy::yyds;
+use database_formats::yy::yykv::{self, InlineValue, Key, Record as SnapshotRecord, StoredValue};
 use database_types::cluster::{Error as SourceError, ShardId};
 
 /// One stored record inside the shard.
@@ -76,12 +76,7 @@ pub fn parse_integer(bytes: &[u8]) -> Option<i64> {
         return None;
     }
     let value: i64 = digits.parse().ok()?;
-    if negative {
-        value.checked_neg()
-    }
-    else {
-        Some(value)
-    }
+    if negative { value.checked_neg() } else { Some(value) }
 }
 
 /// Serializes the shard snapshot to `.yykv` bytes.
@@ -92,7 +87,10 @@ pub fn encode_shard(records: &Records, next_revision: u64) -> Result<Vec<u8>> {
     // Product policy: every record is inline and a negative deadline is a caller
     // bug. Upstream wraps a negative expiry with `as u64`, so the rejection stays
     // here instead of being delegated.
-    if records.values().any(|record| record.expires_at.is_some_and(|deadline| deadline < 0)) {
+    if records
+        .values()
+        .any(|record| record.expires_at.is_some_and(|deadline| deadline < 0))
+    {
         return Err(FormatError("expiry deadline must not be negative".to_owned()));
     }
     let snapshot: BTreeMap<Key, SnapshotRecord> = records
@@ -127,14 +125,20 @@ pub fn decode_shard(bytes: &[u8]) -> Result<(Records, u64)> {
             StoredValue::Inline(value) => value.0,
             // A shared payload reference must not be surfaced as row bytes.
             StoredValue::Object(_) => {
-                return Err(FormatError("shared object payloads are not supported here".to_owned()))
+                return Err(FormatError("shared object payloads are not supported here".to_owned()));
             }
         };
         let namespace = key.namespace.0;
         let key_bytes = key.bytes;
         records.insert(
             (namespace.clone(), key_bytes.clone()),
-            Record { namespace, key: key_bytes, value, revision: record.revision, expires_at: record.expires_at },
+            Record {
+                namespace,
+                key: key_bytes,
+                value,
+                revision: record.revision,
+                expires_at: record.expires_at,
+            },
         );
     }
     Ok((records, snapshot.next_revision))
@@ -191,7 +195,13 @@ fn catalog_error(bytes: &[u8], source: &SourceError) -> CatalogError {
             return reject("magic", "expected \"YYDS\\x01\"".to_owned());
         }
         SourceError::Unsupported("catalog format version requires regeneration") => {
-            return reject("version", format!("expected 0, found {}", peek_u32(bytes, yyds::CATALOG_MAGIC.len()).unwrap_or(0)));
+            return reject(
+                "version",
+                format!(
+                    "expected 0, found {}",
+                    peek_u32(bytes, yyds::CATALOG_MAGIC.len()).unwrap_or(0)
+                ),
+            );
         }
         _ => {}
     }
@@ -215,18 +225,25 @@ fn catalog_error(bytes: &[u8], source: &SourceError) -> CatalogError {
                 ),
             )
         }
-        SourceError::Corrupt("unexpected catalog eof") => {
-            reject("length", catalog_end(bytes).err().unwrap_or("truncated catalog").to_owned())
+        SourceError::Corrupt("unexpected catalog eof") => reject(
+            "length",
+            catalog_end(bytes).err().unwrap_or("truncated catalog").to_owned(),
+        ),
+        SourceError::Corrupt("invalid catalog schema presence flag") => {
+            reject("schema", "invalid presence flag".to_owned())
         }
-        SourceError::Corrupt("invalid catalog schema presence flag") => reject("schema", "invalid presence flag".to_owned()),
-        SourceError::Corrupt("invalid catalog routing presence flag") => reject("routing", "invalid presence flag".to_owned()),
+        SourceError::Corrupt("invalid catalog routing presence flag") => {
+            reject("routing", "invalid presence flag".to_owned())
+        }
         SourceError::Corrupt("invalid catalog routing epoch") => reject("routing", "epoch must be nonzero".to_owned()),
-        SourceError::Unsupported("catalog registers no shard") => {
-            reject("count", format!("expected 1, found {}", shard_count(bytes).unwrap_or(0)))
-        }
-        SourceError::Unsupported("catalog registers more than one shard") => {
-            reject("count", format!("expected 1, found {}", shard_count(bytes).unwrap_or(1)))
-        }
+        SourceError::Unsupported("catalog registers no shard") => reject(
+            "count",
+            format!("expected 1, found {}", shard_count(bytes).unwrap_or(0)),
+        ),
+        SourceError::Unsupported("catalog registers more than one shard") => reject(
+            "count",
+            format!("expected 1, found {}", shard_count(bytes).unwrap_or(1)),
+        ),
         SourceError::InvalidShardId { value } if value.is_empty() => reject("shard-id", "empty".to_owned()),
         SourceError::InvalidShardId { value } if value.contains(['/', '\\']) => {
             reject("shard-id", "contains a path separator".to_owned())
@@ -251,7 +268,12 @@ fn catalog_end(bytes: &[u8]) -> std::result::Result<usize, &'static str> {
     read_u32_diagnostic(bytes, &mut cursor, "truncated version")?;
     if read_u32_diagnostic(bytes, &mut cursor, "truncated schema flag")? == 1 {
         read_u32_diagnostic(bytes, &mut cursor, "truncated schema section")?;
-        skip_block(bytes, &mut cursor, "truncated schema section", "truncated schema section")?;
+        skip_block(
+            bytes,
+            &mut cursor,
+            "truncated schema section",
+            "truncated schema section",
+        )?;
     }
     if read_u32_diagnostic(bytes, &mut cursor, "truncated routing section")? == 1 {
         skip(bytes, &mut cursor, 8, "truncated routing section")?;
@@ -261,7 +283,12 @@ fn catalog_end(bytes: &[u8]) -> std::result::Result<usize, &'static str> {
         skip_block(bytes, &mut cursor, "truncated shard id length", "truncated shard id")?;
     }
     if read_u32_diagnostic(bytes, &mut cursor, "truncated reserved fields")? == 1 {
-        skip_block(bytes, &mut cursor, "truncated resolved contract", "truncated resolved contract")?;
+        skip_block(
+            bytes,
+            &mut cursor,
+            "truncated resolved contract",
+            "truncated resolved contract",
+        )?;
     }
     let owners = read_u32_diagnostic(bytes, &mut cursor, "truncated reserved fields")?;
     for _ in 0..owners {
@@ -276,7 +303,12 @@ fn peek_u32(bytes: &[u8], offset: usize) -> Option<u32> {
     Some(u32::from_le_bytes(bytes.get(offset..offset + 4)?.try_into().ok()?))
 }
 
-fn skip(bytes: &[u8], cursor: &mut usize, length: usize, detail: &'static str) -> std::result::Result<(), &'static str> {
+fn skip(
+    bytes: &[u8],
+    cursor: &mut usize,
+    length: usize,
+    detail: &'static str,
+) -> std::result::Result<(), &'static str> {
     if *cursor + length > bytes.len() {
         return Err(detail);
     }
@@ -284,9 +316,15 @@ fn skip(bytes: &[u8], cursor: &mut usize, length: usize, detail: &'static str) -
     Ok(())
 }
 
-fn read_u32_diagnostic(bytes: &[u8], cursor: &mut usize, detail: &'static str) -> std::result::Result<u32, &'static str> {
+fn read_u32_diagnostic(
+    bytes: &[u8],
+    cursor: &mut usize,
+    detail: &'static str,
+) -> std::result::Result<u32, &'static str> {
     skip(bytes, cursor, 4, detail)?;
-    Ok(u32::from_le_bytes(bytes[*cursor - 4..*cursor].try_into().unwrap_or([0; 4])))
+    Ok(u32::from_le_bytes(
+        bytes[*cursor - 4..*cursor].try_into().unwrap_or([0; 4]),
+    ))
 }
 
 fn skip_block(
@@ -338,36 +376,55 @@ fn shard_error(bytes: &[u8], source: &SourceError) -> FormatError {
         return FormatError("truncated `shard checksum`".to_owned());
     }
     match source {
-        SourceError::CorruptReason { message: "yykv checksum mismatch", .. } => {
-            FormatError(".yykv checksum mismatch".to_owned())
-        }
-        SourceError::CorruptReason { message: "truncated yykv checksum", .. } => {
-            FormatError("truncated `shard checksum`".to_owned())
-        }
-        SourceError::Corrupt("invalid shard revision") | SourceError::Corrupt("legacy shard revision space exhausted") => {
+        SourceError::CorruptReason {
+            message: "yykv checksum mismatch",
+            ..
+        } => FormatError(".yykv checksum mismatch".to_owned()),
+        SourceError::CorruptReason {
+            message: "truncated yykv checksum",
+            ..
+        } => FormatError("truncated `shard checksum`".to_owned()),
+        SourceError::Corrupt("invalid shard revision")
+        | SourceError::Corrupt("legacy shard revision space exhausted") => {
             FormatError("invalid shard revision".to_owned())
         }
-        SourceError::CorruptReason { message: "trailing shard bytes", .. } => FormatError("trailing shard bytes".to_owned()),
-        SourceError::CorruptReason { message: "duplicate shard key", .. } => FormatError("duplicate shard key".to_owned()),
-        SourceError::CorruptReason { message: "shard namespace utf8", .. } => {
-            FormatError("shard namespace is not utf8".to_owned())
-        }
+        SourceError::CorruptReason {
+            message: "trailing shard bytes",
+            ..
+        } => FormatError("trailing shard bytes".to_owned()),
+        SourceError::CorruptReason {
+            message: "duplicate shard key",
+            ..
+        } => FormatError("duplicate shard key".to_owned()),
+        SourceError::CorruptReason {
+            message: "shard namespace utf8",
+            ..
+        } => FormatError("shard namespace is not utf8".to_owned()),
         // Any non-inline payload is refused, including a tag-1 record whose hash
         // bytes are not utf8, because this node has no object store either way.
-        SourceError::CorruptReason { message: "shard object hash utf8", .. }
-        | SourceError::CorruptReason { message: "invalid shard value kind", .. }
+        SourceError::CorruptReason {
+            message: "shard object hash utf8",
+            ..
+        }
+        | SourceError::CorruptReason {
+            message: "invalid shard value kind",
+            ..
+        }
         | SourceError::Unsupported("yykv object-backed value requires an object store") => {
             FormatError("shared object payloads are not supported here".to_owned())
         }
-        SourceError::CorruptReason { message: "legacy yykv revision layout: next_revision is zero", .. } => {
-            FormatError("legacy .yykv revision layout: next revision is zero".to_owned())
-        }
-        SourceError::CorruptReason { message: "legacy yykv revision layout: record sits on next_revision", .. } => {
-            FormatError("legacy .yykv revision layout: a record sits on the next revision".to_owned())
-        }
-        SourceError::CorruptReason { message: "unexpected shard eof" | "shard length overflow", .. } => {
-            FormatError(truncated_detail(bytes))
-        }
+        SourceError::CorruptReason {
+            message: "legacy yykv revision layout: next_revision is zero",
+            ..
+        } => FormatError("legacy .yykv revision layout: next revision is zero".to_owned()),
+        SourceError::CorruptReason {
+            message: "legacy yykv revision layout: record sits on next_revision",
+            ..
+        } => FormatError("legacy .yykv revision layout: a record sits on the next revision".to_owned()),
+        SourceError::CorruptReason {
+            message: "unexpected shard eof" | "shard length overflow",
+            ..
+        } => FormatError(truncated_detail(bytes)),
         other => FormatError(other.to_string()),
     }
 }

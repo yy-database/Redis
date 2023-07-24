@@ -82,8 +82,7 @@ impl Reply {
             Self::Map(entries) => {
                 if protocol >= 3 {
                     out.extend_from_slice(format!("%{}\r\n", entries.len()).as_bytes());
-                }
-                else {
+                } else {
                     out.extend_from_slice(format!("*{}\r\n", entries.len() * 2).as_bytes());
                 }
                 for (key, value) in entries {
@@ -121,18 +120,28 @@ impl Reply {
 
     /// Builds a reply from the JSON reply specification.
     pub fn from_spec(spec: &Json) -> Result<Self, String> {
-        let kind = spec.get("type").and_then(Json::as_str).ok_or("reply specification is missing `type`")?;
+        let kind = spec
+            .get("type")
+            .and_then(Json::as_str)
+            .ok_or("reply specification is missing `type`")?;
         match kind {
             "simple" => Ok(Self::Simple(text(spec)?)),
             "error" => Ok(Self::Error(text(spec)?)),
             "int" => Ok(Self::Integer(
-                spec.get("value").and_then(Json::as_i64).ok_or("reply specification `int` needs an integer `value`")?,
+                spec.get("value")
+                    .and_then(Json::as_i64)
+                    .ok_or("reply specification `int` needs an integer `value`")?,
             )),
             "bulk" => {
                 let bytes = match spec.get("bytes") {
                     Some(Json::Array(values)) => values
                         .iter()
-                        .map(|value| value.as_u64().and_then(|value| u8::try_from(value).ok()).ok_or("reply specification `bulk` has a non byte `bytes` entry"))
+                        .map(|value| {
+                            value
+                                .as_u64()
+                                .and_then(|value| u8::try_from(value).ok())
+                                .ok_or("reply specification `bulk` has a non byte `bytes` entry")
+                        })
                         .collect::<Result<Vec<u8>, _>>()?,
                     _ => text(spec)?.into_bytes(),
                 };
@@ -141,7 +150,10 @@ impl Reply {
             "null" => Ok(Self::Null),
             "null-array" => Ok(Self::NullArray),
             "array" => {
-                let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `array` needs a `value` list")?;
+                let values = spec
+                    .get("value")
+                    .and_then(Json::as_array)
+                    .ok_or("reply specification `array` needs a `value` list")?;
                 let mut replies = Vec::with_capacity(values.len());
                 for value in values {
                     replies.push(Self::from_spec(value)?);
@@ -149,7 +161,10 @@ impl Reply {
                 Ok(Self::Array(replies))
             }
             "push" => {
-                let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `push` needs a `value` list")?;
+                let values = spec
+                    .get("value")
+                    .and_then(Json::as_array)
+                    .ok_or("reply specification `push` needs a `value` list")?;
                 let mut replies = Vec::with_capacity(values.len());
                 for value in values {
                     replies.push(Self::from_spec(value)?);
@@ -157,10 +172,16 @@ impl Reply {
                 Ok(Self::Push(replies))
             }
             "map" => {
-                let values = spec.get("value").and_then(Json::as_array).ok_or("reply specification `map` needs a `value` list")?;
+                let values = spec
+                    .get("value")
+                    .and_then(Json::as_array)
+                    .ok_or("reply specification `map` needs a `value` list")?;
                 let mut entries = Vec::with_capacity(values.len());
                 for pair in values {
-                    let pair = pair.as_array().filter(|pair| pair.len() == 2).ok_or("each `map` entry needs exactly two replies")?;
+                    let pair = pair
+                        .as_array()
+                        .filter(|pair| pair.len() == 2)
+                        .ok_or("each `map` entry needs exactly two replies")?;
                     entries.push((Self::from_spec(&pair[0])?, Self::from_spec(&pair[1])?));
                 }
                 Ok(Self::Map(entries))
@@ -171,7 +192,10 @@ impl Reply {
 }
 
 fn text(spec: &Json) -> Result<String, String> {
-    spec.get("value").and_then(Json::as_str).map(str::to_owned).ok_or_else(|| "reply specification needs a string `value`".to_owned())
+    spec.get("value")
+        .and_then(Json::as_str)
+        .map(str::to_owned)
+        .ok_or_else(|| "reply specification needs a string `value`".to_owned())
 }
 
 /// One parsed client request.
@@ -265,14 +289,12 @@ pub fn decode_reply(input: &[u8]) -> Result<Option<(Reply, usize)>, String> {
     parse_reply(input[0], line, next, input)
 }
 
-fn parse_reply(
-    kind: u8,
-    header: &[u8],
-    next: usize,
-    input: &[u8],
-) -> Result<Option<(Reply, usize)>, String> {
+fn parse_reply(kind: u8, header: &[u8], next: usize, input: &[u8]) -> Result<Option<(Reply, usize)>, String> {
     match kind {
-        b'+' => Ok(Some((Reply::Simple(String::from_utf8_lossy(header).into_owned()), next))),
+        b'+' => Ok(Some((
+            Reply::Simple(String::from_utf8_lossy(header).into_owned()),
+            next,
+        ))),
         b'-' => Ok(Some((Reply::Error(String::from_utf8_lossy(header).into_owned()), next))),
         b':' => {
             let value = parse_count(header).ok_or("reply integer is not canonical")?;
@@ -300,8 +322,7 @@ fn parse_reply(
             let mut values = Vec::new();
             let replies = if kind == b'%' {
                 count.checked_mul(2).ok_or("reply aggregate length is out of range")?
-            }
-            else {
+            } else {
                 count
             };
             for _ in 0..replies {
@@ -318,11 +339,9 @@ fn parse_reply(
                     entries.push((key, value));
                 }
                 Ok(Some((Reply::Map(entries), offset)))
-            }
-            else if kind == b'>' {
+            } else if kind == b'>' {
                 Ok(Some((Reply::Push(values), offset)))
-            }
-            else {
+            } else {
                 Ok(Some((Reply::Array(values), offset)))
             }
         }
@@ -370,8 +389,7 @@ fn parse_count(bytes: &[u8]) -> Option<i64> {
     })?;
     if negative {
         magnitude.checked_neg()
-    }
-    else {
+    } else {
         Some(magnitude)
     }
 }

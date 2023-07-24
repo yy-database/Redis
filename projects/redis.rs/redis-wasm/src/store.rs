@@ -65,15 +65,14 @@ impl Node {
         let shard_path = data_dir.join(format!("{shard_id}.yykv"));
         let (records, next_revision) = if shard_path.exists() {
             let bytes = fs::read(&shard_path)?;
-            format::decode_shard(&bytes).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
-        }
-        else if registered.is_some() {
+            format::decode_shard(&bytes)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))?
+        } else if registered.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("catalog.shard-file: `{shard_id}.yykv` is missing"),
             ));
-        }
-        else {
+        } else {
             let records = Records::new();
             write_durable(&shard_path, &encode(&records, 1)?)?;
             (records, 1)
@@ -119,9 +118,20 @@ impl Node {
     }
 
     /// Inserts or replaces one kind of the key with an optional wall-clock deadline.
-    pub fn set_kind(&mut self, db: u8, kind: &str, key: &[u8], value: &[u8], expires_at: Option<i64>) -> io::Result<()> {
+    pub fn set_kind(
+        &mut self,
+        db: u8,
+        kind: &str,
+        key: &[u8],
+        value: &[u8],
+        expires_at: Option<i64>,
+    ) -> io::Result<()> {
         let record_key = (kind_namespace(db, kind), key.to_vec());
-        self.commit(vec![Change::Put { key: record_key, value: value.to_vec(), expires_at }])
+        self.commit(vec![Change::Put {
+            key: record_key,
+            value: value.to_vec(),
+            expires_at,
+        }])
     }
 
     /// Deletes one kind of the key, reporting whether a live record was removed.
@@ -140,7 +150,11 @@ impl Node {
             return Ok(false);
         };
         let record_key = (kind_namespace(db, kind), key.to_vec());
-        self.commit(vec![Change::Put { key: record_key, value: record.value, expires_at }])?;
+        self.commit(vec![Change::Put {
+            key: record_key,
+            value: record.value,
+            expires_at,
+        }])?;
         Ok(true)
     }
 
@@ -192,7 +206,11 @@ impl Node {
             return Ok(RenameOutcome::Missing);
         };
         if source == destination {
-            return Ok(if if_absent { RenameOutcome::DestinationPresent } else { RenameOutcome::Renamed });
+            return Ok(if if_absent {
+                RenameOutcome::DestinationPresent
+            } else {
+                RenameOutcome::Renamed
+            });
         }
         if if_absent && self.find_kind(db, destination).is_some() {
             return Ok(RenameOutcome::DestinationPresent);
@@ -202,9 +220,13 @@ impl Node {
         };
         let mut changes = KINDS
             .into_iter()
-            .map(|kind| Change::Delete { key: (kind_namespace(db, kind), destination.to_vec()) })
+            .map(|kind| Change::Delete {
+                key: (kind_namespace(db, kind), destination.to_vec()),
+            })
             .collect::<Vec<_>>();
-        changes.push(Change::Delete { key: (kind_namespace(db, source_kind), source.to_vec()) });
+        changes.push(Change::Delete {
+            key: (kind_namespace(db, source_kind), source.to_vec()),
+        });
         changes.push(Change::Put {
             key: (kind_namespace(db, source_kind), destination.to_vec()),
             value: record.value,
@@ -302,7 +324,13 @@ impl Node {
         let record_key = (record_namespace.clone(), key.to_vec());
         self.records.insert(
             record_key,
-            Record { namespace: record_namespace, key: key.to_vec(), value: total.to_string().into_bytes(), revision, expires_at },
+            Record {
+                namespace: record_namespace,
+                key: key.to_vec(),
+                value: total.to_string().into_bytes(),
+                revision,
+                expires_at,
+            },
         );
         self.pending_increments = true;
         Ok(Ok(total))
@@ -345,7 +373,16 @@ impl Node {
                     next_revision = next_revision.saturating_add(1);
                     let namespace = key.0.clone();
                     let bytes = key.1.clone();
-                    staged.insert(key, Record { namespace, key: bytes, value, revision, expires_at });
+                    staged.insert(
+                        key,
+                        Record {
+                            namespace,
+                            key: bytes,
+                            value,
+                            revision,
+                            expires_at,
+                        },
+                    );
                 }
                 Change::Delete { key } => {
                     staged.remove(&key);
@@ -384,8 +421,7 @@ pub fn repair_missing_shard(data_dir: impl AsRef<Path>) -> io::Result<String> {
                 io::ErrorKind::InvalidData,
                 format!("catalog.file: `{CATALOG_FILE}` is missing; open the directory normally to create it"),
             )
-        }
-        else {
+        } else {
             error
         }
     })?;
@@ -421,8 +457,14 @@ pub enum RenameOutcome {
 }
 
 enum Change {
-    Put { key: (String, Vec<u8>), value: Vec<u8>, expires_at: Option<i64> },
-    Delete { key: (String, Vec<u8>) },
+    Put {
+        key: (String, Vec<u8>),
+        value: Vec<u8>,
+        expires_at: Option<i64>,
+    },
+    Delete {
+        key: (String, Vec<u8>),
+    },
 }
 
 /// Namespace label for one Redis database index.
@@ -439,8 +481,7 @@ pub fn namespace(db: u8) -> String {
 pub fn kind_namespace(db: u8, kind: &str) -> String {
     if kind.is_empty() {
         namespace(db)
-    }
-    else {
+    } else {
         format!("{}:{kind}", namespace(db))
     }
 }
@@ -453,7 +494,8 @@ fn belongs_to(candidate: &str, base: &str) -> bool {
 }
 
 fn encode(records: &Records, revision: u64) -> io::Result<Vec<u8>> {
-    format::encode_shard(records, revision).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))
+    format::encode_shard(records, revision)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))
 }
 
 /// Writes `bytes` to `path` through a synced temporary file and an atomic rename.
@@ -474,7 +516,13 @@ pub fn records_from_entries(entries: impl IntoIterator<Item = (u8, Vec<u8>, Vec<
     let mut records = BTreeMap::new();
     for (index, key, value, expires_at) in entries {
         let namespace = namespace(index);
-        let record = Record { namespace: namespace.clone(), key: key.clone(), value, revision: 1, expires_at };
+        let record = Record {
+            namespace: namespace.clone(),
+            key: key.clone(),
+            value,
+            revision: 1,
+            expires_at,
+        };
         records.insert((namespace, key), record);
     }
     records
