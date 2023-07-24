@@ -26,6 +26,47 @@ jobs:
       - name: Format check
         run: cargo fmt --manifest-path projects/redis.rs/Cargo.toml --all --check
 
+  rust-bindings:
+    name: bindings (build and import)
+    runs-on: ubuntu-latest
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2026-07-20
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: projects/redis.rs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build bindings
+        run: cargo build --release --manifest-path projects/redis.rs/Cargo.toml -p redis-napi -p redis-pyo3
+      - name: Import Node-API binding
+        run: |
+          mkdir -p "$RUNNER_TEMP/napi"
+          cp projects/redis.rs/target/release/libredis_napi.so "$RUNNER_TEMP/napi/redis_napi.node"
+          node -e "
+          const binding = require(process.env.RUNNER_TEMP + '/napi/redis_napi.node');
+          const decoded = binding.decodeCommand(Buffer.from('*2\r\n\$3\r\nGET\r\n\$1\r\nk\r\n'));
+          if (!decoded || decoded.args.length !== 2) process.exit(1);
+          const args = decoded.args.map(item => Buffer.from(item).toString());
+          if (args.join(' ') !== 'GET k') process.exit(1);
+          console.log('napi import ok:', args.join(' '));
+          "
+      - name: Import pyo3 binding
+        run: |
+          mkdir -p "$RUNNER_TEMP/pyo3"
+          cp projects/redis.rs/target/release/lib_native.so "$RUNNER_TEMP/pyo3/_native.so"
+          PYTHONPATH="$RUNNER_TEMP/pyo3" python -c "
+          import _native
+          args, consumed = _native.decode_command(b'*2\r\n\$3\r\nGET\r\n\$1\r\nk\r\n')
+          assert [bytes(item) for item in args] == [b'GET', b'k'], args
+          assert consumed == len(b'*2\r\n\$3\r\nGET\r\n\$1\r\nk\r\n'), consumed
+          print('pyo3 import ok:', args)
+          "
+
   rust-test:
     name: cargo test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

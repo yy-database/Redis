@@ -2854,6 +2854,9 @@ function replyNative(reply) {
 
 /** Expected reply as redis-py reads it: values are native and `ERR ` is stripped. */
 function replyExpected(reply) {
+    if (reply === undefined) {
+        throw new Error('case has no expected reply and no scan contract');
+    }
     if (reply.type === 'error') {
         return { kind: 'error', value: reply.value.startsWith('ERR ') ? reply.value.slice(4) : reply.value };
     }
@@ -2933,14 +2936,21 @@ function buildCasePlan(root) {
     const payload = JSON.parse(readFileSync(join(root, 'tests', 'cases', 'five-kinds.json'), 'utf8'));
     return payload.cases
         .filter(entry => entry.op === 'command')
-        .map(entry => ({
-            id: entry.id,
-            db: 7,
-            setup: entry.setup.flatMap(setupCommands),
-            command: entry.argsText,
-            reply: pythonReplyExpected(entry.id, replyExpected(entry.reply)),
-            effects: entry.effect.map(effectExpected),
-        }));
+        .map(entry => {
+            const contract = entry.scanContract === undefined ? null : {
+                cursorArgIndex: 1,
+                universe: entry.scanContract.universe,
+            };
+            return {
+                id: entry.id,
+                db: 7,
+                setup: entry.setup.flatMap(setupCommands),
+                command: entry.argsText,
+                reply: contract === null ? pythonReplyExpected(entry.id, replyExpected(entry.reply)) : null,
+                contract,
+                effects: entry.effect.map(effectExpected),
+            };
+        });
 }
 
 function assertCaseResults(actual, plan) {
@@ -2952,8 +2962,29 @@ function assertCaseResults(actual, plan) {
             problems.push(`${entry.id}: missing from the driver output`);
             continue;
         }
-        if (JSON.stringify(read.reply) !== JSON.stringify(entry.reply)) {
-            problems.push(`${entry.id}: reply expected ${JSON.stringify(entry.reply)}, read ${JSON.stringify(read.reply)}`);
+        if (entry.contract === null) {
+            if (JSON.stringify(read.reply) !== JSON.stringify(entry.reply)) {
+                problems.push(`${entry.id}: reply expected ${JSON.stringify(entry.reply)}, read ${JSON.stringify(read.reply)}`);
+            }
+        } else if (read.pages === undefined) {
+            problems.push(`${entry.id}: driver returned no scan pages`);
+        } else {
+            const seen = new Set();
+            let ended = false;
+            for (const page of read.pages) {
+                for (const member of page.members) seen.add(Buffer.from(member, 'utf8').toString('hex'));
+                ended = page.cursor === '0';
+            }
+            if (!ended) problems.push(`${entry.id}: scan never reached cursor 0`);
+            for (const member of seen) {
+                if (!entry.contract.universe.includes(member)) {
+                    problems.push(`${entry.id}: scan returned unexpected member ${member}`);
+                }
+            }
+            const missing = entry.contract.universe.filter(member => !seen.has(member));
+            if (missing.length > 0) {
+                problems.push(`${entry.id}: scan missed ${missing.join(', ')}`);
+            }
         }
         const expectedEffects = entry.effects.map(effect => effect.expect);
         if (JSON.stringify(read.effects) !== JSON.stringify(expectedEffects)) {
@@ -3017,8 +3048,25 @@ for case in plan:
     client.flushdb()
     for command in case["setup"]:
         client.execute_command(*command)
+    pages = None
     try:
-        reply = wrapped(client.execute_command(*case["command"]))
+        if case.get("contract") is not None:
+            args = list(case["command"])
+            requested = client.execute_command(*args)
+            pages = [{"cursor": str(requested[0]), "members": [str(item) for item in requested[1]]}]
+            cursor = "0"
+            while True:
+                args[case["contract"]["cursorArgIndex"]] = cursor
+                page = client.execute_command(*args)
+                pages.append({"cursor": str(page[0]), "members": [str(item) for item in page[1]]})
+                cursor = str(page[0])
+                if cursor == "0":
+                    break
+                if len(pages) > 1000:
+                    break
+            reply = None
+        else:
+            reply = wrapped(client.execute_command(*case["command"]))
     except redis.ResponseError as error:
         reply = {"kind": "error", "value": str(error)}
     effects = []
@@ -3044,7 +3092,7 @@ for case in plan:
         else:
             raise SystemExit("unknown effect kind " + kind)
         effects.append(plain(value))
-    results.append({"id": case["id"], "reply": reply, "effects": effects})
+    results.append({"id": case["id"], "reply": reply, "pages": pages, "effects": effects})
 
 client.close()
 print(json.dumps(results))
