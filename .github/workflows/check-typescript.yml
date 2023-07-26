@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: pnpm/action-setup@v4
         with:
           version: 10.18.3
@@ -30,7 +33,9 @@ jobs:
         with:
           workspaces: projects/redis.rs
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: |
+          pnpm install --no-frozen-lockfile
+          python -m pip install --quiet "redis==8.1.0"
       - name: Native binding
         run: node scripts/build-platforms.mjs
       - name: TypeScript acceptance
