@@ -1699,6 +1699,101 @@
       ]
     },
     {
+      "id": "pubsub.resp3.unsubscribe.idle",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "UNSUBSCRIBE"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "int",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pubsub.resp3.punsubscribe.idle",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "PUNSUBSCRIBE"
+          ],
+          "protocol": 3,
+          "frames": [
+            {
+              "type": "push",
+              "value": [
+                {
+                  "type": "bulk",
+                  "bytes": [
+                    112,
+                    117,
+                    110,
+                    115,
+                    117,
+                    98,
+                    115,
+                    99,
+                    114,
+                    105,
+                    98,
+                    101
+                  ]
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "int",
+                  "value": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "pubsub.reset",
       "face": "command",
       "op": "dispatch",
