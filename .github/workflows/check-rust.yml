@@ -61,9 +61,10 @@ jobs:
           cp projects/redis.rs/target/release/lib_native.so "$RUNNER_TEMP/pyo3/_native.so"
           PYTHONPATH="$RUNNER_TEMP/pyo3" python -c "
           import _native
-          args, consumed = _native.decode_command(b'*2\r\n\$3\r\nGET\r\n\$1\r\nk\r\n')
+          frame = b'*2\r\n\$3\r\nGET\r\n\$1\r\nk\r\n'
+          consumed, args = _native.decode_command(frame)
+          assert consumed == len(frame), consumed
           assert [bytes(item) for item in args] == [b'GET', b'k'], args
-          assert consumed == len(b'*2\r\n\$3\r\nGET\r\n\$1\r\nk\r\n'), consumed
           print('pyo3 import ok:', args)
           "
 
