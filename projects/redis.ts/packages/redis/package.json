@@ -1,9 +1,9 @@
 {
   "name": "@yydb/redis",
   "version": "0.0.0",
-  "private": true,
   "type": "module",
   "description": "Redis-compatible server and client composed over the `.yyds` and `.yykv` backends",
+  "license": "MPL-2.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -27,14 +27,22 @@
     "prepack": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "devDependencies": {
-    "typescript": "^5.9.2"
+  "engines": {
+    "node": ">=24.0.0"
   },
   "optionalDependencies": {
-    "@yydb/redis-darwin-arm64": "workspace:*",
-    "@yydb/redis-darwin-x64": "workspace:*",
-    "@yydb/redis-linux-x64": "workspace:*",
-    "@yydb/redis-unknown-wasm32": "workspace:*",
-    "@yydb/redis-win32-x64": "workspace:*"
+    "@yydb/redis-darwin-arm64": "0.0.0",
+    "@yydb/redis-darwin-x64": "0.0.0",
+    "@yydb/redis-linux-x64": "0.0.0",
+    "@yydb/redis-unknown-wasm32": "0.0.0",
+    "@yydb/redis-win32-x64": "0.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yy-database/Redis.git",
+    "directory": "projects/redis.ts/packages/redis"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
   }
 }

@@ -1,12 +1,19 @@
 {
   "name": "@yydb/redis-unknown-wasm32",
   "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "description": "WebAssembly binding for `@yydb/redis`",
-  "main": "index.js",
+  "license": "MPL-2.0",
+  "description": "WASM binding for @yydb/redis",
+  "main": "redis.unknown-wasm32.node",
   "files": [
-    "index.js",
-    "lib"
-  ]
+    "redis.unknown-wasm32.node",
+    "readme.md"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yy-database/Redis.git",
+    "directory": "projects/redis.ts/platforms/redis-unknown-wasm32"
+  }
 }

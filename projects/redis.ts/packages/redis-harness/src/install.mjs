@@ -83,10 +83,11 @@ export async function prepareInstall() {
     }
     const composition = join(root, 'projects', 'redis.ts', 'packages', 'redis');
     const platformDir = join(root, 'projects', 'redis.ts', 'platforms', `redis-${platform}`);
-    const binding = join(platformDir, 'lib', `redis-${platform}.node`);
+    const binding = join(platformDir, `redis.${platform}.node`);
     if (!existsSync(binding)) {
         throw new Error(`missing ${binding}: run \`node scripts/build-platforms.mjs\` from the repository root first`);
     }
+
 
     const scratch = mkdtempSync(join(tmpdir(), 'redis-harness-install-'));
     const pnpm = pnpmEntry();

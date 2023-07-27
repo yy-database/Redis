@@ -1,12 +1,21 @@
 {
   "name": "@yydb/redis-win32-x64",
   "version": "0.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Windows x64 binding for `@yydb/redis`",
-  "main": "index.js",
+  "license": "MPL-2.0",
+  "description": "Native binding for @yydb/redis on win32-x64",
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "main": "redis.win32-x64.node",
   "files": [
-    "index.js",
-    "lib"
-  ]
+    "redis.win32-x64.node",
+    "readme.md"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yy-database/Redis.git",
+    "directory": "projects/redis.ts/platforms/redis-win32-x64"
+  }
 }

@@ -62,11 +62,12 @@ test('the composition package resolves from the installed tree', () => {
 
 test('the platform binding resolves from the installed tree', () => {
     const manifest = installed.resolve(`@yydb/redis-${installed.platform}/package.json`);
-    const binding = join(dirname(manifest), 'lib', `redis-${installed.platform}.node`);
+    const binding = join(dirname(manifest), `redis.${installed.platform}.node`);
     assert.ok(binding.startsWith(installed.scratch), binding);
     assert.ok(binding.endsWith('.node'), binding);
     assert.ok(existsSync(binding), `missing installed binding ${binding}`);
 });
+
 
 test('values persist across reopen', () => {
     const directory = temporaryDir();

@@ -145,8 +145,9 @@ pnpm build
 ```
 
 `pnpm build` runs `cargo build -p redis-napi`, copies the artifact to
-`projects/redis.ts/platforms/redis-<platform>/lib`, and compiles the TypeScript
-package into `dist`. Run the server and client directly from the workspace:
+`projects/redis.ts/platforms/redis-<platform>/redis.<platform>.node`, and
+compiles the TypeScript package into `dist`. Run the server and client
+directly from the workspace:
 
 ```sh
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data

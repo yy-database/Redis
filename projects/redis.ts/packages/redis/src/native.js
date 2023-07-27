@@ -1,9 +1,13 @@
 //! Loads the platform binding and re-exports its orthogonal primitives.
+//! `package.json#main` owns the `.node` filename — callers never concatenate it.
 
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const platforms = {
     win32: { x64: 'win32-x64' },
@@ -25,9 +29,21 @@ function load() {
     if (!platform) {
         throw new Error(`no native binding for ${process.platform}-${process.arch}`);
     }
-    const manifest = require.resolve(`@yydb/redis-${platform}/package.json`);
-    binding = require(join(dirname(manifest), 'lib', `redis-${platform}.node`));
-    return binding;
+    const platformPackage = `@yydb/redis-${platform}`;
+    try {
+        binding = require(platformPackage);
+        return binding;
+    } catch (error) {
+        const repo = resolve(packageRoot, '..', '..', '..', '..');
+        const local = join(repo, 'projects', 'redis.ts', 'platforms', `redis-${platform}`);
+        if (existsSync(join(local, 'package.json'))) {
+            binding = require(local);
+            return binding;
+        }
+        throw new Error(
+            `cannot resolve ${platformPackage}: install the matching platform package (${error.message})`,
+        );
+    }
 }
 
 /** Resolves the wire and storage primitives exported by the platform binding. */

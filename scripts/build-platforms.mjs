@@ -1,33 +1,41 @@
 //! Builds the Node-API binding and places it in the matching platform package.
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { copyFileSync, existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-const manifest = join(root, 'projects', 'redis.rs', 'Cargo.toml');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const crateDir = join(root, 'projects', 'redis.rs');
+const platform = `${process.platform}-${process.arch}`;
+const packageDir = join(root, 'projects', 'redis.ts', 'platforms', `redis-${platform}`);
+const nodeName = `redis.${platform}.node`;
 
-const platforms = {
-    win32: { x64: { name: 'win32-x64', artifact: 'redis_napi.dll' } },
-    darwin: {
-        arm64: { name: 'darwin-arm64', artifact: 'libredis_napi.dylib' },
-        x64: { name: 'darwin-x64', artifact: 'libredis_napi.dylib' },
-    },
-    linux: { x64: { name: 'linux-x64', artifact: 'libredis_napi.so' } },
-};
+const artifact = {
+    win32: { name: 'redis_napi.dll' },
+    darwin: { name: 'libredis_napi.dylib' },
+    linux: { name: 'libredis_napi.so' },
+}[process.platform];
 
-const target = platforms[process.platform]?.[process.arch];
-if (target === undefined) {
+if (!artifact) {
     console.log(`no platform package for ${process.platform}-${process.arch}`);
     process.exit(0);
 }
 
-execFileSync('cargo', ['build', '--manifest-path', manifest, '-p', 'redis-napi'], { stdio: 'inherit' });
+const release = process.argv.includes('--release');
+execFileSync(
+    'cargo',
+    ['build', '--manifest-path', join(crateDir, 'Cargo.toml'), '-p', 'redis-napi', ...(release ? ['--release'] : [])],
+    { stdio: 'inherit' },
+);
 
-const targetDir = process.env.CARGO_TARGET_DIR ?? join(root, 'projects', 'redis.rs', 'target');
-const output = join(targetDir, 'debug', target.artifact);
-const destination = join(root, 'projects', 'redis.ts', 'platforms', `redis-${target.name}`, 'lib', `redis-${target.name}.node`);
-mkdirSync(dirname(destination), { recursive: true });
-copyFileSync(output, destination);
-console.log(`installed ${destination}`);
+const profile = release ? 'release' : 'debug';
+const targetDir = resolve(crateDir, process.env.CARGO_TARGET_DIR ?? 'target');
+const source = join(targetDir, profile, artifact.name);
+if (!existsSync(source)) {
+    throw new Error(`missing build artifact ${source}`);
+}
+
+const dest = join(packageDir, nodeName);
+copyFileSync(source, dest);
+console.log(`napi addon -> ${dest}`);

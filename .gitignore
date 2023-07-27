@@ -1,23 +1,26 @@
 # OS
 .DS_Store/
 thumbs.db
-time-travel.*
 
 # IDE
 .vscode/
 .vs/
 .idea/
 *.iml
+*.log
+*.txt
 
 # Rust
 target/
+.cargo/config.toml
 
 # Node
 node_modules/
 dist/
 *.tsbuildinfo
-projects/redis.ts/platforms/*/lib/*.node
-projects/redis.ts/platforms/*/lib/*.wasm
+*.node
+*.wasm
+*.tgz
 
 # Python
 __pycache__/
@@ -25,6 +28,13 @@ __pycache__/
 .venv*/
 *.whl
 *.egg-info/
+
+# Local npm 2FA (never commit)
+.env.placeholder.local
+.env*.local
+
+# Nifty local cache
+.cache/
 
 # Local data
 data/
