@@ -1,0 +1,16 @@
+[package]
+name = "redis-pyo3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Python binding for the Redis-compatible wire service"
+publish = false
+
+[lib]
+name = "redis_server"
+crate-type = ["cdylib"]
+
+[dependencies]
+redis-napi = { path = "../redis-napi" }
+pyo3 = { workspace = true }

@@ -11,4 +11,21 @@ time-travel.*
 
 # Rust
 target/
-Cargo.lock
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv*/
+*.whl
+*.egg-info/
+
+# Local data
+data/
+*.yyds
+*.yykv
+*.tmp

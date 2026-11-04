@@ -1,0 +1,25 @@
+[package]
+name = "redis-napi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Redis-compatible wire service over the YYDS `.yyds` and `.yykv` storage backends"
+publish = false
+readme = "readme.md"
+
+[lib]
+name = "redis_napi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "redis-server"
+path = "src/bin/redis-server.rs"
+
+[[bin]]
+name = "redis-cli"
+path = "src/bin/redis-cli.rs"
+
+[dependencies]
+
+[dev-dependencies]
