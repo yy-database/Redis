@@ -4,13 +4,15 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Python binding for the Redis-compatible wire service"
+repository.workspace = true
+description = "Python binding for the RESP and `.yyds` primitives"
 publish = false
 
 [lib]
-name = "redis_server"
+name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-redis-napi = { path = "../redis-napi" }
 pyo3 = { workspace = true }
+redis-wasm = { path = "../redis-wasm" }
+serde_json = { workspace = true }

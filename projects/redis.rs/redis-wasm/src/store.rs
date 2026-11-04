@@ -147,6 +147,32 @@ impl Node {
         self.len(db) == 0
     }
 
+    /// Appends `suffix` to a live value, preserving its deadline.
+    pub fn append(&mut self, db: u8, key: &[u8], suffix: &[u8]) -> io::Result<usize> {
+        let mut value = self.get(db, key).map_or_else(Vec::new, |record| record.value.clone());
+        value.extend_from_slice(suffix);
+        let deadline = self.deadline(db, key);
+        self.set(db, key, &value, deadline)?;
+        Ok(value.len())
+    }
+
+    /// Adds `delta` to an integer value, preserving its deadline.
+    pub fn incr_by(&mut self, db: u8, key: &[u8], delta: i64) -> io::Result<Result<i64, String>> {
+        let current = match self.get(db, key) {
+            None => 0,
+            Some(record) => match crate::format::parse_integer(&record.value) {
+                Some(value) => value,
+                None => return Ok(Err("value is not an integer or out of range".to_owned())),
+            },
+        };
+        let Some(total) = current.checked_add(delta) else {
+            return Ok(Err("increment or decrement would overflow".to_owned()));
+        };
+        let deadline = self.deadline(db, key);
+        self.set(db, key, total.to_string().as_bytes(), deadline)?;
+        Ok(Ok(total))
+    }
+
     fn commit(&mut self, changes: Vec<Change>) -> io::Result<()> {
         if changes.is_empty() {
             return Ok(());

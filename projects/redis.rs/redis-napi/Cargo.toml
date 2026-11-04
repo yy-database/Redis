@@ -4,22 +4,19 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "Redis-compatible wire service over the YYDS `.yyds` and `.yykv` storage backends"
+repository.workspace = true
+description = "Node-API binding for the RESP and `.yyds` primitives"
 publish = false
-readme = "readme.md"
 
 [lib]
 name = "redis_napi"
-path = "src/lib.rs"
-
-[[bin]]
-name = "redis-server"
-path = "src/bin/redis-server.rs"
-
-[[bin]]
-name = "redis-cli"
-path = "src/bin/redis-cli.rs"
+crate-type = ["cdylib"]
 
 [dependencies]
+napi = { workspace = true }
+napi-derive = { workspace = true }
+redis-wasm = { path = "../redis-wasm" }
+serde_json = { workspace = true }
 
-[dev-dependencies]
+[build-dependencies]
+napi-build = { workspace = true }

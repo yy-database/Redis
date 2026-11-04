@@ -3,8 +3,9 @@ resolver = "2"
 members = [
     "redis-napi",
     "redis-pyo3",
+    "redis-wasm",
 ]
-default-members = ["redis-napi"]
+default-members = ["redis-wasm"]
 
 [workspace.package]
 version = "0.0.0"
@@ -14,4 +15,8 @@ license = "MPL-2.0"
 repository = "https://github.com/yy-database/Redis"
 
 [workspace.dependencies]
+napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
+napi-derive = "3.6.12"
+napi-build = "2.6"
 pyo3 = { version = "0.30.1", features = ["extension-module"] }
+serde_json = "1"

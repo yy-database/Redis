@@ -65,6 +65,29 @@ pub fn now_unix_ms() -> i64 {
         .unwrap_or(0)
 }
 
+/// Canonical integer parsing used by every numeric command: optional minus
+/// sign, no leading zeros, no plus sign, no whitespace.
+pub fn parse_integer(bytes: &[u8]) -> Option<i64> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let (negative, digits) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text),
+    };
+    if digits.is_empty() || digits.len() > 19 || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    if digits.len() > 1 && digits.starts_with('0') {
+        return None;
+    }
+    let value: i64 = digits.parse().ok()?;
+    if negative {
+        value.checked_neg()
+    }
+    else {
+        Some(value)
+    }
+}
+
 /// Serializes the shard snapshot to `.yykv` bytes.
 pub fn encode_shard(records: &Records, next_revision: u64) -> Result<Vec<u8>> {
     let mut body = Vec::new();
@@ -292,5 +315,14 @@ mod tests {
     fn catalog_registers_one_shard() {
         let bytes = encode_catalog("local-0");
         assert_eq!(decode_catalog_shard_id(&bytes).expect("decode"), "local-0");
+    }
+
+    #[test]
+    fn canonical_integers_reject_leading_zero_and_plus() {
+        assert_eq!(parse_integer(b"42"), Some(42));
+        assert_eq!(parse_integer(b"-7"), Some(-7));
+        assert_eq!(parse_integer(b"05"), None);
+        assert_eq!(parse_integer(b"+5"), None);
+        assert_eq!(parse_integer(b""), None);
     }
 }
