@@ -25,3 +25,35 @@ jobs:
         run: cargo build --release
       - name: Tests
         run: cargo test --release
+  acceptance:
+    runs-on: ubuntu-latest
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - name: Rust Nightly
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            override: true
+      - uses: actions/setup-node@v4
+        with:
+            node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+            python-version: "3.12"
+      - name: Workspace
+        run: |
+          npm install -g pnpm@10.18.3
+          pnpm install
+      - name: Python tooling
+        run: python -m pip install maturin pytest
+      - name: Native binding
+        run: node scripts/build-platforms.mjs
+      - name: Rust smoke
+        run: cargo test --release --manifest-path projects/redis.rs/Cargo.toml -p redis-wasm
+      - name: TypeScript acceptance
+        run: pnpm gate:test-count:ts
+      - name: Python acceptance
+        run: pnpm gate:test-count:py
+      - name: Cross implementation oracle
+        run: pnpm gate:oracle
