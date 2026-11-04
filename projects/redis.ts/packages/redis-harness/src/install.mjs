@@ -50,8 +50,12 @@ function pnpmEntry() {
 }
 
 function npmEntry() {
+    const bin = dirname(process.execPath);
     return scriptEntry(
-        [join(nodeModules, 'npm', 'bin', 'npm-cli.js'), join(dirname(process.execPath), 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')],
+        [
+            join(bin, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+            join(bin, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+        ],
         'npm',
     );
 }
