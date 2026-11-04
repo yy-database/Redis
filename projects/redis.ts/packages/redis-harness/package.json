@@ -1,0 +1,12 @@
+{
+  "name": "@yydb/redis-harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Installed-state acceptance checks for `@yydb/redis` and its platform binding",
+  "scripts": {
+    "pretest": "node ../../../../scripts/build-platforms.mjs",
+    "test": "node --test --test-reporter=tap",
+    "oracle": "node bin/oracle.mjs"
+  }
+}
