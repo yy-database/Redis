@@ -163,9 +163,9 @@ function plan(store, session, name, args) {
             if (args.length !== 4) return { error: wrongArity('setex') };
             const seconds = parseInteger(args[2]);
             if (seconds === null) return { error: integerError() };
-            const deadline = seconds > 0 ? secondsDeadline(seconds) : null;
-            if (deadline === null) return { error: replyError("ERR invalid expire time in 'setex' command") };
-            return { run: () => { store.set(session.db, args[1], args[3], deadline); return simple('OK'); } };
+            const offset = seconds > 0 ? secondsDeadline(seconds) : null;
+            if (offset === null) return { error: replyError("ERR invalid expire time in 'setex' command") };
+            return { run: () => { store.set(session.db, args[1], args[3], Date.now() + offset); return simple('OK'); } };
         }
 
         case 'getset': {
@@ -323,9 +323,99 @@ function plan(store, session, name, args) {
             return { run: () => integer(store.size(session.db)) };
         }
 
+        case 'keys': {
+            if (args.length !== 2) return { error: wrongArity('keys') };
+            const pattern = args[1];
+            return {
+                run: () => array(
+                    store.keys(session.db)
+                        .filter(key => globMatch(pattern, key))
+                        .map(key => bulk(key)),
+                ),
+            };
+        }
+
+        case 'scan':
+            return planScan(store, session, args);
+
         default:
             return { error: replyError('ERR unsupported command') };
     }
+}
+
+/** Matches `key` bytes against the Redis glob subset `*`, `?` and literals. */
+export function globMatch(pattern, key) {
+    let patternIndex = 0;
+    let keyIndex = 0;
+    let star = -1;
+    let resume = 0;
+    while (keyIndex < key.length) {
+        if (patternIndex < pattern.length && (pattern[patternIndex] === 0x3f || pattern[patternIndex] === key[keyIndex])) {
+            patternIndex += 1;
+            keyIndex += 1;
+            continue;
+        }
+        if (patternIndex < pattern.length && pattern[patternIndex] === 0x2a) {
+            star = patternIndex;
+            patternIndex += 1;
+            resume = keyIndex;
+            continue;
+        }
+        if (star >= 0) {
+            patternIndex = star + 1;
+            resume += 1;
+            keyIndex = resume;
+            continue;
+        }
+        return false;
+    }
+    while (patternIndex < pattern.length && pattern[patternIndex] === 0x2a) {
+        patternIndex += 1;
+    }
+    return patternIndex === pattern.length;
+}
+
+function planScan(store, session, args) {
+    if (args.length < 2) {
+        return { error: wrongArity('scan') };
+    }
+    const cursor = parseInteger(args[1]);
+    if (cursor === null || cursor < 0) {
+        return { error: replyError('ERR invalid cursor') };
+    }
+    let pattern = null;
+    let count = 10;
+    for (let index = 2; index < args.length; index += 2) {
+        const option = text(args[index]).toLowerCase();
+        const raw = args[index + 1];
+        if (raw === undefined) {
+            return { error: replyError('ERR syntax error') };
+        }
+        if (option === 'match') {
+            pattern = raw;
+            continue;
+        }
+        if (option === 'count') {
+            const amount = parseInteger(raw);
+            if (amount === null || amount <= 0) {
+                return { error: replyError('ERR syntax error') };
+            }
+            count = amount;
+            continue;
+        }
+        return { error: replyError('ERR syntax error') };
+    }
+    const database = session.db;
+    return {
+        run: () => {
+            const keys = store.keys(database).filter(key => pattern === null || globMatch(pattern, key));
+            const start = Math.min(cursor, keys.length);
+            const page = keys.slice(start, start + count);
+            const next = start + page.length;
+            const position = next >= keys.length ? '0' : String(next);
+            return array([bulk(position), array(page.map(key => bulk(key)))]);
+        },
+    };
 }
 
 function planClient(session, args) {

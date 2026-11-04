@@ -152,6 +152,24 @@ impl Store {
         self.node.append(db, &key, &suffix).map(|length| length as u32).map_err(reason)
     }
 
+    /// Live keys of one database in ascending byte order.
+    #[napi]
+    pub fn keys(&self, db: u8) -> Vec<Buffer> {
+        self.node.keys(db).into_iter().map(Buffer::from).collect()
+    }
+
+    /// Inserts or replaces many values with one durable commit.
+    #[napi]
+    pub fn set_many(
+        &mut self, db: u8, keys: Vec<Buffer>, values: Vec<Buffer>,
+    ) -> std::result::Result<(), napi::Error> {
+        if keys.len() != values.len() {
+            return Err(reason("`keys` and `values` must carry the same number of entries"));
+        }
+        let entries = keys.into_iter().zip(values).map(|(key, value)| (key.to_vec(), value.to_vec())).collect::<Vec<_>>();
+        self.node.set_many(db, &entries).map_err(reason)
+    }
+
     /// Adds `delta` to an integer value, preserving its deadline.
     #[napi]
     pub fn incr_by(&mut self, db: u8, key: Buffer, delta: i64) -> std::result::Result<Increment, napi::Error> {

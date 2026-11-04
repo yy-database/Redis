@@ -121,6 +121,16 @@ impl Store {
         self.node.append(db, key, suffix).map_err(runtime)
     }
 
+    /// Live keys of one database in ascending byte order.
+    fn keys(&self, db: u8) -> Vec<Vec<u8>> {
+        self.node.keys(db)
+    }
+
+    /// Inserts or replaces many values with one durable commit.
+    fn set_many(&mut self, db: u8, entries: Vec<(Vec<u8>, Vec<u8>)>) -> PyResult<()> {
+        self.node.set_many(db, &entries).map_err(runtime)
+    }
+
     /// Adds `delta` to an integer value, preserving its deadline.
     ///
     /// Returns `(value, error)`. `error` carries the Redis error text when the

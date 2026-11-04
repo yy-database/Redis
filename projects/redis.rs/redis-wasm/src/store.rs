@@ -149,6 +149,31 @@ impl Node {
         self.len(db) == 0
     }
 
+    /// Live keys of one database in ascending byte order, backing `KEYS` and `SCAN`.
+    pub fn keys(&self, db: u8) -> Vec<Vec<u8>> {
+        let prefix = namespace(db);
+        let now = format::now_unix_ms();
+        self.records
+            .iter()
+            .filter(|(key, record)| key.0 == prefix && !record.is_expired_at(now))
+            .map(|(key, _)| key.1.clone())
+            .collect()
+    }
+
+    /// Inserts or replaces many values with one durable commit, backing bulk loads.
+    pub fn set_many(&mut self, db: u8, entries: &[(Vec<u8>, Vec<u8>)]) -> io::Result<()> {
+        let namespace = namespace(db);
+        let changes = entries
+            .iter()
+            .map(|(key, value)| Change::Put {
+                key: (namespace.clone(), key.clone()),
+                value: value.clone(),
+                expires_at: None,
+            })
+            .collect();
+        self.commit(changes)
+    }
+
     /// Appends `suffix` to a live value, preserving its deadline.
     pub fn append(&mut self, db: u8, key: &[u8], suffix: &[u8]) -> io::Result<usize> {
         let mut value = self.get(db, key).map_or_else(Vec::new, |record| record.value.clone());
