@@ -1,0 +1,3 @@
+packages:
+  - projects/redis.ts/packages/*
+  - projects/redis.ts/platforms/*

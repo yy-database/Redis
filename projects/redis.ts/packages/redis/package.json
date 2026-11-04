@@ -1,0 +1,27 @@
+{
+  "name": "@yydb/redis",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Redis-compatible server and client composed over the `.yyds` and `.yykv` backends",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "bin": {
+    "redis-cli": "./bin/redis-cli.mjs",
+    "redis-server": "./bin/redis-server.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "readme.md"
+  ],
+  "optionalDependencies": {
+    "@yydb/redis-darwin-arm64": "workspace:*",
+    "@yydb/redis-darwin-x64": "workspace:*",
+    "@yydb/redis-linux-x64": "workspace:*",
+    "@yydb/redis-unknown-wasm32": "workspace:*",
+    "@yydb/redis-win32-x64": "workspace:*"
+  }
+}
