@@ -42,10 +42,10 @@ impl Node {
         }
         else {
             let records = Records::new();
-            write_durable(&shard_path, &encode(&records, 0)?)?;
-            (records, 0)
+            write_durable(&shard_path, &encode(&records, 1)?)?;
+            (records, 1)
         };
-        Ok(Self { data_dir, shard_path, records, next_revision })
+        Ok(Self { data_dir, shard_path, records, next_revision: next_revision.max(1) })
     }
 
     /// Directory holding the catalog and the shard.
