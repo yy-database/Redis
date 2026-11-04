@@ -10,10 +10,12 @@ use crate::format::{self, Record, Records};
 
 /// How many logical databases the service exposes, matching the Redis default.
 pub const DATABASES: u8 = 16;
-
-const SHARD_FILE: &str = "local-0.yykv";
-const CATALOG_FILE: &str = "local-0.yyds";
-const NAMESPACE_PREFIX: &str = "redis:db";
+/// File name of the shard snapshot inside the data directory.
+pub const SHARD_FILE: &str = "local-0.yykv";
+/// File name of the catalog inside the data directory.
+pub const CATALOG_FILE: &str = "local-0.yyds";
+/// Namespace prefix carrying the logical database index.
+pub const NAMESPACE_PREFIX: &str = "redis:db";
 
 /// One `.yyds` catalog plus one `.yykv` shard on disk.
 #[derive(Debug)]
@@ -173,31 +175,45 @@ impl Node {
         Ok(Ok(total))
     }
 
+    fn bump_revision(&mut self) -> u64 {
+        let revision = self.next_revision;
+        self.next_revision = self.next_revision.saturating_add(1);
+        revision
+    }
+
     fn commit(&mut self, changes: Vec<Change>) -> io::Result<()> {
         if changes.is_empty() {
             return Ok(());
         }
-        let mut staged = self.records.clone();
-        let mut revision = self.next_revision;
+        let mut staged = self.clone();
         for change in changes {
             match change {
                 Change::Put { key, value, expires_at } => {
-                    revision = revision
-                        .checked_add(1)
-                        .ok_or_else(|| io::Error::other("shard revision exhausted"))?;
+                    let revision = staged.bump_revision();
                     let namespace = key.0.clone();
                     let bytes = key.1.clone();
-                    staged.insert(key, Record { namespace, key: bytes, value, revision, expires_at });
+                    staged.records.insert(key, Record { namespace, key: bytes, value, revision, expires_at });
                 }
                 Change::Delete { key } => {
-                    staged.remove(&key);
+                    staged.records.remove(&key);
                 }
             }
         }
-        write_durable(&self.shard_path, &encode(&staged, revision)?)?;
-        self.records = staged;
-        self.next_revision = revision;
+        write_durable(&staged.shard_path, &encode(&staged.records, staged.next_revision)?)?;
+        self.records = staged.records;
+        self.next_revision = staged.next_revision;
         Ok(())
+    }
+}
+
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        Self {
+            data_dir: self.data_dir.clone(),
+            shard_path: self.shard_path.clone(),
+            records: self.records.clone(),
+            next_revision: self.next_revision,
+        }
     }
 }
 
