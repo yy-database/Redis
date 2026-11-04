@@ -247,6 +247,18 @@ def test_reply_decoding_reports_the_consumed_bytes():
     }
 
 
+def test_a_truncated_bulk_reply_reports_incompleteness():
+    truncated = b"$5\r\nhel"
+    assert decode_reply(truncated) is None
+    assert reference.decode_reply(truncated) is None
+    assert decode_reply(b"*2\r\n$3\r\nabc\r\n:4") is None
+
+    hole = b"$0\r\n\r\n"
+    spec_text, consumed = decode_reply(hole)
+    assert json.loads(spec_text) == {"type": "bulk", "bytes": []}
+    assert consumed == len(hole)
+
+
 def test_command_encoding_matches_the_multibulk_layout():
     args = [b"SET", b"greeting", b"hello"]
     assert encode_command(args) == reference.encode_command(args)
