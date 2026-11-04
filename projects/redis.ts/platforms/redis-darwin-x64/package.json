@@ -1,0 +1,12 @@
+{
+  "name": "@yydb/redis-darwin-x64",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "macOS x64 binding for `@yydb/redis`",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "lib"
+  ]
+}

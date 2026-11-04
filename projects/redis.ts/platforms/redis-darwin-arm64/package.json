@@ -1,0 +1,12 @@
+{
+  "name": "@yydb/redis-darwin-arm64",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "macOS arm64 binding for `@yydb/redis`",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "lib"
+  ]
+}
