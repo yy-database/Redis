@@ -1,0 +1,2302 @@
+{
+  "format": "redis.case/v1",
+  "table": "store",
+  "cases": [
+    {
+      "id": "persistence.db-namespace.0",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b6579",
+          "valueHex": "646230",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646230"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.1",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 1,
+          "keyHex": "6b6579",
+          "valueHex": "646231",
+          "call": "set"
+        },
+        {
+          "db": 1,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646231"
+          },
+          "call": "get"
+        },
+        {
+          "db": 1,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.2",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 2,
+          "keyHex": "6b6579",
+          "valueHex": "646232",
+          "call": "set"
+        },
+        {
+          "db": 2,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646232"
+          },
+          "call": "get"
+        },
+        {
+          "db": 2,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.3",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 3,
+          "keyHex": "6b6579",
+          "valueHex": "646233",
+          "call": "set"
+        },
+        {
+          "db": 3,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646233"
+          },
+          "call": "get"
+        },
+        {
+          "db": 3,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.4",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 4,
+          "keyHex": "6b6579",
+          "valueHex": "646234",
+          "call": "set"
+        },
+        {
+          "db": 4,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646234"
+          },
+          "call": "get"
+        },
+        {
+          "db": 4,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.5",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 5,
+          "keyHex": "6b6579",
+          "valueHex": "646235",
+          "call": "set"
+        },
+        {
+          "db": 5,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646235"
+          },
+          "call": "get"
+        },
+        {
+          "db": 5,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.6",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 6,
+          "keyHex": "6b6579",
+          "valueHex": "646236",
+          "call": "set"
+        },
+        {
+          "db": 6,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646236"
+          },
+          "call": "get"
+        },
+        {
+          "db": 6,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.7",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 7,
+          "keyHex": "6b6579",
+          "valueHex": "646237",
+          "call": "set"
+        },
+        {
+          "db": 7,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646237"
+          },
+          "call": "get"
+        },
+        {
+          "db": 7,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.8",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 8,
+          "keyHex": "6b6579",
+          "valueHex": "646238",
+          "call": "set"
+        },
+        {
+          "db": 8,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646238"
+          },
+          "call": "get"
+        },
+        {
+          "db": 8,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.9",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 9,
+          "keyHex": "6b6579",
+          "valueHex": "646239",
+          "call": "set"
+        },
+        {
+          "db": 9,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "646239"
+          },
+          "call": "get"
+        },
+        {
+          "db": 9,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.10",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 10,
+          "keyHex": "6b6579",
+          "valueHex": "64623130",
+          "call": "set"
+        },
+        {
+          "db": 10,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "64623130"
+          },
+          "call": "get"
+        },
+        {
+          "db": 10,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.11",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 11,
+          "keyHex": "6b6579",
+          "valueHex": "64623131",
+          "call": "set"
+        },
+        {
+          "db": 11,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "64623131"
+          },
+          "call": "get"
+        },
+        {
+          "db": 11,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.12",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 12,
+          "keyHex": "6b6579",
+          "valueHex": "64623132",
+          "call": "set"
+        },
+        {
+          "db": 12,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "64623132"
+          },
+          "call": "get"
+        },
+        {
+          "db": 12,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.13",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 13,
+          "keyHex": "6b6579",
+          "valueHex": "64623133",
+          "call": "set"
+        },
+        {
+          "db": 13,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "64623133"
+          },
+          "call": "get"
+        },
+        {
+          "db": 13,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.14",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 14,
+          "keyHex": "6b6579",
+          "valueHex": "64623134",
+          "call": "set"
+        },
+        {
+          "db": 14,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "64623134"
+          },
+          "call": "get"
+        },
+        {
+          "db": 14,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.db-namespace.15",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 15,
+          "keyHex": "6b6579",
+          "valueHex": "64623135",
+          "call": "set"
+        },
+        {
+          "db": 15,
+          "keyHex": "6b6579",
+          "expect": {
+            "bytes": "64623135"
+          },
+          "call": "get"
+        },
+        {
+          "db": 15,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.set-get",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.get-missing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6d697373696e67",
+          "expect": null,
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.overwrite",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "6669727374",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "7365636f6e64",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "7365636f6e64"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.delete-present",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "delete"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.delete-missing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6e6f7065",
+          "expect": {
+            "bool": false
+          },
+          "call": "delete"
+        }
+      ]
+    },
+    {
+      "id": "persistence.exists",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "exists"
+        },
+        {
+          "db": 0,
+          "keyHex": "78",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "persistence.deadline-future",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "int": 4000000000000
+          },
+          "call": "deadline"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "persistence.deadline-past",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 1,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.expire-set",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expiresAt": 4000000000000,
+          "expect": {
+            "bool": true
+          },
+          "call": "expire"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "int": 4000000000000
+          },
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "persistence.expire-missing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6e6f7065",
+          "expiresAt": 4000000000000,
+          "expect": {
+            "bool": false
+          },
+          "call": "expire"
+        }
+      ]
+    },
+    {
+      "id": "persistence.expire-clear",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expiresAt": null,
+          "expect": {
+            "bool": true
+          },
+          "call": "expire"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "persistence.append-existing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "646566",
+          "expect": {
+            "int": 6
+          },
+          "call": "append"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263646566"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.append-missing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "expect": {
+            "int": 3
+          },
+          "call": "append"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.append-preserves-deadline",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "6465",
+          "expect": {
+            "int": 5
+          },
+          "call": "append"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "int": 4000000000000
+          },
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incr-missing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "delta": 1,
+          "expect": {
+            "increment": {
+              "value": 1,
+              "error": null
+            }
+          },
+          "call": "incr_by"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incr-existing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "35",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "delta": 2,
+          "expect": {
+            "increment": {
+              "value": 7,
+              "error": null
+            }
+          },
+          "call": "incr_by"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "37"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incr-negative",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "3130",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "delta": -3,
+          "expect": {
+            "increment": {
+              "value": 7,
+              "error": null
+            }
+          },
+          "call": "incr_by"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incr-non-integer",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "68656c6c6f",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "delta": 1,
+          "expect": {
+            "increment": {
+              "value": null,
+              "error": "value is not an integer or out of range"
+            }
+          },
+          "call": "incr_by"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "68656c6c6f"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incr-overflow",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "39323233333732303336383534373735383037",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "delta": 1,
+          "expect": {
+            "increment": {
+              "value": null,
+              "error": "increment or decrement would overflow"
+            }
+          },
+          "call": "incr_by"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incr-preserves-deadline",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "35",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "delta": 2,
+          "expect": {
+            "increment": {
+              "value": 7,
+              "error": null
+            }
+          },
+          "call": "incr_by"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "int": 4000000000000
+          },
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "persistence.keys-byte-order",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "63",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "61",
+              "62",
+              "63"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "persistence.keys-empty",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "expect": {
+            "hexList": []
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "persistence.keys-excludes-expired",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6c697665",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "676f6e65",
+          "valueHex": "31",
+          "expiresAt": 1,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "6c697665"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "persistence.keys-uppercase-order",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "5a",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "5a",
+              "61"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "persistence.set-many",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "entries": [
+            [
+              "61",
+              "31"
+            ],
+            [
+              "62",
+              "32"
+            ],
+            [
+              "63",
+              "33"
+            ]
+          ],
+          "call": "set_many"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 3
+          },
+          "call": "size"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "expect": {
+            "bytes": "32"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "61",
+              "62",
+              "63"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "persistence.set-many-overwrite",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "6f6c64",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "entries": [
+            [
+              "61",
+              "6e6577"
+            ]
+          ],
+          "call": "set_many"
+        },
+        {
+          "db": 0,
+          "keyHex": "61",
+          "expect": {
+            "bytes": "6e6577"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "61",
+          "expect": null,
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "persistence.flush-db-isolation",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "7a65726f",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 1,
+          "keyHex": "6f6e65",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "call": "flush_db"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        },
+        {
+          "db": 1,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        },
+        {
+          "db": 1,
+          "keyHex": "6f6e65",
+          "expect": {
+            "bytes": "31"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.flush-db-empty",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 3,
+          "call": "flush_db"
+        },
+        {
+          "db": 3,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.reopen-values",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6772656574696e67",
+          "valueHex": "68656c6c6f",
+          "call": "set"
+        },
+        {
+          "db": 1,
+          "keyHex": "6772656574696e67",
+          "valueHex": "6f74686572",
+          "call": "set"
+        },
+        {
+          "call": "reopen"
+        },
+        {
+          "db": 0,
+          "keyHex": "6772656574696e67",
+          "expect": {
+            "bytes": "68656c6c6f"
+          },
+          "call": "get"
+        },
+        {
+          "db": 1,
+          "keyHex": "6772656574696e67",
+          "expect": {
+            "bytes": "6f74686572"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.reopen-deadlines",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "call": "reopen"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "int": 4000000000000
+          },
+          "call": "deadline"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.reopen-after-delete",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "delete"
+        },
+        {
+          "call": "reopen"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.rename-basic",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "76616c7565",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "736f75726365",
+          "destinationHex": "64657374696e6174696f6e",
+          "ifAbsent": false,
+          "expect": {
+            "text": "renamed"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "expect": null,
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "76616c7565"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.rename-carries-deadline",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "76616c7565",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "736f75726365",
+          "destinationHex": "64657374696e6174696f6e",
+          "ifAbsent": false,
+          "expect": {
+            "text": "renamed"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "int": 4000000000000
+          },
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "persistence.rename-missing",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "sourceHex": "6d697373696e67",
+          "destinationHex": "64657374696e6174696f6e",
+          "ifAbsent": false,
+          "expect": {
+            "text": "missing"
+          },
+          "call": "rename"
+        }
+      ]
+    },
+    {
+      "id": "persistence.renamenx-occupied",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "736f757263652d76616c7565",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "valueHex": "6b657074",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "736f75726365",
+          "destinationHex": "64657374696e6174696f6e",
+          "ifAbsent": true,
+          "expect": {
+            "text": "destination-present"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "6b657074"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "expect": {
+            "bytes": "736f757263652d76616c7565"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.renamenx-free",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "76616c7565",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "736f75726365",
+          "destinationHex": "64657374696e6174696f6e",
+          "ifAbsent": true,
+          "expect": {
+            "text": "renamed"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "76616c7565"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.rename-same-key",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "6b",
+          "destinationHex": "6b",
+          "ifAbsent": false,
+          "expect": {
+            "text": "renamed"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.binary-key-value",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "00ff01",
+          "valueHex": "00ff01fe",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "00ff01",
+          "expect": {
+            "bytes": "00ff01fe"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "00ff01",
+          "expect": {
+            "bool": true
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "persistence.utf8-key-value",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "e994ae",
+          "valueHex": "e580bc",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "e994ae",
+          "expect": {
+            "bytes": "e580bc"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.empty-key-and-value",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "",
+          "valueHex": "",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "",
+          "expect": {
+            "bytes": ""
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.large-value",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6c61726765",
+          "valueHex": "61626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6c61726765",
+          "expect": {
+            "bytes": "61626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768616263646566676861626364656667686162636465666768"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.reset-clears-deadline",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "77",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "77"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.delete-then-set",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "delete"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "77",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "77"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.layout.fresh-directory",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [],
+      "shardHex": "59594b5603e42b42c2392d245f010000000000000000000000",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 25
+    },
+    {
+      "id": "persistence.layout.single-record",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "6f6e65",
+          "call": "set"
+        }
+      ],
+      "shardHex": "59594b56037589dacfab4f8ac10200000000000000010000000900000072656469733a64623005000000616c7068610100000000000000000000000000000000030000006f6e65",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 71
+    },
+    {
+      "id": "persistence.layout.two-databases",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "6f6e65",
+          "call": "set"
+        },
+        {
+          "db": 1,
+          "keyHex": "62657461",
+          "valueHex": "74776f",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        }
+      ],
+      "shardHex": "59594b560355d423b2382ed14c0300000000000000020000000900000072656469733a64623005000000616c7068610100000000000000000000000000000000030000006f6e650900000072656469733a6462310400000062657461020000000000000000409452a3030000000300000074776f",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 116
+    },
+    {
+      "id": "persistence.layout.after-delete",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "6f6e65",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62657461",
+          "valueHex": "74776f",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "call": "delete"
+        }
+      ],
+      "shardHex": "59594b560306ee94bae5b85ab90300000000000000010000000900000072656469733a646230040000006265746102000000000000000000000000000000000300000074776f",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 70
+    },
+    {
+      "id": "persistence.layout.byte-order",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "32",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "shardHex": "59594b5603272fc7fdab4815e60300000000000000020000000900000072656469733a6462300100000061020000000000000000000000000000000001000000310900000072656469733a646230010000006201000000000000000000000000000000000100000032",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 105
+    },
+    {
+      "id": "persistence.layout.after-reopen",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6f6e65",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "call": "reopen"
+        },
+        {
+          "db": 0,
+          "keyHex": "74776f",
+          "valueHex": "32",
+          "call": "set"
+        },
+        {
+          "call": "reopen"
+        },
+        {
+          "db": 0,
+          "keyHex": "7468726565",
+          "valueHex": "33",
+          "call": "set"
+        }
+      ],
+      "shardHex": "59594b56038c603eb0572c7e690400000000000000030000000900000072656469733a646230030000006f6e65010000000000000000000000000000000001000000310900000072656469733a646230050000007468726565030000000000000000000000000000000001000000330900000072656469733a6462300300000074776f02000000000000000000000000000000000100000032",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 153
+    },
+    {
+      "id": "persistence.layout.binary-value",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "62696e",
+          "valueHex": "00ff01",
+          "call": "set"
+        }
+      ],
+      "shardHex": "59594b5603422856c742dbc6eb0200000000000000010000000900000072656469733a6462300300000062696e01000000000000000000000000000000000300000000ff01",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 69
+    },
+    {
+      "id": "persistence.layout.expiry-encoding",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        }
+      ],
+      "shardHex": "59594b5603ac86fa723071c5820200000000000000010000000900000072656469733a646230010000006b010000000000000000409452a3030000000100000076",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 65
+    },
+    {
+      "id": "error.store.unknown-magic",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "58585858030000000000000000"
+        }
+      ],
+      "expectOpenError": "unknown .yykv header"
+    },
+    {
+      "id": "error.store.legacy-magic",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b56026c65676163792d626f6479"
+        }
+      ],
+      "expectOpenError": "legacy .yykv v2 snapshot carries no checksum: delete the shard and let the node recreate it"
+    },
+    {
+      "id": "error.store.checksum-mismatch",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b56037589dacfab4f8ac10200000000000000010000000900000072656469733a64623005000000616c7068610100000000000000000000000000000000030000006f6e9a"
+        }
+      ],
+      "expectOpenError": ".yykv checksum mismatch"
+    },
+    {
+      "id": "error.store.truncated-header",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b"
+        }
+      ],
+      "expectOpenError": "truncated shard header"
+    },
+    {
+      "id": "error.store.empty-file",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": ""
+        }
+      ],
+      "expectOpenError": "truncated shard header"
+    },
+    {
+      "id": "error.store.trailing-bytes",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b56036c94701625bda4ec01000000000000000000000000"
+        }
+      ],
+      "expectOpenError": "trailing shard bytes"
+    },
+    {
+      "id": "error.store.duplicate-key",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b5603bf6b7b29b980e63e0300000000000000020000000900000072656469733a646230010000006b010000000000000000000000000000000001000000760900000072656469733a646230010000006b02000000000000000000000000000000000100000076"
+        }
+      ],
+      "expectOpenError": "duplicate shard key"
+    },
+    {
+      "id": "error.store.zero-revision",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b56039a00b12c73a4468b0100000000000000010000000900000072656469733a646230010000006b00000000000000000000000000000000000100000076"
+        }
+      ],
+      "expectOpenError": "invalid shard revision"
+    },
+    {
+      "id": "error.store.revision-beyond-next",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b56035cc76407d2b109cb0100000000000000010000000900000072656469733a646230010000006b02000000000000000000000000000000000100000076"
+        }
+      ],
+      "expectOpenError": "invalid shard revision"
+    },
+    {
+      "id": "error.store.unsupported-payload-tag",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b5603a9780383185ee4fc0200000000000000010000000900000072656469733a646230010000006b01000000000000000000000000000000010100000076"
+        }
+      ],
+      "expectOpenError": "shared object payloads are not supported here"
+    },
+    {
+      "id": "error.store.non-utf8-namespace",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b560331d5ab0b3d224e6402000000000000000100000002000000fffe010000006b01000000000000000000000000000000000100000076"
+        }
+      ],
+      "expectOpenError": "shard namespace is not utf8"
+    },
+    {
+      "id": "error.store.truncated-namespace-length",
+      "face": "error",
+      "op": "store",
+      "steps": [],
+      "seed": [
+        {
+          "path": "local-0.yykv",
+          "hex": "59594b5603568364bd41f03fb40200000000000000010000000000"
+        }
+      ],
+      "expectOpenError": "truncated `namespace` length"
+    },
+    {
+      "id": "persistence.rename-overwrites-destination",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "736f757263652d76616c7565",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "valueHex": "6f6c64",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "736f75726365",
+          "destinationHex": "64657374696e6174696f6e",
+          "ifAbsent": false,
+          "expect": {
+            "text": "renamed"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "736f757263652d76616c7565"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.rename-then-delete",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "sourceHex": "61",
+          "destinationHex": "62",
+          "ifAbsent": false,
+          "expect": {
+            "text": "renamed"
+          },
+          "call": "rename"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "expect": {
+            "bool": true
+          },
+          "call": "delete"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.keys-multiple-databases",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 2,
+          "keyHex": "62",
+          "valueHex": "32",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "61"
+            ]
+          },
+          "call": "keys"
+        },
+        {
+          "db": 2,
+          "expect": {
+            "hexList": [
+              "62"
+            ]
+          },
+          "call": "keys"
+        },
+        {
+          "db": 1,
+          "expect": {
+            "hexList": []
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "persistence.incrby-negative-preserves-value",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "valueHex": "30",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "delta": -1,
+          "expect": {
+            "increment": {
+              "value": -1,
+              "error": null
+            }
+          },
+          "call": "incr_by"
+        },
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "2d31"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "persistence.reopen-then-overwrite",
+      "face": "persistence",
+      "op": "store",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "6669727374",
+          "call": "set"
+        },
+        {
+          "call": "reopen"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "7365636f6e64",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "7365636f6e64"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "expect": {
+            "int": 1
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "persistence.layout.multiple-deletes",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "6b656570",
+          "valueHex": "76",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "78",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "78",
+          "call": "delete"
+        },
+        {
+          "db": 0,
+          "keyHex": "79",
+          "valueHex": "32",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "79",
+          "call": "delete"
+        }
+      ],
+      "shardHex": "59594b56034d08178c671d47650400000000000000010000000900000072656469733a646230040000006b65657001000000000000000000000000000000000100000076",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 68
+    },
+    {
+      "id": "persistence.layout.empty-after-flush",
+      "face": "persistence",
+      "op": "layout",
+      "steps": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "call": "flush_db"
+        }
+      ],
+      "shardHex": "59594b5603f7d5acd21ab8ee3e020000000000000000000000",
+      "catalogHex": "595944530100000000000000000000000001000000070000006c6f63616c2d300000000000000000",
+      "shardLen": 25
+    }
+  ]
+}

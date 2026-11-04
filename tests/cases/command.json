@@ -1,0 +1,1770 @@
+{
+  "format": "redis.case/v1",
+  "table": "command",
+  "cases": [
+    {
+      "id": "command.set",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SET",
+        "k",
+        "v"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.get.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GET",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          118
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.get.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GET",
+        "k"
+      ],
+      "reply": {
+        "type": "null"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.setnx.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETNX",
+        "k",
+        "v"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.setnx.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETNX",
+        "k",
+        "other"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.setex",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETEX",
+        "k",
+        "10",
+        "v"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "deadline_set"
+        }
+      ]
+    },
+    {
+      "id": "command.setex.zero",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETEX",
+        "k",
+        "0",
+        "v"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR invalid expire time in 'setex' command"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.setex.non-integer",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SETEX",
+        "k",
+        "abc",
+        "v"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.getset.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETSET",
+        "k",
+        "w"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          118
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "77"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.getset.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETSET",
+        "k",
+        "w"
+      ],
+      "reply": {
+        "type": "null"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "77"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.getdel.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETDEL",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          118
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.getdel.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "GETDEL",
+        "k"
+      ],
+      "reply": {
+        "type": "null"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.append.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "APPEND",
+        "k",
+        "def"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 6
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616263",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263646566"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.append.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "APPEND",
+        "k",
+        "abc"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "616263"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.strlen.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "STRLEN",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.strlen.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "STRLEN",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.type.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "TYPE",
+        "k"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "string"
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.type.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "TYPE",
+        "k"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "none"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.del.multi",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "DEL",
+        "a",
+        "b",
+        "c"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 2
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        },
+        {
+          "db": 0,
+          "keyHex": "63",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.del.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "DEL",
+        "a"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.exists.duplicates",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "EXISTS",
+        "k",
+        "k",
+        "x"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 2
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.exists.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "EXISTS",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.mset",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "MSET",
+        "a",
+        "1",
+        "b",
+        "2"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "expect": {
+            "bytes": "31"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "expect": {
+            "bytes": "32"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.mget.mixed",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "MGET",
+        "a",
+        "missing"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "expect": {
+            "bytes": "31"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "6d697373696e67",
+          "expect": null,
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.incr.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCR",
+        "n"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "31"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.incr.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCR",
+        "n"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "valueHex": "32",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "33"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.incr.non-integer",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCR",
+        "n"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "valueHex": "68656c6c6f",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "68656c6c6f"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.decr.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "DECR",
+        "n"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -1
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "2d31"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.incrby",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBY",
+        "n",
+        "5"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 7
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "valueHex": "32",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "37"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.decrby",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "DECRBY",
+        "n",
+        "5"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 5
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "valueHex": "3130",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "35"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.incrby.non-integer",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "INCRBY",
+        "n",
+        "abc"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "valueHex": "32",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6e",
+          "expect": {
+            "bytes": "32"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.ttl.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "TTL",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -2
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.ttl.no-deadline",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "TTL",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        },
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bytes": "76"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.pttl.no-deadline",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "PTTL",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": -1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "command.persist.present",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "PERSIST",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "expiresAt": 4000000000000,
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "command.persist.missing-deadline",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "PERSIST",
+        "k"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": null,
+          "call": "deadline"
+        }
+      ]
+    },
+    {
+      "id": "command.expire.missing-key",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "EXPIRE",
+        "k",
+        "60"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.expire.zero-deletes",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "EXPIRE",
+        "k",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.pexpire.sets-deadline",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "PEXPIRE",
+        "k",
+        "60000"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "expect": {
+            "bool": true
+          },
+          "call": "deadline_set"
+        }
+      ]
+    },
+    {
+      "id": "command.rename.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "RENAME",
+        "missing",
+        "destination"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR no such key"
+      },
+      "setup": [],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        }
+      ]
+    },
+    {
+      "id": "command.rename.basic",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "RENAME",
+        "source",
+        "destination"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "76616c7565",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "expect": {
+            "bool": false
+          },
+          "call": "exists"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "76616c7565"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.renamenx.occupied",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "RENAMENX",
+        "source",
+        "destination"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "736f75726365",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "valueHex": "6b657074",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "expect": {
+            "bytes": "736f75726365"
+          },
+          "call": "get"
+        },
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "6b657074"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.renamenx.free",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "RENAMENX",
+        "source",
+        "destination"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "736f75726365",
+          "valueHex": "76616c7565",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "keyHex": "64657374696e6174696f6e",
+          "expect": {
+            "bytes": "76616c7565"
+          },
+          "call": "get"
+        }
+      ]
+    },
+    {
+      "id": "command.select.zero",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SELECT",
+        "0"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.select.out-of-range",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SELECT",
+        "16"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR DB index is out of range"
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.select.non-integer",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "SELECT",
+        "abc"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR DB index is out of range"
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.flushdb",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "FLUSHDB"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "76",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "command.dbsize",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "DBSIZE"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 2
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62",
+          "valueHex": "32",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "int": 2
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "command.flushall",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "FLUSHALL"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "OK"
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 1,
+          "keyHex": "62",
+          "valueHex": "32",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        },
+        {
+          "db": 1,
+          "expect": {
+            "int": 0
+          },
+          "call": "size"
+        }
+      ]
+    },
+    {
+      "id": "command.keys.exact",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "KEYS",
+        "alpha"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              108,
+              112,
+              104,
+              97
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62657461",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "616c706861",
+              "62657461"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "command.keys.star",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "KEYS",
+        "*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              108,
+              112,
+              104,
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98,
+              101,
+              116,
+              97
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62657461",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "616c706861",
+              "62657461"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "command.keys.prefix",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "KEYS",
+        "al*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              108,
+              112,
+              104,
+              97
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "31",
+          "call": "set"
+        },
+        {
+          "db": 0,
+          "keyHex": "62657461",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "616c706861",
+              "62657461"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "command.keys.question",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "KEYS",
+        "?lpha"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              108,
+              112,
+              104,
+              97
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "616c706861"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "command.keys.no-match",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "KEYS",
+        "gamma"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "616c706861",
+          "valueHex": "31",
+          "call": "set"
+        }
+      ],
+      "effect": [
+        {
+          "db": 0,
+          "expect": {
+            "hexList": [
+              "616c706861"
+            ]
+          },
+          "call": "keys"
+        }
+      ]
+    },
+    {
+      "id": "command.ping",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "PING"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "PONG"
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.ping.message",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "PING",
+        "hello"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          104,
+          101,
+          108,
+          108,
+          111
+        ]
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.echo",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "ECHO",
+        "hello"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          104,
+          101,
+          108,
+          108,
+          111
+        ]
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    }
+  ]
+}
