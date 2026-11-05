@@ -7,8 +7,8 @@
     "test": "cargo test --manifest-path projects/redis.rs/Cargo.toml --workspace --all-targets",
     "test:ts": "pnpm --filter @yydb/redis-harness test",
     "test:py": "node scripts/run-python-tests.mjs",
-    "gate:test-count:ts": "node scripts/check-test-floor.mjs --kind ts --floor 420 -- pnpm --filter @yydb/redis-harness test",
-    "gate:test-count:py": "node scripts/check-test-floor.mjs --kind py --floor 345 -- node scripts/run-python-tests.mjs",
+    "gate:test-count:ts": "node scripts/check-test-floor.mjs --kind ts --floor 433 -- pnpm --filter @yydb/redis-harness test",
+    "gate:test-count:py": "node scripts/check-test-floor.mjs --kind py --floor 358 -- node scripts/run-python-tests.mjs",
     "gate:conformance:compare": "node scripts/compare-conformance.mjs",
     "gate:oracle": "node projects/redis.ts/packages/redis-harness/bin/oracle.mjs"
   },
