@@ -42,6 +42,7 @@ export const encodeCommand = args => primitives().encodeCommand(args.map(bytes))
 export const encodeReply = (spec, protocol) => primitives().encodeReply(JSON.stringify(spec), protocol);
 export const decodeReply = input => primitives().decodeReply(bytes(input));
 export const parseInteger = value => primitives().parseInteger(bytes(value));
+export const repairShard = dataDir => primitives().repairShard(String(dataDir));
 
 export class Store {
     constructor(dataDir) {

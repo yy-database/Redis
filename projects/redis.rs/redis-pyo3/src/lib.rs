@@ -58,6 +58,15 @@ fn parse_integer(value: &[u8]) -> Option<i64> {
     redis_wasm::format::parse_integer(value)
 }
 
+/// Creates the shard registered by an existing `.yyds` catalog when it is missing.
+///
+/// Recovery entry for the `catalog.shard-file` open error. The catalog is
+/// validated but never rewritten, and an existing shard is never overwritten.
+#[pyfunction]
+fn repair_shard(data_dir: &str) -> PyResult<String> {
+    redis_wasm::store::repair_missing_shard(data_dir).map_err(runtime)
+}
+
 /// A `.yyds` catalog plus `.yykv` shard opened by the host.
 #[pyclass]
 struct Store {
@@ -171,6 +180,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(encode_reply, module)?)?;
     module.add_function(wrap_pyfunction!(decode_reply, module)?)?;
     module.add_function(wrap_pyfunction!(parse_integer, module)?)?;
+    module.add_function(wrap_pyfunction!(repair_shard, module)?)?;
     module.add_class::<Store>()?;
     Ok(())
 }

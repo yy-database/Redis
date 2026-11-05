@@ -12,6 +12,7 @@ from _native import (  # noqa: F401
     encode_command,
     encode_reply,
     parse_integer,
+    repair_shard,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "encode_command",
     "encode_reply",
     "parse_integer",
+    "repair_shard",
 ]
