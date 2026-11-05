@@ -42,6 +42,16 @@ handle; the server also flushes when it closes. A crash loses every increment
 applied since the last flush, and reopening returns the value as of that flush,
 never below it.
 
+A directory whose `.yyds` catalog is valid but whose registered `.yykv` shard is
+absent fails to open with the error `catalog.shard-file: <id>.yykv is missing`.
+This is deliberate: silently creating an empty shard would mask a shard that was
+never written or was lost. A new directory writes the shard before the catalog,
+so a crash between the two renames reopens by recreating the catalog around the
+shard that is already there. An explicitly incomplete directory — a catalog
+written by another tool, or a backup that carried only `.yyds` — is repaired
+with `repairShard(dataDir)`, which creates the empty shard the catalog registers,
+never rewrites the catalog, and never overwrites an existing shard.
+
 Not supported:
 
 - Incremental single-key rewrites of `.yykv`: there is no offset index or
