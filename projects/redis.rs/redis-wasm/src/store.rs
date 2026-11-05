@@ -18,12 +18,19 @@ pub const CATALOG_FILE: &str = "local-0.yyds";
 pub const NAMESPACE_PREFIX: &str = "redis:db";
 
 /// One `.yyds` catalog plus one `.yykv` shard on disk.
+///
+/// The `.yykv` snapshot carries one checksum over its whole body and a record
+/// count in front of the records, so rewriting any single record means
+/// re-serializing the entire shard. Counter updates therefore accumulate in
+/// memory and reach the file on [`Node::flush`], on any other mutation, or when
+/// the node is dropped. See [`Node::flush`] for the durability boundary.
 #[derive(Debug)]
 pub struct Node {
     data_dir: PathBuf,
     shard_path: PathBuf,
     records: Records,
     next_revision: u64,
+    pending_increments: bool,
 }
 
 impl Node {
@@ -45,7 +52,13 @@ impl Node {
             write_durable(&shard_path, &encode(&records, 1)?)?;
             (records, 1)
         };
-        Ok(Self { data_dir, shard_path, records, next_revision: next_revision.max(1) })
+        Ok(Self {
+            data_dir,
+            shard_path,
+            records,
+            next_revision: next_revision.max(1),
+            pending_increments: false,
+        })
     }
 
     /// Directory holding the catalog and the shard.
@@ -184,6 +197,10 @@ impl Node {
     }
 
     /// Adds `delta` to an integer value, preserving its deadline.
+    ///
+    /// The result is visible to every read on this node immediately. It reaches
+    /// the shard on the next [`Node::flush`], on any other mutation, or when the
+    /// node is dropped; until then the increment is memory only.
     pub fn incr_by(&mut self, db: u8, key: &[u8], delta: i64) -> io::Result<Result<i64, String>> {
         let current = match self.get(db, key) {
             None => 0,
@@ -195,9 +212,34 @@ impl Node {
         let Some(total) = current.checked_add(delta) else {
             return Ok(Err("increment or decrement would overflow".to_owned()));
         };
-        let deadline = self.deadline(db, key);
-        self.set(db, key, total.to_string().as_bytes(), deadline)?;
+        let expires_at = self.deadline(db, key);
+        let revision = self.bump_revision();
+        let record_namespace = namespace(db);
+        let record_key = (record_namespace.clone(), key.to_vec());
+        self.records.insert(
+            record_key,
+            Record { namespace: record_namespace, key: key.to_vec(), value: total.to_string().into_bytes(), revision, expires_at },
+        );
+        self.pending_increments = true;
         Ok(Ok(total))
+    }
+
+    /// Writes the shard snapshot when counter updates are buffered.
+    ///
+    /// Counter updates stay in memory until this call, another mutation, the
+    /// node being dropped, or the process exiting cleanly. The durability
+    /// boundary is therefore a completed `flush`: everything this node wrote
+    /// before that point survives a crash, while increments applied since then
+    /// are lost, and a reopened node reports the value as of the last flush.
+    /// The snapshot itself is still written whole through a synced temporary
+    /// file and an atomic rename, so a crash can never leave a torn shard.
+    pub fn flush(&mut self) -> io::Result<()> {
+        if !self.pending_increments {
+            return Ok(());
+        }
+        write_durable(&self.shard_path, &encode(&self.records, self.next_revision)?)?;
+        self.pending_increments = false;
+        Ok(())
     }
 
     fn bump_revision(&mut self) -> u64 {
@@ -210,35 +252,34 @@ impl Node {
         if changes.is_empty() {
             return Ok(());
         }
-        let mut staged = self.clone();
+        let mut staged = self.records.clone();
+        let mut next_revision = self.next_revision;
         for change in changes {
             match change {
                 Change::Put { key, value, expires_at } => {
-                    let revision = staged.bump_revision();
+                    let revision = next_revision;
+                    next_revision = next_revision.saturating_add(1);
                     let namespace = key.0.clone();
                     let bytes = key.1.clone();
-                    staged.records.insert(key, Record { namespace, key: bytes, value, revision, expires_at });
+                    staged.insert(key, Record { namespace, key: bytes, value, revision, expires_at });
                 }
                 Change::Delete { key } => {
-                    staged.records.remove(&key);
+                    staged.remove(&key);
                 }
             }
         }
-        write_durable(&staged.shard_path, &encode(&staged.records, staged.next_revision)?)?;
-        self.records = staged.records;
-        self.next_revision = staged.next_revision;
+        write_durable(&self.shard_path, &encode(&staged, next_revision)?)?;
+        self.records = staged;
+        self.next_revision = next_revision;
+        // The snapshot just written contains every buffered increment.
+        self.pending_increments = false;
         Ok(())
     }
 }
 
-impl Clone for Node {
-    fn clone(&self) -> Self {
-        Self {
-            data_dir: self.data_dir.clone(),
-            shard_path: self.shard_path.clone(),
-            records: self.records.clone(),
-            next_revision: self.next_revision,
-        }
+impl Drop for Node {
+    fn drop(&mut self) {
+        let _ = self.flush();
     }
 }
 

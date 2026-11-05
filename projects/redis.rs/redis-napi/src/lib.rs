@@ -170,6 +170,12 @@ impl Store {
         self.node.set_many(db, &entries).map_err(reason)
     }
 
+    /// Writes counter updates buffered since the last flush, marking the durability boundary.
+    #[napi]
+    pub fn flush(&mut self) -> std::result::Result<(), napi::Error> {
+        self.node.flush().map_err(reason)
+    }
+
     /// Adds `delta` to an integer value, preserving its deadline.
     #[napi]
     pub fn incr_by(&mut self, db: u8, key: Buffer, delta: i64) -> std::result::Result<Increment, napi::Error> {

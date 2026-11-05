@@ -10,8 +10,9 @@ const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
 /**
  * Starts an emulated server bound to `host`, persisting through `.yyds` and `.yykv`.
  *
- * The caller owns the process lifetime. `close` stops the listener and the
- * open connections without touching the storage directory.
+ * The caller owns the process lifetime. `close` flushes buffered counter updates,
+ * stops the listener and the open connections, and leaves the storage directory
+ * in place.
  */
 export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}) {
     const store = new Store(dataDir);
@@ -58,6 +59,7 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
         dataDir: store.dataDir(),
         store,
         close: () => new Promise(resolve => {
+            store.flush();
             for (const socket of connections) {
                 socket.destroy();
             }
