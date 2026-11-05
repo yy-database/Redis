@@ -130,6 +130,7 @@ def run_steps(store, steps, directory):
     seen = []
     for entry in steps:
         if entry["call"] == "reopen":
+            current.flush()
             current = Store(directory)
             seen.append({"call": "reopen", "value": None})
             continue
@@ -273,6 +274,7 @@ def run_case(entry):
         store = Store(directory)
         if op == "layout":
             run_steps(store, entry["steps"], directory)
+            store.flush()
             shard = Path(directory, "local-0.yykv").read_bytes().hex()
             catalog = Path(directory, "local-0.yyds").read_bytes().hex()
             assert shard == entry["shardHex"]
@@ -381,15 +383,27 @@ def run_stress(entry):
     if kind == "incr":
         directory = tempfile.mkdtemp(prefix="redis-stress-")
         store = Store(directory)
+        if entry.get("seed", 0) > 0:
+            keys = [("%s%06d" % (entry["prefix"], index)).encode() for index in range(entry["seed"])]
+            values = [("v%d" % index).encode() for index in range(entry["seed"])]
+            store.set_many(0, list(zip(keys, values)))
         last = None
         started = time.perf_counter()
         for _ in range(entry["count"]):
             last = store.incr_by(0, b"counter", 1)
         write_ms = int((time.perf_counter() - started) * 1000)
+        flush_started = time.perf_counter()
+        store.flush()
+        flush_ms = int((time.perf_counter() - flush_started) * 1000)
         assert last[0] == entry["expect"]["value"]
         assert store.get(0, b"counter") == str(entry["expect"]["value"]).encode()
-        assert write_ms < 120_000
-        return {"writeMs": write_ms, "value": last[0]}
+        reopen_started = time.perf_counter()
+        again = Store(directory)
+        persisted = again.get(0, b"counter")
+        reopen_ms = int((time.perf_counter() - reopen_started) * 1000)
+        assert persisted == str(entry["expect"]["value"]).encode()
+        assert write_ms < 120_000 and flush_ms < 120_000 and reopen_ms < 120_000
+        return {"writeMs": write_ms, "flushMs": flush_ms, "reopenMs": reopen_ms, "value": last[0], "persisted": True}
     raise AssertionError(f"unsupported stress kind {kind}")
 
 
