@@ -183,31 +183,91 @@ pub fn encode_catalog(shard_id: &str) -> Vec<u8> {
     out
 }
 
-/// Parses the first shard identifier registered by a `.yyds` catalog.
-pub fn decode_catalog_shard_id(bytes: &[u8]) -> Result<String> {
-    if bytes.len() < YYDS_MAGIC.len() + 4 {
-        return Err(FormatError("truncated catalog header".to_owned()));
+/// Structured `.yyds` validation failure: `field` names the exact check that failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CatalogError {
+    /// Check that rejected the catalog, for example `magic` or `shard-id`.
+    pub field: &'static str,
+    /// What was expected and what the bytes carried.
+    pub detail: String,
+}
+
+impl std::fmt::Display for CatalogError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "catalog.{}: {}", self.field, self.detail)
+    }
+}
+
+impl std::error::Error for CatalogError {}
+
+/// Parses and validates a `.yyds` catalog, returning the registered shard id.
+///
+/// Checks the magic, the format version, the two reserved sections, the shard
+/// count, the shape of the shard id, and that no bytes follow the registration.
+pub fn decode_catalog_shard_id(bytes: &[u8]) -> std::result::Result<String, CatalogError> {
+    let reject = |field: &'static str, detail: String| CatalogError { field, detail };
+    let header_len = YYDS_MAGIC.len() + 4;
+    if bytes.len() < YYDS_MAGIC.len() {
+        return Err(reject("length", "truncated header".to_owned()));
     }
     if &bytes[..YYDS_MAGIC.len()] != YYDS_MAGIC {
-        return Err(FormatError("unknown .yyds catalog header".to_owned()));
+        return Err(reject("magic", "expected \"YYDS\\x01\"".to_owned()));
+    }
+    if bytes.len() < header_len {
+        return Err(reject("length", "truncated version".to_owned()));
     }
     let mut cursor = YYDS_MAGIC.len();
-    let version = take_u32(bytes, &mut cursor, "version")?;
+    let version = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4]));
+    cursor += 4;
     if version != CATALOG_VERSION {
-        return Err(FormatError("catalog version requires regeneration".to_owned()));
+        return Err(reject("version", format!("expected {CATALOG_VERSION}, found {version}")));
     }
-    if take_u32(bytes, &mut cursor, "schema flag")? != 0 {
-        return Err(FormatError("catalog schema section is not supported here".to_owned()));
+    for (field, expected) in [("schema", "schema flag"), ("routing", "routing section")] {
+        if bytes.len() < cursor + 4 {
+            return Err(reject("length", format!("truncated {expected}")));
+        }
+        let value = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4]));
+        cursor += 4;
+        if value != 0 {
+            return Err(reject(field, format!("expected 0, found {value}")));
+        }
     }
-    if take_u32(bytes, &mut cursor, "routing epoch")? != 0 {
-        return Err(FormatError("catalog routing section is not supported here".to_owned()));
+    if bytes.len() < cursor + 4 {
+        return Err(reject("length", "truncated shard count".to_owned()));
     }
-    let count = take_u32(bytes, &mut cursor, "shard count")?;
+    let count = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4]));
+    cursor += 4;
     if count != 1 {
-        return Err(FormatError(format!("expected exactly one shard registration, found {count}")));
+        return Err(reject("count", format!("expected 1, found {count}")));
     }
-    let id = take_bytes(bytes, &mut cursor, "shard id")?;
-    String::from_utf8(id.to_vec()).map_err(|_| FormatError("catalog shard id is not utf8".to_owned()))
+    if bytes.len() < cursor + 4 {
+        return Err(reject("length", "truncated shard id length".to_owned()));
+    }
+    let id_len = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().unwrap_or([0; 4])) as usize;
+    cursor += 4;
+    if cursor + id_len > bytes.len() {
+        return Err(reject("length", "truncated shard id".to_owned()));
+    }
+    let id = &bytes[cursor..cursor + id_len];
+    cursor += id_len;
+    if id.is_empty() {
+        return Err(reject("shard-id", "empty".to_owned()));
+    }
+    let id = std::str::from_utf8(id).map_err(|_| reject("shard-id", "not utf8".to_owned()))?;
+    if id.contains('/') || id.contains('\\') {
+        return Err(reject("shard-id", "contains a path separator".to_owned()));
+    }
+    let expected_len = cursor + 8;
+    if bytes.len() < expected_len {
+        return Err(reject("length", "truncated reserved fields".to_owned()));
+    }
+    if bytes.len() > expected_len {
+        return Err(reject(
+            "trailing",
+            format!("expected no bytes after the shard registration, found {}", bytes.len() - expected_len),
+        ));
+    }
+    Ok(id.to_owned())
 }
 
 /// FNV-1a over the snapshot body: integrity only, not security.
