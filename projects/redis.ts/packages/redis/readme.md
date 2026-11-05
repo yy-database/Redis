@@ -1,8 +1,8 @@
 # `@yydb/redis`
 
-Redis-compatible server and command line client. Every value is persisted
-through `.yyds` and `.yykv`, and the wire protocol is encoded by the native
-`redis-napi` binding.
+Redis-compatible server and command line client. Values are persisted in the
+`.yykv` shard and registered by the `.yyds` catalog, and the wire protocol is
+encoded by the native `redis-napi` binding.
 
 ```sh
 redis-server --port 6379 --data-dir ./data
@@ -15,11 +15,11 @@ The package exposes the same primitives the binaries compose: `startServer`,
 
 ## Limits and costs
 
-`.yykv` is a whole-snapshot format: every accepted write re-serializes the shard
-body and rewrites the file through a synced temporary file plus an atomic
-rename. Write amplification therefore grows linearly with the number of records
-in the shard. Measured on one Windows/NTFS host with the debug binding, one
-isolated `SET` costs (median of three):
+`.yykv` is a whole-snapshot format: every write that reaches the shard
+re-serializes the shard body and rewrites the file through a synced temporary
+file plus an atomic rename. Write amplification therefore grows linearly with
+the number of records in the shard. Measured on one Windows/NTFS host with the
+debug binding, one isolated `SET` costs (median of three):
 
 | records in shard | single `SET` | bytes rewritten | write amplification |
 | ---------------- | ------------ | --------------- | ------------------- |
@@ -31,7 +31,7 @@ At 1e5 records an isolated single-key write takes about 205 ms, roughly five
 writes per second on one shard. That is a property of the format, not a tunable
 parameter.
 
-The high-throughput path is batching: `set_many` folds many keys into one
+The high-throughput path is batching: `setMany` folds many keys into one
 snapshot write. The same 1e5 keys take about 0.2–0.5 s in one call, against
 roughly 2.8 h and about 250 GB written when issued as 1e5 separate `SET`
 commands.
