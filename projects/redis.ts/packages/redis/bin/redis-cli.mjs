@@ -3,7 +3,7 @@
 
 import { connect } from 'node:net';
 import { createInterface } from 'node:readline';
-import { decodeReply, encodeCommand } from '../src/native.js';
+import { decodeReply, encodeCommand } from '../dist/native.js';
 
 const USAGE = 'usage: redis-cli [-h <host>] [-p <port>] [-3] [command [argument ...]]';
 

@@ -56,7 +56,7 @@ function record(snapshot, key) {
 test('the composition package resolves from the installed tree', () => {
     const resolved = installed.resolve('@yydb/redis');
     assert.ok(resolved.startsWith(installed.scratch), resolved);
-    assert.match(resolved.replaceAll('\\', '/'), /\/node_modules\/@yydb\/redis\/src\/index\.js$/);
+    assert.match(resolved.replaceAll('\\', '/'), /\/node_modules\/@yydb\/redis\/dist\/index\.js$/);
     assert.deepEqual(installed.tarballs.length, 2);
 });
 

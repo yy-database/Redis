@@ -55,5 +55,9 @@ jobs:
         run: pnpm gate:test-count:ts
       - name: Python acceptance
         run: pnpm gate:test-count:py
+      - name: TypeScript installed-state gate
+        run: pnpm gate:install:ts
+      - name: Python installed-state gate
+        run: pnpm gate:install:py
       - name: Cross implementation oracle
         run: pnpm gate:oracle

@@ -134,9 +134,9 @@ pnpm install
 pnpm build
 ```
 
-`pnpm build` runs `cargo build -p redis-napi` and copies the artifact to
-`projects/redis.ts/platforms/redis-<platform>/lib`. Run the server and client
-directly from the workspace:
+`pnpm build` runs `cargo build -p redis-napi`, copies the artifact to
+`projects/redis.ts/platforms/redis-<platform>/lib`, and compiles the TypeScript
+package into `dist`. Run the server and client directly from the workspace:
 
 ```sh
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data
@@ -149,13 +149,13 @@ An installed `@yydb/redis` exposes the same entry points as `redis-server` and
 `redis-cli`. The server has no `SHUTDOWN` command; stop it with `SIGINT` or
 `SIGTERM`, which flushes buffered increments before closing.
 
-The Python wheel ships the `_native` extension only. Build and install it, then
-make the composition package importable from
-`projects/redis.py/packages/redis`; that package is not part of the wheel and
-provides primitives only, with no server loop or CLI.
+The Python wheel ships the `redis` package together with its compiled
+`redis._native` extension, so installing the wheel is enough to import the
+primitives. The package provides primitives only, with no server loop or CLI.
 
 ```sh
-python -m maturin build --manifest-path projects/redis.rs/redis-pyo3/Cargo.toml --out dist
+cd projects/redis.py/packages/redis
+python -m maturin build --out dist
 pip install dist/<wheel>
 ```
 
@@ -169,6 +169,8 @@ Tests and gates:
 | `pnpm test:py` | Builds the wheel, installs it in a scratch environment, runs pytest |
 | `pnpm gate:test-count:ts` | The TypeScript suite with the 436-case floor |
 | `pnpm gate:test-count:py` | The Python suite with the 361-case floor |
+| `pnpm gate:install:ts` | Packs the tarballs, installs them in a scratch directory, imports the entry from a plain `node` process and performs a real write and read |
+| `pnpm gate:install:py` | Builds the wheel, installs it in a clean virtual environment and performs a real write and read |
 | `pnpm gate:oracle` | Independent recomputation of the wire and layout bytes |
 | `pnpm gate:conformance:compare <ts-report> <py-report>` | Compares the TypeScript and Python reports for the shared case tables |
 
