@@ -18,7 +18,7 @@ jobs:
       - name: Rust Nightly
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: nightly-2026-07-20
             override: true
             components: rustfmt, clippy
       - name: Build
@@ -33,7 +33,7 @@ jobs:
       - name: Rust Nightly
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain: nightly-2026-07-20
             override: true
       - uses: actions/setup-node@v4
         with:
