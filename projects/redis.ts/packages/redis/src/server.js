@@ -131,6 +131,11 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
                     return;
                 }
                 write(result);
+                // A peer `CLIENT KILL` is reported by the binding, because the
+                // killed connection lives on another socket owned by this loop.
+                for (const id of result.killed ?? []) {
+                    clients.get(id)?.kill();
+                }
                 if (result.close) {
                     socket.end();
                     return;
@@ -148,10 +153,12 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
             pubsub.detach(session);
             connections.delete(socket);
             clients.delete(session.id);
+            store.serverRelease(session.id);
         });
         socket.on('error', () => {
             connections.delete(socket);
             clients.delete(session.id);
+            store.serverRelease(session.id);
         });
     });
     await new Promise((resolve, reject) => {

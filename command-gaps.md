@@ -13,6 +13,12 @@ entries are `execute_hash_command` (`mod.rs`, line 56), `execute_set_command`
 `handle_list` (line 1563) and `handle_zset` (line 4179), which own command
 semantics, type checks and reply framing.
 
+The server face has its own entry: `execute_server_command` (`mod.rs`), which
+sets the host session fields on `server_face::EmbeddedServerFace` and dispatches
+to `server_face::handle_client`, `handle_command`, `handle_info`, `handle_config`
+and `handle_acl`. `server_face::ClientRegistry` is the listener-level registry
+shared by every embedded session.
+
 ## Hash family
 
 | Command | Upstream coordinate | Real server behavior | Class |
@@ -102,10 +108,32 @@ Option conflicts inside `MULTI` are rejected while the command is queued, while 
 real server queues the command and reports the error inside `EXEC`. Arity errors
 abort the queue on both sides.
 
+## Server face
+
+No gaps left. `CLIENT`, `COMMAND`, `INFO`, `CONFIG` and `ACL` are served by
+`EmbeddedServerFace`; the TypeScript side only forwards them through
+`Store.serverCommand` and no longer keeps a planner copy.
+
+Each host connection owns one embedded session keyed by the connection id, and
+all sessions share one `ClientRegistry`. `CLIENT SETNAME` / `SETINFO`,
+`CONFIG SET` and the negotiated RESP version therefore stay connection-scoped,
+while `CLIENT LIST`, `CLIENT INFO` and `CLIENT KILL` see the host's other
+connections. A peer kill marks the record closed and reports its id back to the
+host, which closes the matching socket; the host also calls
+`Store.serverRelease` when a connection ends so the registry stops listing it.
+
+`CLIENT KILL` on the current session is reported through the `close` flag and is
+not repeated in the killed list. Detached sessions have no socket, so their
+`addr` / `laddr` are `127.0.0.1:0` by construction.
+
 ## Verifying a gap
 
 `pnpm gate:oracle` rechecks the wire and layout bytes of the implemented
 surface, and `pnpm gate:drivers` replays the command cases through the real
-`node-redis` and `redis-py` clients. A command listed above as
-upstream-missing is not covered by either gate through the facade; it is covered
-only by the planner tests in the case tables.
+`node-redis` and `redis-py` clients. `pnpm gate:oracle:live` replays every wire
+case against a real Redis and refuses to run when the server version differs
+from `projects/redis.ts/packages/redis-harness/oracle-provenance.json`; CI runs
+it against the `redis:8.10.3` service so the corpus provenance and the oracle
+image cannot drift apart silently. A command listed above as upstream-missing is
+not covered by either gate through the facade; it is covered only by the planner
+tests in the case tables.

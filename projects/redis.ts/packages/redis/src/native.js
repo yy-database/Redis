@@ -177,4 +177,14 @@ export class Store {
     stringCommand(db, protocol, args) {
         return JSON.parse(this.native.stringCommand(db, protocol, args.map(bytes)));
     }
+
+    /** Server-face commands keep their per-connection session state inside the binding. */
+    serverCommand(session, db, protocol, args) {
+        return JSON.parse(this.native.serverCommand(session, db, protocol, args.map(bytes)));
+    }
+
+    /** Drops the embedded session of one connection that just closed. */
+    serverRelease(session) {
+        this.native.serverRelease(session);
+    }
 }

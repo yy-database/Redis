@@ -34,8 +34,8 @@ function commandStore(store) {
     return new Proxy(store, {
         get(target, property) {
             if (property === 'hashCommand' || property === 'setCommand' || property === 'listCommand'
-                || property === 'zsetCommand' || property === 'stringCommand') {
-                return (db, protocol, args) => JSON.parse(target[property](db, protocol, args));
+                || property === 'zsetCommand' || property === 'stringCommand' || property === 'serverCommand') {
+                return (...call) => JSON.parse(target[property](...call));
             }
             const value = Reflect.get(target, property);
             return typeof value === 'function' ? value.bind(target) : value;
@@ -231,8 +231,9 @@ function runSteps(store, steps, directory) {
     return seen;
 }
 
+/** One harness connection: `id` matches the first id a fresh registry hands out. */
 function session() {
-    return { db: 0, protocol: 2, queued: null, name: '' };
+    return { id: 1, db: 0, protocol: 2, queued: null, name: '' };
 }
 
 /** Executes one scan-family command, returning its cursor and page tokens in hex. */

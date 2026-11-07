@@ -3,10 +3,12 @@
 //! The binding owns no listener, no command dispatcher, and no process entry
 //! point. A host composes these calls into a server loop or a client.
 
-use std::sync::{Mutex, MutexGuard};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use database_execution::cluster::KeyValueExecutor;
 use database_query::cluster_kv::{KeyValueAction, KeyValueCommand, KeyValueResult};
+use database_server::yyds::redis::{ClientRegistry, EmbeddedServerFace};
 use database_types::cluster::{Error as ClusterError, FenceToken, Namespace};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
@@ -94,10 +96,21 @@ pub fn parse_integer(value: Buffer) -> Option<i64> {
     redis_wasm::format::parse_integer(&value)
 }
 
+/// Embedded server sessions keyed by the host connection id.
+///
+/// One registry is shared by every session so `CLIENT LIST` and `CLIENT KILL` observe
+/// the host's other connections. The host owns the ids and closes the matching socket
+/// when a peer kill reports it back.
+struct ServerSessions {
+    registry: Arc<ClientRegistry>,
+    faces: HashMap<u32, EmbeddedServerFace>,
+}
+
 /// A `.yyds` catalog plus `.yykv` shard opened by the host.
 #[napi]
 pub struct Store {
     node: Mutex<Node>,
+    server: Mutex<ServerSessions>,
 }
 
 impl Store {
@@ -471,6 +484,10 @@ impl Store {
     pub fn new(data_dir: String) -> std::result::Result<Self, napi::Error> {
         Ok(Self {
             node: Mutex::new(Node::open(data_dir).map_err(reason)?),
+            server: Mutex::new(ServerSessions {
+                registry: Arc::new(ClientRegistry::standalone()),
+                faces: HashMap::new(),
+            }),
         })
     }
 
@@ -802,6 +819,68 @@ impl Store {
             .map_err(reason)?
             .ok_or_else(|| reason("string command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one server-face request and returns the reply specification as JSON.
+    ///
+    /// `session` is the host connection id. Each id gets its own embedded session, so
+    /// `CLIENT` state is connection-scoped while `CLIENT LIST` and `CLIENT KILL` see the
+    /// host's other sessions. The reply also carries `killed`, the host ids a peer kill
+    /// closed and that the host must disconnect.
+    #[napi]
+    pub fn server_command(
+        &self,
+        session: u32,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
+        let arguments = args
+            .iter()
+            .map(|argument| argument.as_ref())
+            .collect::<Vec<&[u8]>>();
+        let executor = StoreExecutor { node: &self.node };
+        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let registry = Arc::clone(&sessions.registry);
+        let face = sessions
+            .faces
+            .entry(session)
+            .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
+        let mut frame = Vec::new();
+        let close = !database_server::yyds::redis::execute_server_command(
+            face,
+            &mut frame,
+            &arguments,
+            &executor,
+            db,
+            protocol,
+        )
+        .map_err(reason)?;
+        let killed = registry
+            .take_killed()
+            .into_iter()
+            .filter(|id| *id != u64::from(session))
+            .collect::<Vec<_>>();
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("server command produced an empty reply frame"))?;
+        let killed = killed
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        Ok(format!("{{\"reply\":{},\"close\":{close},\"killed\":[{killed}]}}", reply.to_spec()))
+    }
+
+    /// Drops the embedded session opened for one host connection.
+    ///
+    /// The host calls this when the connection ends so `CLIENT LIST` stops reporting it.
+    #[napi]
+    pub fn server_release(&self, session: u32) {
+        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if sessions.faces.remove(&session).is_some() {
+            sessions.registry.detach(u64::from(session));
+        }
     }
 
     /// Executes one zset-family request and returns the reply specification as JSON.
