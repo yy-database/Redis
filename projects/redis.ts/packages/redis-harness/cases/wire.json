@@ -329,21 +329,23 @@
       }
     },
     {
-      "id": "wire.decode_command.error.zero-count",
-      "face": "error",
+      "id": "wire.decode_command.empty-count",
+      "face": "resp",
       "op": "decode_command",
       "inputHex": "2a300d0a",
       "expect": {
-        "error": "ERR Protocol error: invalid multibulk length"
+        "consumed": 4,
+        "argsHex": []
       }
     },
     {
-      "id": "wire.decode_command.error.negative-count",
-      "face": "error",
+      "id": "wire.decode_command.negative-count",
+      "face": "resp",
       "op": "decode_command",
       "inputHex": "2a2d310d0a",
       "expect": {
-        "error": "ERR Protocol error: invalid multibulk length"
+        "consumed": 5,
+        "argsHex": []
       }
     },
     {

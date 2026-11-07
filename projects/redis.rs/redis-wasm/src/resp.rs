@@ -208,8 +208,11 @@ pub struct Request {
 /// Parses one command from the front of `input`.
 ///
 /// Returns the request and the number of consumed bytes, or `None` when more
-/// bytes are required. A framing violation is reported as an `ERR Protocol
-/// error: ...` string so the caller can reply with it and close the connection.
+/// bytes are required. A zero or negative multibulk length is a request with no
+/// arguments that Redis consumes without replying, so callers must skip an empty
+/// `args` list instead of executing it. Any other framing violation is reported
+/// as an `ERR Protocol error: ...` string so the caller can reply with it and
+/// close the connection.
 pub fn decode_command(input: &[u8]) -> Result<Option<(Request, usize)>, String> {
     if input.is_empty() {
         return Ok(None);
@@ -221,7 +224,10 @@ pub fn decode_command(input: &[u8]) -> Result<Option<(Request, usize)>, String> 
         return Ok(None);
     };
     let count = parse_count(header).ok_or("ERR Protocol error: invalid multibulk length")?;
-    if count <= 0 || count as usize > MAX_REQUEST_ARGS {
+    if count <= 0 {
+        return Ok(Some((Request { args: Vec::new() }, offset)));
+    }
+    if count as usize > MAX_REQUEST_ARGS {
         return Err("ERR Protocol error: invalid multibulk length".to_owned());
     }
     let mut args = Vec::with_capacity(count as usize);

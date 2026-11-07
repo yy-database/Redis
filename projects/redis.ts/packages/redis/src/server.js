@@ -109,6 +109,11 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
                     return;
                 }
                 pending = pending.subarray(decoded.consumed);
+                // Redis consumes `*0` and a negative multibulk length as an
+                // empty request and never answers it, so the loop just moves on.
+                if (decoded.args.length === 0) {
+                    continue;
+                }
                 const result = execute(store, session, decoded.args);
                 if (result.block !== undefined) {
                     // Park the command until another connection pushes to one of

@@ -267,10 +267,17 @@ def test_command_encoding_matches_the_multibulk_layout():
     assert encode_command(binary) == b"*3\r\n$3\r\nSET\r\n$6\r\nbinary\r\n$3\r\n\x00\xff\x01\r\n"
 
 
+def test_empty_multibulk_headers_consume_without_arguments():
+    for frame in (b"*0\r\n", b"*-1\r\n", b"*-5\r\n"):
+        consumed, args = decode_command(frame)
+        assert consumed == len(frame)
+        assert args == []
+        assert reference.decode_command(frame) == ([], len(frame))
+
+
 def test_command_framing_violations_are_rejected():
     for raw, message in (
         (b"GET key\r\n", "expected a multibulk request"),
-        (b"*0\r\n", "invalid multibulk length"),
         (b"*1\r\n$-2\r\n", "invalid bulk length"),
         (b"*1\r\nx\r\n", "expected a bulk string"),
         (b"*1\r\n$2\r\nab\rX", "invalid bulk string terminator"),

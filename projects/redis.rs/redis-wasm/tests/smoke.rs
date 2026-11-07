@@ -36,3 +36,12 @@ fn primitives_compose_without_a_listener() -> io::Result<()> {
     let _ = std::fs::remove_dir_all(&data_dir);
     Ok(())
 }
+
+#[test]
+fn empty_multibulk_headers_consume_without_arguments() {
+    for frame in [b"*0\r\n".as_slice(), b"*-1\r\n".as_slice(), b"*-5\r\n".as_slice()] {
+        let (request, consumed) = decode_command(frame).expect("decode").expect("complete request");
+        assert!(request.args.is_empty());
+        assert_eq!(consumed, frame.len());
+    }
+}

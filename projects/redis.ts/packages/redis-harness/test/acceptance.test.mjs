@@ -171,9 +171,18 @@ test('command encoding matches the multibulk layout', () => {
     assert.equal(encodeCommand(binary).toString('hex'), '2a330d0a24330d0a5345540d0a24360d0a62696e6172790d0a24330d0a00ff010d0a');
 });
 
+test('empty multibulk headers consume without arguments', () => {
+    for (const frame of ['*0\r\n', '*-1\r\n', '*-5\r\n']) {
+        const buffer = Buffer.from(frame);
+        const decoded = decodeCommand(buffer);
+        assert.deepEqual(decoded.args, []);
+        assert.equal(decoded.consumed, buffer.length);
+        assert.deepEqual(referenceDecodeCommand(buffer), { args: [], consumed: buffer.length });
+    }
+});
+
 test('command framing violations are rejected', () => {
     assert.throws(() => decodeCommand(Buffer.from('GET key\r\n')), /expected a multibulk request/);
-    assert.throws(() => decodeCommand(Buffer.from('*0\r\n')), /invalid multibulk length/);
     assert.throws(() => decodeCommand(Buffer.from('*1\r\n$-2\r\n')), /invalid bulk length/);
     assert.throws(() => decodeCommand(Buffer.from('*1\r\nx\r\n')), /expected a bulk string/);
     assert.throws(() => decodeCommand(Buffer.from('*1\r\n$2\r\nab\rX')), /invalid bulk string terminator/);

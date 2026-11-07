@@ -153,8 +153,11 @@ def decode_command(data: bytes):
         return None
     raw, offset = header
     count = _count(raw)
-    if count is None or count <= 0:
+    if count is None:
         raise ValueError("invalid multibulk length")
+    if count <= 0:
+        # Redis consumes an empty or negative multibulk header without replying.
+        return [], offset
     args = []
     for _ in range(count):
         if offset >= len(data):

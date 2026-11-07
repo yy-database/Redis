@@ -193,8 +193,12 @@ export function decodeCommand(bytes) {
         return null;
     }
     const total = count(header.value);
-    if (total === null || total <= 0) {
+    if (total === null) {
         throw new Error('invalid multibulk length');
+    }
+    if (total <= 0) {
+        // Redis consumes an empty or negative multibulk header without replying.
+        return { args: [], consumed: header.next };
     }
     let offset = header.next;
     const args = [];
