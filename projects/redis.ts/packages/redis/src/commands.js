@@ -145,11 +145,6 @@ function sortZSet(entries) {
     entries.sort((left, right) => (left[1] - right[1]) || Buffer.compare(left[0], right[0]));
 }
 
-/** Score text as the gateway writes it: the shortest decimal form, no trailing `.0`. */
-function scoreText(score) {
-    return String(score);
-}
-
 /** Live string bytes, `null` when the key is missing. */
 function readString(store, db, key) {
     const body = store.getKind(db, SUFFIX.string, key);
@@ -160,141 +155,6 @@ function readString(store, db, key) {
 function rewriteString(store, db, key, body) {
     const expiresAt = store.deadlineKind(db, SUFFIX.string, key);
     store.setKind(db, SUFFIX.string, key, body, expiresAt ?? null);
-}
-
-/** Inclusive byte range clamped to `length`, `null` when it selects nothing. */
-function byteRange(start, stop, length) {
-    const begin = start < 0 ? Math.max(0, length + start) : start;
-    const end = stop < 0 ? length + stop : Math.min(stop, length - 1);
-    if (begin > end || begin >= length || end < 0) return null;
-    return [begin, end];
-}
-
-/** Clamps one byte or bit index into the units the value holds. */
-function clampIndex(index, units) {
-    const normalized = index < 0 ? units + index : index;
-    return Math.min(Math.max(normalized, 0), Math.max(units - 1, 0));
-}
-
-/** Reads one bit of `body`, MSB first, answering `0` past the end of the value. */
-function bitAt(body, offset) {
-    const index = Math.floor(offset / 8);
-    if (index >= body.length) return 0;
-    return (body[index] >> (7 - (offset % 8))) & 1;
-}
-
-/** Counts the set bits of an inclusive bit range. */
-function countBitRange(body, begin, end) {
-    let total = 0;
-    for (let offset = begin; offset <= end; offset += 1) {
-        total += bitAt(body, offset);
-    }
-    return total;
-}
-
-const MAX_BIT_OFFSET = 0xffffffff;
-const MAX_STRING = 512 * 1024 * 1024;
-
-/** Parses a canonical bit index in `0..2^32-1`, `null` otherwise. */
-function parseBitOffset(raw) {
-    const value = parseInteger(raw);
-    return value !== null && value >= 0 && value <= MAX_BIT_OFFSET ? value : null;
-}
-
-const INT64_MIN = -(1n << 63n);
-const INT64_MAX = (1n << 63n) - 1n;
-
-/** Parses one signed 64-bit integer exactly, `null` outside the range or on bad text. */
-function parseI64(raw) {
-    const value = text(raw);
-    const negative = value.startsWith('-');
-    const digits = negative ? value.slice(1) : value;
-    if (digits.length === 0 || digits.length > 19 || !/^\d+$/.test(digits)) return null;
-    if (digits.length > 1 && digits.startsWith('0')) return null;
-    const magnitude = BigInt(digits);
-    const parsed = negative ? -magnitude : magnitude;
-    return parsed >= INT64_MIN && parsed <= INT64_MAX ? parsed : null;
-}
-
-/**
- * Parses `iN` / `uN` the way the gateway does.
- *
- * Unsigned widths stop at `u63` and signed widths stop at `i64`, matching the
- * documented rejection of `u64`.
- */
-function parseBitEncoding(raw) {
-    const value = text(raw);
-    const match = /^(i|u)(\d+)$/.exec(value.toLowerCase());
-    if (match === null) return null;
-    const signed = match[1] === 'i';
-    const bits = Number(match[2]);
-    if (!Number.isSafeInteger(bits) || bits < 1) return null;
-    if (bits > (signed ? 64 : 63)) return null;
-    return { signed, bits };
-}
-
-/** Parses a bit offset: plain bit index, or `#n` multiplied by the encoding width. */
-function parseBitfieldOffset(raw, bits) {
-    const value = text(raw);
-    let big;
-    if (value.startsWith('#')) {
-        const scaled = parseI64(value.slice(1));
-        big = scaled === null ? null : scaled * BigInt(bits);
-    }
-    else {
-        big = parseI64(value);
-    }
-    if (big === null || big < 0n || big > BigInt(MAX_BIT_OFFSET)) return null;
-    return Number(big);
-}
-
-/** Reads one bitfield value, missing bits counting as zero. */
-function readBitfield(body, offset, encoding) {
-    let raw = 0n;
-    for (let step = 0; step < encoding.bits; step += 1) {
-        const position = offset + step;
-        const index = Math.floor(position / 8);
-        const bit = index < body.length ? (body[index] >> (7 - (position % 8))) & 1 : 0;
-        raw = (raw << 1n) | BigInt(bit);
-    }
-    if (encoding.signed && raw >= (1n << BigInt(encoding.bits - 1))) {
-        return raw - (1n << BigInt(encoding.bits));
-    }
-    return raw;
-}
-
-/** Writes one bitfield value, growing the body and zero filling as needed. */
-function writeBitfield(body, offset, encoding, value) {
-    const bits = encoding.bits;
-    const mask = (1n << BigInt(bits)) - 1n;
-    const raw = value & mask;
-    const needed = Math.floor((offset + bits + 7) / 8);
-    if (body.length < needed) {
-        const grown = Buffer.alloc(needed);
-        body.copy(grown, 0);
-        body = grown;
-    }
-    for (let step = 0; step < bits; step += 1) {
-        const position = offset + step;
-        const byte = Math.floor(position / 8);
-        const bit = (raw >> BigInt(bits - 1 - step)) & 1n;
-        const shift = 7 - (position % 8);
-        if (bit === 1n) body[byte] |= 1 << shift;
-        else body[byte] &= ~(1 << shift);
-    }
-    return body;
-}
-
-/** Range check plus the selected `WRAP` / `SAT` / `FAIL` policy; `null` on `FAIL`. */
-function normalizeBitfield(value, encoding, overflow) {
-    const bits = BigInt(encoding.bits);
-    const minimum = encoding.signed ? -(1n << (bits - 1n)) : 0n;
-    const maximum = encoding.signed ? (1n << (bits - 1n)) - 1n : (1n << bits) - 1n;
-    if (value >= minimum && value <= maximum) return value;
-    if (overflow === 'fail') return null;
-    if (overflow === 'sat') return value < minimum ? minimum : maximum;
-    const span = maximum - minimum + 1n;
-    return minimum + (((value - minimum) % span) + span) % span;
 }
 
 /**
@@ -497,13 +357,6 @@ function readZSet(store, db, key) {
 function rewriteKind(store, db, kind, key, body) {
     const expiresAt = store.deadlineKind(db, SUFFIX[kind], key);
     store.setKind(db, SUFFIX[kind], key, body, expiresAt ?? null);
-}
-
-/** Drops every non-string representation, keeping one logical key per name. */
-function dropOtherKinds(store, db, key) {
-    for (const kind of KINDS) {
-        if (kind !== 'string') store.deleteKind(db, SUFFIX[kind], key);
-    }
 }
 
 function commandName(args) {
@@ -757,31 +610,6 @@ function text(buffer) {
     return buffer.toString('utf8');
 }
 
-function secondsDeadline(seconds) {
-    const milliseconds = seconds * 1000;
-    return Number.isSafeInteger(milliseconds) ? milliseconds : null;
-}
-
-function millisecondsDeadline(milliseconds) {
-    return Number.isSafeInteger(milliseconds) ? milliseconds : null;
-}
-
-/**
- * Builds a deadline factory for one expiry option.
- *
- * `ex` and `px` are relative to the moment the command runs, `exat` and `pxat`
- * are absolute unix timestamps. `null` means the amount overflows.
- */
-function deadlineFactory(option, amount) {
-    const relative = option === 'ex' || option === 'px';
-    const seconds = option === 'ex' || option === 'exat';
-    const scaled = seconds ? secondsDeadline(amount) : millisecondsDeadline(amount);
-    if (scaled === null) {
-        return null;
-    }
-    return () => (relative ? Date.now() + scaled : scaled);
-}
-
 function hello(protocol, id) {
     return map([
         ['server', bulk('redis')],
@@ -990,354 +818,53 @@ function plan(store, session, name, args) {
             return planAcl(args);
 
         case 'get':
-            if (args.length !== 2) return { error: wrongArity('get') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    return bulk(store.get(session.db, args[1]));
-                },
-            };
-
         case 'set':
-            return planSet(store, session, args);
-
-        case 'setnx': {
-            if (args.length !== 3) return { error: wrongArity('setnx') };
-            return {
-                run: () => {
-                    if (kindOf(store, session.db, args[1]) !== null) return integer(0);
-                    store.set(session.db, args[1], args[2], null);
-                    return integer(1);
-                },
-            };
-        }
-
-        case 'setex': {
-            if (args.length !== 4) return { error: wrongArity('setex') };
-            const seconds = parseInteger(args[2]);
-            if (seconds === null) return { error: integerError() };
-            const offset = seconds > 0 ? secondsDeadline(seconds) : null;
-            if (offset === null) return { error: replyError("ERR invalid expire time in 'setex' command") };
-            return {
-                run: () => {
-                    store.set(session.db, args[1], args[3], Date.now() + offset);
-                    dropOtherKinds(store, session.db, args[1]);
-                    return simple('OK');
-                },
-            };
-        }
-
-        case 'getset': {
-            if (args.length !== 3) return { error: wrongArity('getset') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const previous = store.get(session.db, args[1]);
-                    store.set(session.db, args[1], args[2], null);
-                    return bulk(previous);
-                },
-            };
-        }
-
-        case 'getdel': {
-            if (args.length !== 2) return { error: wrongArity('getdel') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const previous = store.get(session.db, args[1]);
-                    if (previous !== null && previous !== undefined) store.delete(session.db, args[1]);
-                    return bulk(previous);
-                },
-            };
-        }
-
+        case 'setnx':
+        case 'setex':
+        case 'psetex':
+        case 'getset':
+        case 'getdel':
         case 'getex':
-            return planGetEx(store, session, args);
-
-        case 'mget': {
-            if (args.length < 2) return { error: wrongArity('mget') };
-            return { run: () => array(args.slice(1).map(key => bulk(store.get(session.db, key)))) };
-        }
-
-        case 'mset': {
-            if (args.length < 3 || args.length % 2 === 0) return { error: wrongArity('mset') };
-            return {
-                run: () => {
-                    for (let index = 1; index < args.length; index += 2) {
-                        store.set(session.db, args[index], args[index + 1], null);
-                        dropOtherKinds(store, session.db, args[index]);
-                    }
-                    return simple('OK');
-                },
-            };
-        }
-
-        case 'del': {
-            if (args.length < 2) return { error: wrongArity('del') };
-            return {
-                run: () => {
-                    let removed = 0;
-                    for (const key of args.slice(1)) {
-                        let dropped = false;
-                        for (const kind of KINDS) {
-                            if (store.deleteKind(session.db, SUFFIX[kind], key)) dropped = true;
-                        }
-                        if (dropped) removed += 1;
-                    }
-                    return integer(removed);
-                },
-            };
-        }
-
-        case 'exists': {
-            if (args.length < 2) return { error: wrongArity('exists') };
-            return {
-                run: () => integer(args.slice(1).filter(key => kindOf(store, session.db, key) !== null).length),
-            };
-        }
-
-        case 'type': {
-            if (args.length !== 2) return { error: wrongArity('type') };
-            return { run: () => simple(kindOf(store, session.db, args[1]) ?? 'none') };
-        }
-
-        case 'strlen': {
-            if (args.length !== 2) return { error: wrongArity('strlen') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const value = store.get(session.db, args[1]);
-                    return integer(value === null || value === undefined ? 0 : value.length);
-                },
-            };
-        }
-
-        case 'append': {
-            if (args.length !== 3) return { error: wrongArity('append') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    return integer(store.append(session.db, args[1], args[2]));
-                },
-            };
-        }
-
-        case 'getrange': {
-            if (args.length !== 4) return { error: wrongArity('getrange') };
-            const start = parseInteger(args[2]);
-            const stop = parseInteger(args[3]);
-            if (start === null || stop === null) return { error: integerError() };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const body = readString(store, session.db, args[1]);
-                    if (body === null) return bulk('');
-                    const range = byteRange(start, stop, body.length);
-                    if (range === null) return bulk('');
-                    return bulk(body.subarray(range[0], range[1] + 1));
-                },
-            };
-        }
-
-        case 'setrange': {
-            if (args.length !== 4) return { error: wrongArity('setrange') };
-            const offset = parseInteger(args[2]);
-            if (offset === null) return { error: integerError() };
-            if (offset < 0) return { error: replyError('ERR offset is out of range') };
-            const replacement = args[3];
-            const end = offset + replacement.length;
-            if (end > MAX_STRING) {
-                return { error: replyError('ERR string exceeds maximum allowed size (proto-max-bulk-len)') };
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const current = readString(store, session.db, args[1]);
-                    if (replacement.length === 0) return integer(current === null ? 0 : current.length);
-                    const length = Math.max(current === null ? 0 : current.length, end);
-                    const body = Buffer.alloc(length);
-                    if (current !== null) current.copy(body, 0);
-                    replacement.copy(body, offset);
-                    rewriteString(store, session.db, args[1], body);
-                    return integer(length);
-                },
-            };
-        }
-
-        case 'incrbyfloat': {
-            if (args.length !== 3) return { error: wrongArity('incrbyfloat') };
-            const increment = parseFloatText(args[2]);
-            if (increment === null || Number.isNaN(increment)) {
-                return { error: replyError('ERR value is not a valid float') };
-            }
-            const key = args[1];
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, key);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const current = readString(store, session.db, key);
-                    let value = 0;
-                    if (current !== null) {
-                        const parsed = parseFloatText(current);
-                        if (parsed === null || Number.isNaN(parsed)) {
-                            return replyError('ERR value is not a valid float');
-                        }
-                        value = parsed;
-                    }
-                    const updated = value + increment;
-                    if (!Number.isFinite(updated)) {
-                        return replyError('ERR increment would produce NaN or Infinity');
-                    }
-                    const result = scoreText(updated);
-                    rewriteString(store, session.db, key, Buffer.from(result));
-                    return bulk(result);
-                },
-            };
-        }
-
-        case 'setbit': {
-            if (args.length !== 4) return { error: wrongArity('setbit') };
-            const offset = parseBitOffset(args[2]);
-            if (offset === null) {
-                return { error: replyError('ERR bit offset is not an integer or out of range') };
-            }
-            const bitText = text(args[3]);
-            if (bitText !== '0' && bitText !== '1') {
-                return { error: replyError('ERR bit is not an integer or out of range') };
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const current = readString(store, session.db, args[1]);
-                    const index = Math.floor(offset / 8);
-                    const length = Math.max(current === null ? 0 : current.length, index + 1);
-                    const body = Buffer.alloc(length);
-                    if (current !== null) current.copy(body, 0);
-                    const mask = 1 << (7 - (offset % 8));
-                    const previous = (body[index] & mask) === 0 ? 0 : 1;
-                    if (bitText === '1') {
-                        body[index] |= mask;
-                    }
-                    else {
-                        body[index] &= ~mask;
-                    }
-                    rewriteString(store, session.db, args[1], body);
-                    return integer(previous);
-                },
-            };
-        }
-
-        case 'getbit': {
-            if (args.length !== 3) return { error: wrongArity('getbit') };
-            const offset = parseBitOffset(args[2]);
-            if (offset === null) {
-                return { error: replyError('ERR bit offset is not an integer or out of range') };
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const body = readString(store, session.db, args[1]);
-                    return integer(body === null ? 0 : bitAt(body, offset));
-                },
-            };
-        }
-
-        case 'bitcount': {
-            if (args.length !== 2 && args.length !== 4 && args.length !== 5) {
-                return { error: wrongArity('bitcount') };
-            }
-            let bitUnit = false;
-            if (args.length === 5) {
-                const unitText = text(args[4]).toLowerCase();
-                if (unitText !== 'byte' && unitText !== 'bit') {
-                    return { error: replyError('ERR syntax error') };
-                }
-                bitUnit = unitText === 'bit';
-            }
-            let start = null;
-            let stop = null;
-            if (args.length >= 4) {
-                start = parseInteger(args[2]);
-                stop = parseInteger(args[3]);
-                if (start === null || stop === null) return { error: integerError() };
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const body = readString(store, session.db, args[1]);
-                    if (body === null) return integer(0);
-                    if (start === null) return integer(countBitRange(body, 0, body.length * 8 - 1));
-                    const units = bitUnit ? body.length * 8 : body.length;
-                    const range = byteRange(start, stop, units);
-                    if (range === null) return integer(0);
-                    if (bitUnit) return integer(countBitRange(body, range[0], range[1]));
-                    return integer(countBitRange(body, range[0] * 8, range[1] * 8 + 7));
-                },
-            };
-        }
-
-        case 'bitpos': {
-            if (args.length < 3 || args.length > 6) return { error: wrongArity('bitpos') };
-            const target = text(args[2]);
-            if (target !== '0' && target !== '1') {
-                return { error: replyError('ERR The bit argument must be 1 or 0.') };
-            }
-            let bitUnit = false;
-            if (args.length === 6) {
-                const unitText = text(args[5]).toLowerCase();
-                if (unitText !== 'byte' && unitText !== 'bit') {
-                    return { error: replyError('ERR syntax error') };
-                }
-                bitUnit = unitText === 'bit';
-            }
-            let start = null;
-            let stop = null;
-            if (args.length >= 4) {
-                start = parseInteger(args[3]);
-                if (start === null) return { error: integerError() };
-            }
-            if (args.length >= 5) {
-                stop = parseInteger(args[4]);
-                if (stop === null) return { error: integerError() };
-            }
-            const wanted = target === '1' ? 1 : 0;
-            const endGiven = stop !== null;
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind !== null && kind !== 'string') return wrongType();
-                    const body = readString(store, session.db, args[1]);
-                    if (body === null) return integer(wanted === 0 ? 0 : -1);
-                    if (start !== null && stop !== null && start < 0 && stop < 0 && start > stop) {
-                        return integer(-1);
-                    }
-                    const units = bitUnit ? body.length * 8 : body.length;
-                    const begin = start === null ? 0 : clampIndex(start, units);
-                    const end = stop === null ? units - 1 : clampIndex(stop, units);
-                    if (begin > end) return integer(-1);
-                    const first = bitUnit ? begin : begin * 8;
-                    const last = bitUnit ? end : end * 8 + 7;
-                    for (let offset = first; offset <= last; offset += 1) {
-                        if (bitAt(body, offset) === wanted) return integer(offset);
-                    }
-                    return integer(wanted === 0 && !endGiven ? body.length * 8 : -1);
-                },
-            };
-        }
-
+        case 'mget':
+        case 'mset':
+        case 'del':
+        case 'exists':
+        case 'type':
+        case 'strlen':
+        case 'append':
+        case 'getrange':
+        case 'setrange':
+        case 'incr':
+        case 'decr':
+        case 'incrby':
+        case 'decrby':
+        case 'incrbyfloat':
+        case 'setbit':
+        case 'getbit':
+        case 'bitcount':
+        case 'bitpos':
         case 'bitfield':
         case 'bitfield_ro':
-            return planBitfield(store, session, name, args);
+        case 'ttl':
+        case 'pttl':
+        case 'expire':
+        case 'pexpire':
+        case 'expireat':
+        case 'pexpireat':
+        case 'expiretime':
+        case 'pexpiretime':
+        case 'persist':
+        case 'rename':
+        case 'renamenx':
+        case 'copy':
+        case 'keys':
+        case 'scan':
+        case 'randomkey':
+        case 'dbsize':
+        case 'flushdb':
+        case 'flushall':
+        case 'object':
+            return planString(store, session, name, args);
 
         case 'hset':
         case 'hget':
@@ -1474,135 +1001,6 @@ function plan(store, session, name, args) {
         case 'smismember':
             return planSMisMember(store, session, args);
 
-        case 'incr':
-            if (args.length !== 2) return { error: wrongArity('incr') };
-            return incremental(store, session, args[1], 1);
-
-        case 'decr':
-            if (args.length !== 2) return { error: wrongArity('decr') };
-            return incremental(store, session, args[1], -1);
-
-        case 'incrby':
-        case 'decrby': {
-            if (args.length !== 3) return { error: wrongArity(name) };
-            const delta = parseInteger(args[2]);
-            if (delta === null) return { error: integerError() };
-            return incremental(store, session, args[1], name === 'incrby' ? delta : -delta);
-        }
-
-        case 'ttl':
-        case 'pttl': {
-            if (args.length !== 2) return { error: wrongArity(name) };
-            const milliseconds = name === 'pttl';
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind === null) return integer(-2);
-                    const deadline = store.deadlineKind(session.db, SUFFIX[kind], args[1]);
-                    if (deadline === null || deadline === undefined) return integer(-1);
-                    const remaining = deadline - Date.now();
-                    if (remaining <= 0) return integer(-2);
-                    return integer(milliseconds ? remaining : Math.trunc((remaining + 500) / 1000));
-                },
-            };
-        }
-
-        case 'expire':
-        case 'pexpire':
-        case 'expireat':
-        case 'pexpireat':
-            return planExpire(store, session, name, args);
-
-        case 'persist': {
-            if (args.length !== 2) return { error: wrongArity('persist') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind === null) return integer(0);
-                    const suffix = SUFFIX[kind];
-                    if (store.deadlineKind(session.db, suffix, args[1]) === null) return integer(0);
-                    store.expireKind(session.db, suffix, args[1], null);
-                    return integer(1);
-                },
-            };
-        }
-
-        case 'rename':
-        case 'renamenx':
-            return planRename(store, session, name, args);
-
-        case 'flushdb':
-        case 'flushall': {
-            if (args.length > 2) return { error: replyError('ERR syntax error') };
-            if (args.length === 2) {
-                const option = text(args[1]).toLowerCase();
-                if (option !== 'async' && option !== 'sync') {
-                    return { error: replyError('ERR syntax error') };
-                }
-            }
-            const everyDatabase = name === 'flushall';
-            return {
-                run: () => {
-                    if (everyDatabase) {
-                        for (let index = 0; index < DATABASES; index += 1) store.flushDb(index);
-                    }
-                    else {
-                        store.flushDb(session.db);
-                    }
-                    return simple('OK');
-                },
-            };
-        }
-
-        case 'dbsize': {
-            if (args.length !== 1) return { error: wrongArity('dbsize') };
-            return { run: () => integer(store.size(session.db)) };
-        }
-
-        case 'randomkey': {
-            if (args.length !== 1) return { error: wrongArity('randomkey') };
-            return {
-                run: () => {
-                    const picked = randomMember(store.keys(session.db));
-                    return picked === null ? nullReply() : bulk(picked);
-                },
-            };
-        }
-
-        case 'copy':
-            return planCopy(store, session, args);
-
-        case 'expiretime':
-        case 'pexpiretime': {
-            if (args.length !== 2) return { error: wrongArity(name) };
-            const milliseconds = name === 'pexpiretime';
-            return {
-                run: () => {
-                    const kind = kindOf(store, session.db, args[1]);
-                    if (kind === null) return integer(-2);
-                    const deadline = store.deadlineKind(session.db, SUFFIX[kind], args[1]);
-                    if (deadline === null || deadline === undefined) return integer(-1);
-                    // 真机 `EXPIRETIME` 按毫秒位四舍五入到秒（余数 >= 500 进位），不是截断。
-                    return integer(milliseconds ? deadline : Math.round(deadline / 1000));
-                },
-            };
-        }
-
-        case 'keys': {
-            if (args.length !== 2) return { error: wrongArity('keys') };
-            const pattern = args[1];
-            return {
-                run: () => array(
-                    store.keys(session.db)
-                        .filter(key => globMatch(pattern, key))
-                        .map(key => bulk(key)),
-                ),
-            };
-        }
-
-        case 'scan':
-            return planScan(store, session, args);
-
         default:
             return { error: unknownCommand(args) };
     }
@@ -1702,58 +1100,73 @@ function classMatch(pattern, start, byte) {
     return [index, negated ? !matched : matched];
 }
 
-function planScan(store, session, args) {
-    if (args.length < 2) {
-        return { error: wrongArity('scan') };
-    }
-    const cursorText = text(args[1]);
-    if (!/^\d+$/.test(cursorText)) {
-        return { error: replyError('ERR invalid cursor') };
-    }
-    const cursor = Number(cursorText);
-    if (!Number.isFinite(cursor)) {
-        return { error: replyError('ERR invalid cursor') };
-    }
-    let pattern = null;
-    let count = 10;
-    for (let index = 2; index < args.length; index += 2) {
-        const option = text(args[index]).toLowerCase();
-        const raw = args[index + 1];
-        if (raw === undefined) {
-            return { error: replyError('ERR syntax error') };
-        }
-        if (option === 'match') {
-            pattern = raw;
-            continue;
-        }
-        if (option === 'count') {
-            const amount = parseInteger(raw);
-            if (amount === null || amount <= 0) {
-                return { error: replyError('ERR syntax error') };
-            }
-            count = amount;
-            continue;
-        }
-        return { error: replyError('ERR syntax error') };
-    }
-    const database = session.db;
-    return {
-        run: () => {
-            const keys = store.keys(database);
-            const start = Math.min(cursor, keys.length);
-            if (start >= keys.length) {
-                return array([bulk('0'), array([])]);
-            }
-            const end = Math.min(start + count, keys.length);
-            const next = end >= keys.length ? '0' : String(end);
-            const page = keys
-                .slice(start, end)
-                .filter(key => pattern === null || globMatch(pattern, key));
-            return array([bulk(next), array(page.map(key => bulk(key)))]);
-        },
-    };
-}
+/** Queue-time arity of the string/key family, as `[minimum, maximum]` arguments. */
+const STRING_ARITY = {
+    get: [2, 2],
+    set: [3, Infinity],
+    setnx: [3, 3],
+    setex: [4, 4],
+    psetex: [4, 4],
+    getset: [3, 3],
+    getdel: [2, 2],
+    getex: [2, Infinity],
+    mget: [2, Infinity],
+    mset: [3, Infinity],
+    del: [2, Infinity],
+    exists: [2, Infinity],
+    type: [2, 2],
+    strlen: [2, 2],
+    append: [3, 3],
+    getrange: [4, 4],
+    setrange: [4, 4],
+    incr: [2, 2],
+    decr: [2, 2],
+    incrby: [3, 3],
+    decrby: [3, 3],
+    incrbyfloat: [3, 3],
+    setbit: [4, 4],
+    getbit: [3, 3],
+    bitcount: [2, 5],
+    bitpos: [3, 6],
+    bitfield: [2, Infinity],
+    bitfield_ro: [2, Infinity],
+    ttl: [2, 2],
+    pttl: [2, 2],
+    expire: [3, Infinity],
+    pexpire: [3, Infinity],
+    expireat: [3, Infinity],
+    pexpireat: [3, Infinity],
+    expiretime: [2, 2],
+    pexpiretime: [2, 2],
+    persist: [2, 2],
+    rename: [3, 3],
+    renamenx: [3, 3],
+    copy: [3, Infinity],
+    keys: [2, 2],
+    scan: [2, Infinity],
+    randomkey: [1, 1],
+    dbsize: [1, 1],
+    flushdb: [1, 2],
+    flushall: [1, 2],
+    object: [2, Infinity],
+};
 
+/**
+ * Plans one string/key-family command.
+ *
+ * Arity and the two fixed-shape rules (`MSET` pairs, `BITCOUNT` ranges) stay here
+ * because a transaction rejects a malformed command while it is queued. Option
+ * parsing, type checks, storage and reply framing all run upstream.
+ */
+function planString(store, session, name, args) {
+    const [minimum, maximum] = STRING_ARITY[name];
+    const malformed = args.length < minimum
+        || args.length > maximum
+        || (name === 'mset' && args.length % 2 === 0)
+        || (name === 'bitcount' && args.length === 3);
+    if (malformed) return { error: wrongArity(name) };
+    return { run: () => store.stringCommand(session.db, session.protocol ?? 2, args) };
+}
 /** Container commands whose `cmd` field in `CLIENT LIST` is rendered as `parent|sub`. */
 const CONTAINER_COMMANDS = new Set([
     'acl', 'client', 'command', 'config', 'function', 'latency', 'memory', 'object',
@@ -2531,240 +1944,6 @@ function planAcl(args) {
     return { error: replyError(`ERR unknown subcommand '${text(args[1])}'. Try ACL HELP.`) };
 }
 
-function planSet(store, session, args) {
-    if (args.length < 3) {
-        return { error: wrongArity('set') };
-    }
-    let ifAbsent = false;
-    let ifPresent = false;
-    let keepDeadline = false;
-    let expiry = null;
-    for (let index = 3; index < args.length; index += 1) {
-        const option = text(args[index]).toLowerCase();
-        if (option === 'nx') {
-            ifAbsent = true;
-            continue;
-        }
-        if (option === 'xx') {
-            ifPresent = true;
-            continue;
-        }
-        if (option === 'keepttl') {
-            if (expiry !== null) return { error: replyError('ERR syntax error') };
-            keepDeadline = true;
-            continue;
-        }
-        const unit = option === 'ex' || option === 'px' || option === 'exat' || option === 'pxat' ? option : null;
-        if (unit === null) {
-            return { error: replyError('ERR syntax error') };
-        }
-        if (keepDeadline) {
-            return { error: replyError('ERR syntax error') };
-        }
-        const raw = args[index + 1];
-        if (raw === undefined) {
-            return { error: replyError('ERR syntax error') };
-        }
-        index += 1;
-        const amount = parseInteger(raw);
-        if (amount === null) {
-            return { error: integerError() };
-        }
-        if (amount <= 0) {
-            return { error: replyError("ERR invalid expire time in 'set' command") };
-        }
-        // Upstream keeps the last expiry option when one is repeated.
-        expiry = deadlineFactory(unit, amount);
-        if (expiry === null) {
-            return { error: replyError("ERR invalid expire time in 'set' command") };
-        }
-    }
-    if (ifAbsent && ifPresent) {
-        return { error: replyError('ERR syntax error') };
-    }
-    const key = args[1];
-    const value = args[2];
-    return {
-        run: () => {
-            const kind = kindOf(store, session.db, key);
-            if ((ifAbsent && kind !== null) || (ifPresent && kind === null)) {
-                return nullReply();
-            }
-            const deadline = expiry !== null
-                ? expiry()
-                : keepDeadline && kind !== null
-                    ? store.deadlineKind(session.db, SUFFIX[kind], key)
-                    : null;
-            store.set(session.db, key, value, deadline ?? null);
-            dropOtherKinds(store, session.db, key);
-            return simple('OK');
-        },
-    };
-}
-
-function planGetEx(store, session, args) {
-    if (args.length < 2) {
-        return { error: wrongArity('getex') };
-    }
-    let deadline = null;
-    let persist = false;
-    let touched = false;
-    if (args.length >= 3) {
-        const option = text(args[2]).toLowerCase();
-        if (option === 'persist') {
-            if (args.length !== 3) return { error: replyError('ERR syntax error') };
-            persist = true;
-            touched = true;
-        }
-        else if (option === 'ex' || option === 'px' || option === 'exat' || option === 'pxat') {
-            const raw = args[3];
-            if (raw === undefined || args.length !== 4) return { error: replyError('ERR syntax error') };
-            const amount = parseInteger(raw);
-            if (amount === null) return { error: integerError() };
-            if (amount <= 0) return { error: replyError("ERR invalid expire time in 'getex' command") };
-            deadline = deadlineFactory(option, amount);
-            if (deadline === null) return { error: replyError("ERR invalid expire time in 'getex' command") };
-            touched = true;
-        }
-        else {
-            return { error: replyError('ERR syntax error') };
-        }
-    }
-    const key = args[1];
-    return {
-        run: () => {
-            const kind = kindOf(store, session.db, key);
-            if (kind !== null && kind !== 'string') return wrongType();
-            const value = store.get(session.db, key);
-            if (value === null || value === undefined) {
-                return nullReply();
-            }
-            if (persist) {
-                store.expire(session.db, key, null);
-            }
-            else if (touched) {
-                store.expire(session.db, key, deadline());
-            }
-            return bulk(value);
-        },
-    };
-}
-
-function planExpire(store, session, name, args) {
-    if (args.length !== 3) {
-        return { error: wrongArity(name) };
-    }
-    const amount = parseInteger(args[2]);
-    if (amount === null) {
-        return { error: integerError() };
-    }
-    const absolute = name === 'expireat' || name === 'pexpireat';
-    const factory = deadlineFactory(absolute ? (name === 'expireat' ? 'exat' : 'pxat') : (name === 'expire' ? 'ex' : 'px'), amount);
-    if (factory === null) {
-        return { error: replyError(`ERR invalid expire time in '${name}' command`) };
-    }
-    const key = args[1];
-    return {
-        run: () => {
-            const kind = kindOf(store, session.db, key);
-            if (kind === null) return integer(0);
-            const suffix = SUFFIX[kind];
-            const deadline = factory();
-            if (deadline <= 0 || (!absolute && amount <= 0)) {
-                store.deleteKind(session.db, suffix, key);
-                return integer(1);
-            }
-            store.expireKind(session.db, suffix, key, deadline);
-            return integer(1);
-        },
-    };
-}
-
-function planRename(store, session, name, args) {
-    if (args.length !== 3) {
-        return { error: wrongArity(name) };
-    }
-    const ifAbsent = name === 'renamenx';
-    const source = args[1];
-    const destination = args[2];
-    return {
-        run: () => {
-            if (source.equals(destination)) {
-                if (kindOf(store, session.db, source) === null) return replyError('ERR no such key');
-                return ifAbsent ? integer(0) : simple('OK');
-            }
-            const outcome = store.rename(session.db, source, destination, ifAbsent);
-            if (outcome === 'missing') return replyError('ERR no such key');
-            if (outcome === 'destination-present') return integer(0);
-            return ifAbsent ? integer(1) : simple('OK');
-        },
-    };
-}
-
-/** Plans `COPY source destination [DB index] [REPLACE]`. */
-function planCopy(store, session, args) {
-    if (args.length < 3) {
-        return { error: wrongArity('copy') };
-    }
-    const source = args[1];
-    const destination = args[2];
-    let targetDb = session.db;
-    let replace = false;
-    for (let index = 3; index < args.length; index += 1) {
-        const option = text(args[index]).toLowerCase();
-        if (option === 'replace') {
-            replace = true;
-            continue;
-        }
-        if (option === 'db') {
-            const raw = args[index + 1];
-            if (raw === undefined) return { error: replyError('ERR syntax error') };
-            index += 1;
-            const database = parseInteger(raw);
-            if (database === null || database < 0 || database >= DATABASES) {
-                return { error: replyError('ERR DB index is out of range') };
-            }
-            targetDb = database;
-            continue;
-        }
-        return { error: replyError('ERR syntax error') };
-    }
-    if (targetDb === session.db && source.equals(destination)) {
-        return { error: replyError('ERR source and destination objects are the same') };
-    }
-    const database = session.db;
-    return {
-        run: () => {
-            const kind = kindOf(store, database, source);
-            if (kind === null) return integer(0);
-            if (!replace && kindOf(store, targetDb, destination) !== null) return integer(0);
-            const body = kind === 'string'
-                ? store.get(database, source)
-                : store.getKind(database, SUFFIX[kind], source);
-            if (body === null || body === undefined) return integer(0);
-            const deadline = kind === 'string'
-                ? store.deadline(database, source)
-                : store.deadlineKind(database, SUFFIX[kind], source);
-            dropEveryKind(store, targetDb, destination);
-            if (kind === 'string') store.set(targetDb, destination, body, deadline ?? null);
-            else store.setKind(targetDb, SUFFIX[kind], destination, body, deadline ?? null);
-            return integer(1);
-        },
-    };
-}
-
-function incremental(store, session, key, delta) {
-    return {
-        run: () => {
-            const kind = kindOf(store, session.db, key);
-            if (kind !== null && kind !== 'string') return wrongType();
-            const outcome = store.incrBy(session.db, key, delta);
-            if (outcome.error) return replyError(`ERR ${outcome.error}`);
-            return integer(outcome.value);
-        },
-    };
-}
-
 /**
  * Plans one set aggregate: intersection, union or difference, optionally stored.
  *
@@ -3388,95 +2567,6 @@ function planSort(store, session, name, args) {
                 return integer(gathered.length);
             }
             return array(gathered.map(value => (value === null ? nullReply() : bulk(value))));
-        },
-    };
-}
-
-/**
- * Plans one `BITFIELD` / `BITFIELD_RO` call.
- *
- * Every subcommand is parsed before the key is touched, so a malformed encoding
- * or value rejects the whole call without creating or rewriting the key. Only
- * `GET` leaves the body untouched, which is why a read never materialises an
- * absent key.
- */
-function planBitfield(store, session, name, args) {
-    const db = session.db;
-    const readonly = name === 'bitfield_ro';
-    if (args.length < 2) return { error: wrongArity(name) };
-    let overflow = 'wrap';
-    const operations = [];
-    let index = 2;
-    while (index < args.length) {
-        const keyword = text(args[index]).toLowerCase();
-        if (keyword === 'overflow') {
-            const policy = args[index + 1] === undefined ? null : text(args[index + 1]).toLowerCase();
-            if (policy === null) return { error: replyError('ERR syntax error') };
-            if (policy !== 'wrap' && policy !== 'sat' && policy !== 'fail') {
-                return { error: replyError('ERR Invalid OVERFLOW type specified') };
-            }
-            overflow = policy;
-            index += 2;
-            continue;
-        }
-        const writing = keyword === 'set' || keyword === 'incrby';
-        if (readonly && writing) {
-            return { error: replyError('ERR BITFIELD_RO only supports the GET subcommand') };
-        }
-        const needed = keyword === 'get' ? 3 : writing ? 4 : 0;
-        if (needed === 0 || index + needed > args.length) {
-            return { error: replyError('ERR syntax error') };
-        }
-        const encoding = parseBitEncoding(args[index + 1]);
-        if (encoding === null) {
-            return { error: replyError('ERR Invalid bitfield type. Use something like i16 u8. Note that u64 is not supported but i64 is.') };
-        }
-        const offset = parseBitfieldOffset(args[index + 2], encoding.bits);
-        if (offset === null) {
-            return { error: replyError('ERR bit offset is not an integer or out of range') };
-        }
-        if (keyword === 'get') {
-            operations.push({ kind: 'get', encoding, offset });
-        }
-        else {
-            const value = parseI64(args[index + 3]);
-            if (value === null) {
-                return { error: replyError('ERR value is not an integer or out of range') };
-            }
-            operations.push({ kind: keyword, encoding, offset, value, overflow });
-        }
-        index += needed;
-    }
-    return {
-        run: () => {
-            const kind = kindOf(store, db, args[1]);
-            if (kind !== null && kind !== 'string') return wrongType();
-            let body = readString(store, db, args[1]) ?? Buffer.alloc(0);
-            const results = [];
-            let changed = false;
-            for (const operation of operations) {
-                if (operation.kind === 'get') {
-                    results.push(readBitfield(body, operation.offset, operation.encoding));
-                    continue;
-                }
-                const previous = readBitfield(body, operation.offset, operation.encoding);
-                if (operation.kind === 'set') {
-                    body = writeBitfield(body, operation.offset, operation.encoding, operation.value);
-                    changed = true;
-                    results.push(previous);
-                    continue;
-                }
-                const updated = normalizeBitfield(previous + operation.value, operation.encoding, operation.overflow);
-                if (updated === null) {
-                    results.push(null);
-                    continue;
-                }
-                body = writeBitfield(body, operation.offset, operation.encoding, updated);
-                changed = true;
-                results.push(updated);
-            }
-            if (changed) rewriteString(store, db, args[1], body);
-            return array(results.map(value => (value === null ? nullReply() : integer(Number(value)))));
         },
     };
 }

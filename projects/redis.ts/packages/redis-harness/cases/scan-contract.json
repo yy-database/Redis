@@ -1,0 +1,105 @@
+{
+  "format": "redis.case/v1",
+  "table": "scan-contract",
+  "cases": [
+    {
+      "id": "command.scan.full-traversal",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0"
+      ],
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "757365723a31",
+          "757365723a32",
+          "757365723a33",
+          "6f74686572"
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a32",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a33",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f74686572",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.match-count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "MATCH",
+        "user:*",
+        "COUNT",
+        "2"
+      ],
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "757365723a31",
+          "757365723a32",
+          "757365723a33"
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a31",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a32",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "757365723a33",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6f74686572",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    }
+  ]
+}

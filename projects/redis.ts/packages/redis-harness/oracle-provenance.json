@@ -1,0 +1,7 @@
+{
+  "format": "redis.oracle-provenance/v1",
+  "server": "redis-server",
+  "version": "8.10.3",
+  "verifiedAt": "2026-11-08",
+  "notes": "Wire-replayable cases are compared against this server. Storage, layout, wire-codec and stress cases are covered by the package tests instead."
+}

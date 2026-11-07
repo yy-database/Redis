@@ -14,6 +14,16 @@ jobs:
   typescript:
     name: pnpm packages
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:8.10.3
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
@@ -43,5 +53,10 @@ jobs:
         run: pnpm gate:install:ts
       - name: Cross implementation oracle
         run: pnpm gate:oracle
+      - name: Live Redis oracle
+        run: pnpm gate:oracle:live
+        env:
+          REDIS_ORACLE_HOST: 127.0.0.1
+          REDIS_ORACLE_PORT: "6379"
       - name: Real driver conformance
         run: pnpm gate:drivers

@@ -33,7 +33,8 @@ const { decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, re
 function commandStore(store) {
     return new Proxy(store, {
         get(target, property) {
-            if (property === 'hashCommand' || property === 'setCommand' || property === 'listCommand' || property === 'zsetCommand') {
+            if (property === 'hashCommand' || property === 'setCommand' || property === 'listCommand'
+                || property === 'zsetCommand' || property === 'stringCommand') {
                 return (db, protocol, args) => JSON.parse(target[property](db, protocol, args));
             }
             const value = Reflect.get(target, property);

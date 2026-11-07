@@ -353,18 +353,19 @@ impl KeyValueExecutor for StoreExecutor<'_> {
             KeyValueAction::Delete => Ok(KeyValueResult::Delete {
                 removed: node.delete_kind(db, kind, key).map_err(ClusterError::Io)?,
             }),
-            KeyValueAction::SetExpiry { expires_at } => Ok(KeyValueResult::Expiry {
-                present: node
+            KeyValueAction::SetExpiry { expires_at } => Ok(KeyValueResult::ExpiryChanged {
+                applied: node
                     .set_deadline_kind(db, kind, key, Some(expires_at))
                     .map_err(ClusterError::Io)?,
-                expires_at: Some(expires_at),
             }),
-            KeyValueAction::ClearExpiry => Ok(KeyValueResult::Expiry {
-                present: node
-                    .set_deadline_kind(db, kind, key, None)
-                    .map_err(ClusterError::Io)?,
-                expires_at: None,
-            }),
+            KeyValueAction::ClearExpiry => {
+                let had_deadline = node.contains_kind(db, kind, key) && node.deadline_kind(db, kind, key).is_some();
+                node.set_deadline_kind(db, kind, key, None)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::ExpiryChanged {
+                    applied: had_deadline,
+                })
+            }
             KeyValueAction::GetExpiry => Ok(KeyValueResult::Expiry {
                 present: node.contains_kind(db, kind, key),
                 expires_at: node.deadline_kind(db, kind, key),
@@ -388,19 +389,69 @@ impl KeyValueExecutor for StoreExecutor<'_> {
                 destination,
                 if_absent,
             } => {
-                if kind != "" {
-                    return Err(ClusterError::Unsupported(
-                        "renames are only defined for the string kind",
-                    ));
-                }
                 let outcome = node
                     .rename(db, key, &destination, if_absent)
                     .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::Delete {
-                    removed: matches!(outcome, RenameOutcome::Renamed),
+                Ok(KeyValueResult::Rename {
+                    source_present: !matches!(outcome, RenameOutcome::Missing),
+                    applied: matches!(outcome, RenameOutcome::Renamed),
                 })
             }
         }
+    }
+
+    fn execute_read_batch(
+        &self,
+        fence: Option<&FenceToken>,
+        commands: &[KeyValueCommand],
+    ) -> database_types::cluster::Result<Vec<KeyValueResult>> {
+        // The binding drives one synchronous client call at a time, so replaying
+        // the reads back to back cannot interleave with a concurrent write.
+        let _ = fence;
+        commands
+            .iter()
+            .map(|command| self.execute(None, command.clone()))
+            .collect()
+    }
+
+    fn execute_scan(
+        &self,
+        fence: Option<&FenceToken>,
+        namespace: &Namespace,
+        prefix: &[u8],
+        after: Option<&[u8]>,
+        before: Option<&[u8]>,
+        limit: usize,
+    ) -> database_types::cluster::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        // This executor serves one local shard, so there is no lease to fence.
+        let _ = fence;
+        let (db, kind) = locate(namespace)
+            .ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
+        let node = self
+            .node
+            .lock()
+            .map_err(|_| ClusterError::Unsupported("store lock poisoned"))?;
+        let mut records = Vec::new();
+        for key in node.keys(db) {
+            if !key.starts_with(prefix) {
+                continue;
+            }
+            if after.is_some_and(|after| key.as_slice() <= after) {
+                continue;
+            }
+            if before.is_some_and(|before| key.as_slice() >= before) {
+                continue;
+            }
+            if limit != 0 && records.len() >= limit {
+                break;
+            }
+            // `keys` merges every kind of the database, so a key that only lives
+            // in another kind namespace is not part of this scan.
+            if let Some(record) = node.get_kind(db, kind, &key) {
+                records.push((key, upstream_value(kind, &record.value)));
+            }
+        }
+        Ok(records)
     }
 }
 
@@ -719,6 +770,37 @@ impl Store {
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("list command produced an empty reply frame"))?;
+        Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one string/key-family request and returns the reply specification as JSON.
+    ///
+    /// `protocol` is `2` or `3`, matching the connection that issued the request.
+    #[napi]
+    pub fn string_command(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
+        let arguments = args
+            .iter()
+            .map(|argument| argument.as_ref())
+            .collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        database_server::yyds::redis::execute_string_command(
+            &mut frame,
+            &arguments,
+            &executor,
+            &namespace,
+            protocol,
+        )
+        .map_err(reason)?;
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("string command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
     }
 

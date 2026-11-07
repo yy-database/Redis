@@ -1,0 +1,432 @@
+{
+  "format": "redis.case/v1",
+  "table": "object-encoding",
+  "cases": [
+    {
+      "id": "command.object.encoding.int",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          105,
+          110,
+          116
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "3132333435",
+          "call": "set"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.int-negative",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          105,
+          110,
+          116
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "2d3432",
+          "call": "set"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.leading-zero",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          101,
+          109,
+          98,
+          115,
+          116,
+          114
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "303037",
+          "call": "set"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.embstr-ceiling",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          101,
+          109,
+          98,
+          115,
+          116,
+          114
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "616161616161616161616161616161616161616161616161616161616161616161616161",
+          "call": "set"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.raw-floor",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          114,
+          97,
+          119
+        ]
+      },
+      "setup": [
+        {
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": "61616161616161616161616161616161616161616161616161616161616161616161616161",
+          "call": "set"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.hash-listpack",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          108,
+          105,
+          115,
+          116,
+          112,
+          97,
+          99,
+          107
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6b",
+          "valueHex": "0100000001000000660100000076"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.list-listpack",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          108,
+          105,
+          115,
+          116,
+          112,
+          97,
+          99,
+          107
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6b",
+          "valueHex": "0200000001000000610100000062"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.set-intset",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          105,
+          110,
+          116,
+          115,
+          101,
+          116
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6b",
+          "valueHex": "03000000010000003101000000320100000033"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.set-listpack",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          108,
+          105,
+          115,
+          116,
+          112,
+          97,
+          99,
+          107
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6b",
+          "valueHex": "0200000001000000610100000062"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.set-hashtable",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          104,
+          97,
+          115,
+          104,
+          116,
+          97,
+          98,
+          108,
+          101
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6b",
+          "valueHex": "01000000410000006161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.zset-listpack",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          108,
+          105,
+          115,
+          116,
+          112,
+          97,
+          99,
+          107
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6b",
+          "valueHex": "01000000010000006d0000000000000000"
+        }
+      ],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding.missing",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "null"
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.unknown-subcommand",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "BOGUS",
+        "k"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR unknown subcommand 'BOGUS'. Try OBJECT HELP."
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    },
+    {
+      "id": "command.object.encoding-arity",
+      "face": "command",
+      "op": "command",
+      "argsText": [
+        "OBJECT",
+        "ENCODING"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR wrong number of arguments for 'object|encoding' command"
+      },
+      "setup": [],
+      "effect": [],
+      "sides": [
+        "ts"
+      ]
+    }
+  ]
+}

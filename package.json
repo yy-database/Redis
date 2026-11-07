@@ -14,6 +14,7 @@
         "gate:test-count:py": "node scripts/check-test-floor.mjs --kind py -- node scripts/run-python-tests.mjs",
         "gate:conformance:compare": "node scripts/compare-conformance.mjs",
         "gate:oracle": "node projects/redis.ts/packages/redis-harness/bin/oracle.mjs",
+        "gate:oracle:live": "node scripts/oracle-live.mjs --all",
         "oracle:live": "node scripts/oracle-live.mjs"
     },
     "packageManager": "pnpm@10.18.3",

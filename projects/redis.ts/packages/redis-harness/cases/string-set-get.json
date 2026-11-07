@@ -1,0 +1,1258 @@
+{
+  "format": "redis.case/v1",
+  "table": "string-set-get",
+  "cases": [
+    {
+      "id": "dispatch.set.get-old-value",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "old"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "new",
+            "GET"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              111,
+              108,
+              100
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              110,
+              101,
+              119
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.get-missing",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "x",
+            "GET"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.get-nx-blocked",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "old"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "new",
+            "NX",
+            "GET"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              111,
+              108,
+              100
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              111,
+              108,
+              100
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.get-xx-missing",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "new",
+            "XX",
+            "GET"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.get-wrongtype",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "HSET",
+            "h",
+            "f",
+            "v"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "h",
+            "v",
+            "GET"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+          }
+        },
+        {
+          "argsText": [
+            "HGET",
+            "h",
+            "f"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              118
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.repeated-options",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "NX",
+            "NX"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k2",
+            "v",
+            "EX",
+            "10",
+            "EX",
+            "20"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.nx-xx-conflict",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "NX",
+            "XX"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.string.fresh-writers",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SETNX",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "SETNX",
+            "k",
+            "w"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "PSETEX",
+            "p",
+            "1000",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "MSET",
+            "a",
+            "1",
+            "b",
+            "2"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "MGET",
+            "a",
+            "b",
+            "missing"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  49
+                ]
+              },
+              {
+                "type": "bulk",
+                "bytes": [
+                  50
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.string.embedded-nul",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k\u0000ey",
+            "v\u0000al"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k\u0000ey"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              118,
+              0,
+              97,
+              108
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "STRLEN",
+            "k\u0000ey"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 4
+          }
+        },
+        {
+          "argsText": [
+            "KEYS",
+            "k*"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  107,
+                  0,
+                  101,
+                  121
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.string.empty-value",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "empty",
+            ""
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "empty"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": []
+          }
+        },
+        {
+          "argsText": [
+            "STRLEN",
+            "empty"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "empty"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "string"
+          }
+        },
+        {
+          "argsText": [
+            "OBJECT",
+            "ENCODING",
+            "empty"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              101,
+              109,
+              98,
+              115,
+              116,
+              114
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.string.long-value",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "long",
+            "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "STRLEN",
+            "long"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 4096
+          }
+        },
+        {
+          "argsText": [
+            "GETRANGE",
+            "long",
+            "-4",
+            "-1"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              120,
+              120,
+              120,
+              120
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "OBJECT",
+            "ENCODING",
+            "long"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              114,
+              97,
+              119
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.keepttl-keeps-expiry",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "EX",
+            "100"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "w",
+            "KEEPTTL"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              119
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "PERSIST",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "TTL",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": -1
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.xx-get",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "old"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "new",
+            "XX",
+            "GET"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              111,
+              108,
+              100
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              110,
+              101,
+              119
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.nx-get-missing",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "new",
+            "NX",
+            "GET"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              110,
+              101,
+              119
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.set.expiry-option-conflicts",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "EX",
+            "10",
+            "PX",
+            "10000"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "KEEPTTL",
+            "PX",
+            "1000"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR syntax error"
+          }
+        },
+        {
+          "argsText": [
+            "EXISTS",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.getex.rewrites-expiry",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v",
+            "EX",
+            "100"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "GETEX",
+            "k",
+            "EX",
+            "200"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              118
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "PERSIST",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "GETEX",
+            "k",
+            "PERSIST"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              118
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "TTL",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": -1
+          }
+        },
+        {
+          "argsText": [
+            "GETEX",
+            "missing",
+            "EX",
+            "100"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.expire.conditions",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "100"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "200",
+            "XX"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "100",
+            "NX"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "50",
+            "GT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "300",
+            "GT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "100",
+            "LT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "PERSIST",
+            "k"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "plain",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "plain",
+            "100",
+            "GT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "plain",
+            "100",
+            "LT"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "100",
+            "NX",
+            "XX"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR NX and XX, GT or LT options at the same time are not compatible"
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "100",
+            "GT",
+            "LT"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR GT and LT options at the same time are not compatible"
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "100",
+            "BOGUS"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR Unsupported option BOGUS"
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "k",
+            "abc",
+            "NX"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR value is not an integer or out of range"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.resp3.null-shapes",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "protocol": 3,
+          "argsText": [
+            "GET",
+            "missing"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "GETEX",
+            "missing"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "GETDEL",
+            "missing"
+          ],
+          "reply": {
+            "type": "null"
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "missing"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "none"
+          }
+        },
+        {
+          "argsText": [
+            "EXPIRE",
+            "missing",
+            "10"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 0
+          }
+        },
+        {
+          "argsText": [
+            "TTL",
+            "missing"
+          ],
+          "reply": {
+            "type": "int",
+            "value": -2
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "GET",
+            "k"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              118
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.type.every-kind",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "HSET",
+            "h",
+            "f",
+            "v"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "RPUSH",
+            "l",
+            "a"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "SADD",
+            "s",
+            "a"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "ZADD",
+            "z",
+            "1",
+            "a"
+          ],
+          "reply": {
+            "type": "int",
+            "value": 1
+          }
+        },
+        {
+          "argsText": [
+            "XADD",
+            "x",
+            "1-1",
+            "f",
+            "v"
+          ],
+          "reply": {
+            "type": "bulk",
+            "bytes": [
+              49,
+              45,
+              49
+            ]
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "h"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "hash"
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "l"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "list"
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "s"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "set"
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "z"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "zset"
+          }
+        },
+        {
+          "argsText": [
+            "TYPE",
+            "x"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "stream"
+          }
+        }
+      ]
+    }
+  ]
+}

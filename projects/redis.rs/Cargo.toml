@@ -17,15 +17,16 @@ repository = "https://github.com/yy-database/Redis"
 [workspace.dependencies]
 # Upstream byte layouts for the `.yyds` catalog and the `.yykv` shard plus the
 # executor contract and the Redis command facade, pinned to the `dev` tip that
-# carries all five Redis value kinds, `SCAN`, `RENAME`, the string range, float
-# and bit command family, the zset algebra, sort and bitfield families, `LPOS`,
-# the HyperLogLog family, the public hash and set command entries, and the list
+# carries all six Redis value kinds, `SCAN`, `RENAME`, the string and key family
+# entry with `SET ... GET`, `OBJECT ENCODING`, `SETNX`, `PSETEX`, `MSET` and
+# `FLUSHDB`, the zset algebra, sort and bitfield families, `LPOS`, the
+# HyperLogLog family, the public hash and set command entries, and the list
 # family entry with `LMPOP`.
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "bd0f19ec841468fa48122f2b35add4f5f0fe91b9", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "bd0f19ec841468fa48122f2b35add4f5f0fe91b9", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "bd0f19ec841468fa48122f2b35add4f5f0fe91b9", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "bd0f19ec841468fa48122f2b35add4f5f0fe91b9", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "bd0f19ec841468fa48122f2b35add4f5f0fe91b9", package = "database-server" }
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "e9480426c218d010d491ca38c20f933548415773", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "e9480426c218d010d491ca38c20f933548415773", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "e9480426c218d010d491ca38c20f933548415773", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "e9480426c218d010d491ca38c20f933548415773", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "e9480426c218d010d491ca38c20f933548415773", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

@@ -5,15 +5,20 @@
 //! this repository's codec. Set `REDIS_ORACLE_HOST` and `REDIS_ORACLE_PORT` to
 //! point at the instance under test.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { connect } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const SCRIPT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = process.env.REDIS_ORACLE_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.REDIS_ORACLE_PORT ?? 6379);
-const ROOT = process.env.REDIS_ORACLE_ROOT ?? process.cwd();
+const ROOT = process.env.REDIS_ORACLE_ROOT ?? SCRIPT_ROOT;
+const ALL = process.argv.includes('--all');
 const TABLES = process.argv.slice(2).filter(argument => !argument.startsWith('--'));
 const PROTOCOL = Number((process.argv.find(argument => argument.startsWith('--protocol=') ?? '') ?? '').split('=')[1] ?? 2);
+const CASES = join('projects', 'redis.ts', 'packages', 'redis-harness', 'cases');
+const PROVENANCE = join('projects', 'redis.ts', 'packages', 'redis-harness', 'oracle-provenance.json');
 
 /** Parses one RESP frame starting at `offset`, returning the frame and the next offset. */
 function parseFrame(bytes, offset) {
@@ -425,6 +430,20 @@ async function main() {
     let link = await openLink();
     const banner = await link.send(['PING']);
 
+    // The corpus records which server produced its expectations, so a CI image
+    // bump cannot silently drift away from the bytes the cases were checked by.
+    const provenance = JSON.parse(readFileSync(join(ROOT, PROVENANCE), 'utf8'));
+    const info = await link.send(['INFO', 'server']);
+    const reported = /^redis_version:(.+)$/m.exec(info.value ?? '')?.[1]?.trim();
+    if (reported !== provenance.version) {
+        throw new Error(
+            `corpus provenance expects ${provenance.server} ${provenance.version}, connected server reports ${reported ?? 'unknown'}`,
+        );
+    }
+    console.log(`live oracle provenance: ${provenance.server} ${provenance.version} (verified ${provenance.verifiedAt})`);
+
+    const tables = ALL ? discoverTables() : TABLES.length > 0 ? TABLES : ['blocking-ops'];
+
     // Each shared case starts from an empty store, so every database is cleared
     // and each setup step runs in the database it declares.
     const applySetup = async entry => {
@@ -437,16 +456,16 @@ async function main() {
     const problems = [];
     let checked = 0;
     let storeOnly = 0;
-    for (const table of TABLES.length > 0 ? TABLES : ['blocking-ops']) {
-        const payload = JSON.parse(readFileSync(join(ROOT, 'projects', 'redis.ts', 'packages', 'redis-harness', 'cases', `${table}.json`), 'utf8'));
+    let notWire = 0;
+    for (const table of tables) {
+        const payload = JSON.parse(readFileSync(join(ROOT, CASES, `${table}.json`), 'utf8'));
         for (const entry of payload.cases) {
-            if (entry.op === 'store') {
-                // Storage-only cases have no wire command to replay.
-                storeOnly += 1;
-                continue;
-            }
             if (entry.op !== 'command' && entry.op !== 'dispatch') {
-                throw new Error(`${table}/${entry.id}: unsupported op ${entry.op}`);
+                // Storage, layout, wire-codec, parse, repair and stress cases have
+                // no command frame to replay; their packages own those assertions.
+                if (entry.op === 'store') storeOnly += 1;
+                else notWire += 1;
+                continue;
             }
             if (entry.op === 'dispatch') {
                 // `RESET` drops subscriptions in the real server and returns the
@@ -493,7 +512,15 @@ async function main() {
         process.exitCode = 1;
         return;
     }
-    console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches, ${storeOnly} store-only case(s) skipped`);
+    console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches, ${storeOnly} store-only and ${notWire} non-wire case(s) skipped`);
+}
+
+/** Lists every case table in the shared corpus for a full CI replay. */
+function discoverTables() {
+    return readdirSync(join(ROOT, CASES))
+        .filter(name => name.endsWith('.json'))
+        .map(name => name.slice(0, -'.json'.length))
+        .sort();
 }
 
 /** Replays a multi-step dispatcher case, comparing replies and push frames. */
