@@ -206,7 +206,7 @@ fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
     if kind == "hash" {
         hash_with_count(value)
     }
-    else if kind == "set" {
+    else if kind == "set" || kind == "list" {
         set_with_count(value)
     }
     else {
@@ -218,7 +218,7 @@ fn downstream_value(kind: &str, value: Vec<u8>) -> Vec<u8> {
     if kind == "hash" {
         hash_without_count(&value)
     }
-    else if kind == "set" {
+    else if kind == "set" || kind == "list" {
         set_without_count(&value)
     }
     else {
@@ -686,6 +686,39 @@ impl Store {
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("set command produced an empty reply frame"))?;
+        Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one list-family request and returns the reply specification as JSON.
+    ///
+    /// `protocol` is `2` or `3`, matching the connection that issued the request.
+    /// Blocking commands answer at once in their non-blocking form, so the host owns
+    /// the wait loop while the facade keeps the command semantics.
+    #[napi]
+    pub fn list_command(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
+        let arguments = args
+            .iter()
+            .map(|argument| argument.as_ref())
+            .collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        database_server::yyds::redis::execute_list_command(
+            &mut frame,
+            &arguments,
+            &executor,
+            &namespace,
+            protocol,
+        )
+        .map_err(reason)?;
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("list command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
     }
 }

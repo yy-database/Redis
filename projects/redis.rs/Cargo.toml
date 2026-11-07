@@ -19,12 +19,13 @@ repository = "https://github.com/yy-database/Redis"
 # executor contract and the Redis command facade, pinned to the `dev` tip that
 # carries all five Redis value kinds, `SCAN`, `RENAME`, the string range, float
 # and bit command family, the zset algebra, sort and bitfield families, `LPOS`,
-# the HyperLogLog family, and the public hash and set command entries.
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "ff53bc6313d563c6cb60fcf503db4426c22492cf", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "ff53bc6313d563c6cb60fcf503db4426c22492cf", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "ff53bc6313d563c6cb60fcf503db4426c22492cf", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "ff53bc6313d563c6cb60fcf503db4426c22492cf", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "ff53bc6313d563c6cb60fcf503db4426c22492cf", package = "database-server" }
+# the HyperLogLog family, the public hash and set command entries, and the list
+# family entry with `LMPOP`.
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "6dccfc714a6d376b96910fd2d39070ba0eb92338", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "6dccfc714a6d376b96910fd2d39070ba0eb92338", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "6dccfc714a6d376b96910fd2d39070ba0eb92338", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "6dccfc714a6d376b96910fd2d39070ba0eb92338", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "6dccfc714a6d376b96910fd2d39070ba0eb92338", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

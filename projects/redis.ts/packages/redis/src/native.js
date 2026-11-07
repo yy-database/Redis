@@ -162,4 +162,9 @@ export class Store {
     setCommand(db, protocol, args) {
         return JSON.parse(this.native.setCommand(db, protocol, args.map(bytes)));
     }
+
+    /** Runs one list-family request in the binding and returns its reply specification. */
+    listCommand(db, protocol, args) {
+        return JSON.parse(this.native.listCommand(db, protocol, args.map(bytes)));
+    }
 }
