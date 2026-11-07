@@ -2933,7 +2933,7 @@ function pythonReplyExpected(id, reply) {
 
 /** Turns the TS-only command cases into a plan the redis-py case driver can replay. */
 function buildCasePlan(root) {
-    const payload = JSON.parse(readFileSync(join(root, 'tests', 'cases', 'five-kinds.json'), 'utf8'));
+    const payload = JSON.parse(readFileSync(join(root, 'projects', 'redis.ts', 'packages', 'redis-harness', 'cases', 'five-kinds.json'), 'utf8'));
     return payload.cases
         .filter(entry => entry.op === 'command')
         .map(entry => {

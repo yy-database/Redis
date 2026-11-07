@@ -1,6 +1,7 @@
 """Shared-case conformance checks for the installed Python package.
 
-Every case in `tests/cases` is also executed by the TypeScript package checks.
+Every case under `projects/redis.ts/packages/redis-harness/cases` is also executed
+by the TypeScript package checks.
 Expected values are literal: they come from the documented wire grammar, the
 documented shard/catalog layout, and documented Redis command semantics. No
 check compares one implementation against another at run time.
@@ -34,15 +35,17 @@ def _seed_directory(entry, directory):
             handle.write(raw(seed["hex"]))
 
 
-def _repository_root():
+def _cases_directory():
+    relative = Path("projects", "redis.ts", "packages", "redis-harness", "cases")
     for parent in Path(__file__).resolve().parents:
-        if (parent / "tests" / "cases").is_dir():
-            return parent
-    raise RuntimeError("could not locate tests/cases")
+        candidate = parent / relative
+        if candidate.is_dir():
+            return candidate
+    raise RuntimeError("could not locate the harness cases")
 
 
 def _load_cases():
-    directory = _repository_root() / "tests" / "cases"
+    directory = _cases_directory()
     rows = []
     for path in sorted(directory.glob("*.json")):
         payload = json.loads(path.read_text(encoding="utf-8"))

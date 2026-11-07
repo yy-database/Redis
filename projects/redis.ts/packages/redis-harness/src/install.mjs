@@ -114,6 +114,7 @@ export async function prepareInstall() {
         platform,
         tarballs,
         resolve: specifier => require.resolve(specifier),
+        loadBinding: specifier => require(specifier),
         async load() {
             return import(pathToFileURL(require.resolve('@yydb/redis')).href);
         },

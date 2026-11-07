@@ -1,5 +1,5 @@
 //! Compares the per-case observations produced by the TypeScript and Python
-//! conformance runs. Both runners consume the same `tests/cases` tables, so any
+//! conformance runs. Both runners consume the same harness `cases` tables, so any
 //! difference here is a real cross-implementation disagreement.
 
 import { readFileSync } from 'node:fs';

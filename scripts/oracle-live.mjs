@@ -438,7 +438,7 @@ async function main() {
     let checked = 0;
     let storeOnly = 0;
     for (const table of TABLES.length > 0 ? TABLES : ['blocking-ops']) {
-        const payload = JSON.parse(readFileSync(join(ROOT, 'tests', 'cases', `${table}.json`), 'utf8'));
+        const payload = JSON.parse(readFileSync(join(ROOT, 'projects', 'redis.ts', 'packages', 'redis-harness', 'cases', `${table}.json`), 'utf8'));
         for (const entry of payload.cases) {
             if (entry.op === 'store') {
                 // Storage-only cases have no wire command to replay.

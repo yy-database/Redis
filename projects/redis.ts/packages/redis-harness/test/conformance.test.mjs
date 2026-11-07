@@ -1,6 +1,6 @@
 //! Shared-case conformance checks for `@yydb/redis`.
 //!
-//! Every case in `tests/cases` is also executed by the Python package checks.
+//! Every case in `cases` is also executed by the Python package checks.
 //! Expected values are literal: they come from the documented wire grammar, the
 //! documented shard/catalog layout, and documented Redis command semantics. No
 //! check compares one implementation against another at run time.
@@ -8,18 +8,38 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { after, test } from 'node:test';
 
-import { prepareInstall, repositoryRoot } from '../src/install.mjs';
+import { prepareInstall } from '../src/install.mjs';
 
 const installed = await prepareInstall();
 const redis = await installed.load();
-const binding = (await import(pathToFileURL(installed.resolve(`@yydb/redis-${installed.platform}`)).href)).default;
-const NativeStore = binding.Store;
+// The checks speak in raw byte values, so they use the binding directly. A `.node`
+// addon is CommonJS-only, which is why this goes through `require` instead of `import`.
+const NativeStore = installed.loadBinding(`@yydb/redis-${installed.platform}`).Store;
 
 const { decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, repairShard, execute } = redis;
+
+/**
+ * Adapts the raw binding to the surface `execute` expects.
+ *
+ * Every primitive already matches, except `hashCommand`, whose reply crosses the
+ * binding as JSON text and is parsed by the composition package. The adapter keeps
+ * the byte-level `Store` the layout checks need while giving `execute` parsed specs.
+ */
+function commandStore(store) {
+    return new Proxy(store, {
+        get(target, property) {
+            if (property === 'hashCommand') {
+                return (db, protocol, args) => JSON.parse(target.hashCommand(db, protocol, args));
+            }
+            const value = Reflect.get(target, property);
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+    });
+}
 
 const directories = [];
 const observations = [];
@@ -60,7 +80,7 @@ function writeReport() {
 }
 
 function loadCases() {
-    const directory = join(repositoryRoot(), 'tests', 'cases');
+    const directory = join(dirname(fileURLToPath(import.meta.url)), '..', 'cases');
     const rows = [];
     for (const name of readdirSync(directory).filter(entry => entry.endsWith('.json')).sort()) {
         const payload = JSON.parse(readFileSync(join(directory, name), 'utf8'));
@@ -386,7 +406,7 @@ function runCase(entry) {
         }
         case 'command': {
             const directory = temporaryDir();
-            const store = new NativeStore(directory);
+            const store = commandStore(new NativeStore(directory));
             runSteps(store, entry.setup, directory);
             let result;
             try {
@@ -409,7 +429,7 @@ function runCase(entry) {
         }
         case 'dispatch': {
             const directory = temporaryDir();
-            const store = new NativeStore(directory);
+            const store = commandStore(new NativeStore(directory));
             runSteps(store, entry.setup, directory);
             const state = session();
             const seen = [];
