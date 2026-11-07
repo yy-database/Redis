@@ -25,15 +25,16 @@ const { decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, re
 /**
  * Adapts the raw binding to the surface `execute` expects.
  *
- * Every primitive already matches, except `hashCommand`, whose reply crosses the
- * binding as JSON text and is parsed by the composition package. The adapter keeps
- * the byte-level `Store` the layout checks need while giving `execute` parsed specs.
+ * Every primitive already matches, except `hashCommand` and `setCommand`, whose
+ * replies cross the binding as JSON text and are parsed by the composition package.
+ * The adapter keeps the byte-level `Store` the layout checks need while giving
+ * `execute` parsed specs.
  */
 function commandStore(store) {
     return new Proxy(store, {
         get(target, property) {
-            if (property === 'hashCommand') {
-                return (db, protocol, args) => JSON.parse(target.hashCommand(db, protocol, args));
+            if (property === 'hashCommand' || property === 'setCommand') {
+                return (db, protocol, args) => JSON.parse(target[property](db, protocol, args));
             }
             const value = Reflect.get(target, property);
             return typeof value === 'function' ? value.bind(target) : value;

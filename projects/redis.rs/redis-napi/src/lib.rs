@@ -175,9 +175,39 @@ fn hash_without_count(counted: &[u8]) -> Vec<u8> {
     }
 }
 
+/// Presents a flat set blob in the counted form expected by the upstream handler.
+///
+/// The shard keeps collection values as flat length-framed chunks, while the upstream
+/// handler frames a set with its member count. The conversion is byte-only: member
+/// order and member bytes are untouched. A malformed blob is handed over unchanged
+/// so the upstream decoder reports it as corrupt.
+fn set_with_count(flat: &[u8]) -> Vec<u8> {
+    let Some(chunks) = count_chunks(flat)
+    else {
+        return flat.to_vec();
+    };
+    let mut out = Vec::with_capacity(flat.len() + 4);
+    out.extend_from_slice(&(chunks as u32).to_le_bytes());
+    out.extend_from_slice(flat);
+    out
+}
+
+/// Drops the upstream member count and returns the flat layout stored by the shard.
+fn set_without_count(counted: &[u8]) -> Vec<u8> {
+    if counted.len() >= 4 {
+        counted[4..].to_vec()
+    }
+    else {
+        counted.to_vec()
+    }
+}
+
 fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
     if kind == "hash" {
         hash_with_count(value)
+    }
+    else if kind == "set" {
+        set_with_count(value)
     }
     else {
         value.to_vec()
@@ -187,6 +217,9 @@ fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
 fn downstream_value(kind: &str, value: Vec<u8>) -> Vec<u8> {
     if kind == "hash" {
         hash_without_count(&value)
+    }
+    else if kind == "set" {
+        set_without_count(&value)
     }
     else {
         value
@@ -620,6 +653,39 @@ impl Store {
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("hash command produced an empty reply frame"))?;
+        Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one set-family request and returns the reply specification as JSON.
+    ///
+    /// `protocol` is `2` or `3`, matching the connection that issued the request.
+    /// The binding only forwards the arguments and serializes the reply, so the
+    /// command semantics stay in the upstream facade.
+    #[napi]
+    pub fn set_command(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
+        let arguments = args
+            .iter()
+            .map(|argument| argument.as_ref())
+            .collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        database_server::yyds::redis::execute_set_command(
+            &mut frame,
+            &arguments,
+            &executor,
+            &namespace,
+            protocol,
+        )
+        .map_err(reason)?;
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("set command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
     }
 }

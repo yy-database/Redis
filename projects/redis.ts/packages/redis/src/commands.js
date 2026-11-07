@@ -98,10 +98,6 @@ function decodeList(body) {
 }
 
 /** Set members share the list framing and keep insertion order. */
-function encodeSet(members) {
-    return encodeChunks(members);
-}
-
 function decodeSet(body) {
     return decodeChunks(body);
 }
@@ -2776,9 +2772,8 @@ function incremental(store, session, key, delta) {
 /**
  * Plans one set aggregate: intersection, union or difference, optionally stored.
  *
- * The `*STORE` forms read the sources first, so a wrong type aborts before the
- * destination is touched, then drop every representation of the destination
- * because a store resets its value and its deadline.
+ * Arity stays here because a transaction rejects a malformed command while it is
+ * queued. Set algebra, type checks and reply framing all run upstream.
  */
 function planSetAggregate(store, session, name, args) {
     if (name === 'sintercard') return planSInterCard(store, session, args);
@@ -2788,29 +2783,24 @@ function planSetAggregate(store, session, name, args) {
     }
     const destination = keeps ? args[1] : null;
     const keys = keeps ? args.slice(2) : args.slice(1);
-    const db = session.db;
-    return {
-        run: () => {
-            const sets = readSetsForAggregate(store, db, keys);
-            if (sets === null) return wrongType();
-            let result;
-            if (name.startsWith('sinter')) {
-                result = intersectMembers(sets);
-            }
-            else if (name.startsWith('sunion')) {
-                result = uniqueMembers(sets.flat());
-            }
-            else {
-                result = differenceMembers(sets);
-            }
-            if (!keeps) return array(result.map(member => bulk(member)));
-            dropEveryKind(store, db, destination);
-            if (result.length === 0) return integer(0);
-            const body = encodeSet(result);
-            if (body === null) return replyError('ERR set value exceeds the storage limit');
-            store.setKind(db, 'set', destination, body, null);
-            return integer(result.length);
-        },
+    const guarded = destination === null ? keys : [destination, ...keys];
+    return { run: forwardSet(store, session, args, guarded) };
+}
+
+/**
+ * Forwards one set request to the upstream facade after rejecting a stream key.
+ *
+ * The upstream type probe knows the five kinds its facade implements and has no
+ * stream kind, so a stream operand is rejected here until the stream family moves
+ * upstream. Without this guard a set write would fork the key into two live
+ * representations.
+ */
+function forwardSet(store, session, args, keys) {
+    return () => {
+        for (const key of keys) {
+            if (store.existsKind(session.db, SUFFIX.stream, key)) return wrongType();
+        }
+        return store.setCommand(session.db, session.protocol ?? 2, args);
     };
 }
 
@@ -2842,11 +2832,6 @@ function uniqueMembers(members) {
 function intersectMembers(sets) {
     if (sets.length === 0) return [];
     return uniqueMembers(sets[0]).filter(member => sets.every(set => set.some(entry => entry.equals(member))));
-}
-
-function differenceMembers(sets) {
-    if (sets.length === 0) return [];
-    return uniqueMembers(sets[0]).filter(member => !sets.slice(1).some(set => set.some(entry => entry.equals(member))));
 }
 
 /** Plans `SINTERCARD`, whose keys are counted from a leading length and may carry `LIMIT`. */
@@ -5660,153 +5645,38 @@ function planCollection(store, session, name, args) {
 
         case 'sadd': {
             if (args.length < 3) return { error: wrongArity('sadd') };
-            const incoming = args.slice(2);
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'set') return wrongType();
-                    const members = readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    let added = 0;
-                    for (const member of incoming) {
-                        if (!members.some(existing => existing.equals(member))) {
-                            members.push(member);
-                            added += 1;
-                        }
-                    }
-                    if (added > 0) {
-                        const body = encodeSet(members);
-                        if (body === null) return replyError('ERR set value exceeds the storage limit');
-                        rewriteKind(store, db, 'set', key, body);
-                    }
-                    return integer(added);
-                },
-            };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'srem': {
             if (args.length < 3) return { error: wrongArity('srem') };
-            const dropping = args.slice(2);
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'set') return wrongType();
-                    const members = readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    const kept = members.filter(existing => !dropping.some(candidate => candidate.equals(existing)));
-                    const removed = members.length - kept.length;
-                    if (kept.length === 0) {
-                        store.deleteKind(db, SUFFIX.set, key);
-                    }
-                    else if (removed > 0) {
-                        const body = encodeSet(kept);
-                        if (body === null) return replyError('ERR set value exceeds the storage limit');
-                        rewriteKind(store, db, 'set', key, body);
-                    }
-                    return integer(removed);
-                },
-            };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'smembers': {
             if (args.length !== 2) return { error: wrongArity('smembers') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return array([]);
-                    if (kind !== 'set') return wrongType();
-                    const members = readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    return array(members.map(member => bulk(member)));
-                },
-            };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'scard': {
             if (args.length !== 2) return { error: wrongArity('scard') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'set') return wrongType();
-                    const members = readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    return integer(members.length);
-                },
-            };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'sismember': {
             if (args.length !== 3) return { error: wrongArity('sismember') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'set') return wrongType();
-                    const members = readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    return integer(members.some(member => member.equals(args[2])) ? 1 : 0);
-                },
-            };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'smove': {
             if (args.length !== 4) return { error: wrongArity('smove') };
-            const source = args[1];
-            const destination = args[2];
-            const member = args[3];
-            return {
-                run: () => {
-                    const sourceKind = kindOf(store, db, source);
-                    const destinationKind = kindOf(store, db, destination);
-                    if ((sourceKind !== null && sourceKind !== 'set')
-                        || (destinationKind !== null && destinationKind !== 'set')) {
-                        return wrongType();
-                    }
-                    if (sourceKind === null) return integer(0);
-                    const sourceMembers = readSet(store, db, source);
-                    if (sourceMembers === null) return replyError('ERR stored set value is corrupt');
-                    const position = sourceMembers.findIndex(entry => entry.equals(member));
-                    if (position < 0) return integer(0);
-                    if (source.equals(destination)) return integer(1);
-                    const kept = sourceMembers.filter((entry, index) => index !== position);
-                    if (kept.length === 0) {
-                        store.deleteKind(db, SUFFIX.set, source);
-                    }
-                    else {
-                        const body = encodeSet(kept);
-                        if (body === null) return replyError('ERR set value exceeds the storage limit');
-                        rewriteKind(store, db, 'set', source, body);
-                    }
-                    const destinationMembers = destinationKind === null ? [] : readSet(store, db, destination);
-                    if (destinationMembers === null) return replyError('ERR stored set value is corrupt');
-                    if (!destinationMembers.some(entry => entry.equals(member))) destinationMembers.push(member);
-                    const body = encodeSet(destinationMembers);
-                    if (body === null) return replyError('ERR set value exceeds the storage limit');
-                    rewriteKind(store, db, 'set', destination, body);
-                    return integer(1);
-                },
-            };
+            return { run: forwardSet(store, session, args, [args[1], args[2]]) };
         }
 
         case 'srandmember': {
             if (args.length !== 2 && args.length !== 3) return { error: wrongArity('srandmember') };
-            let count = null;
-            if (args.length === 3) {
-                count = parseInteger(args[2]);
-                if (count === null) return { error: integerError() };
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'set') return wrongType();
-                    const members = kind === null ? [] : readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    if (count === null) return members.length === 0 ? nullReply() : bulk(randomMember(members));
-                    return array(sampleMembers(members, count).map(member => bulk(member)));
-                },
-            };
+            if (args.length === 3 && parseInteger(args[2]) === null) return { error: integerError() };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'sscan': {
@@ -5815,15 +5685,7 @@ function planCollection(store, session, name, args) {
             if (cursor === null) return { error: replyError('ERR invalid cursor') };
             const options = parseScanOptions(args, 3);
             if (options.error !== undefined) return { error: options.error };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'set') return wrongType();
-                    const members = kind === null ? [] : readSet(store, db, key);
-                    if (members === null) return replyError('ERR stored set value is corrupt');
-                    return scanReply(members, cursor, options.count, options.pattern, member => member, member => [bulk(member)]);
-                },
-            };
+            return { run: forwardSet(store, session, args, [key]) };
         }
 
         case 'zscan': {

@@ -157,4 +157,9 @@ export class Store {
     hashCommand(db, protocol, args) {
         return JSON.parse(this.native.hashCommand(db, protocol, args.map(bytes)));
     }
+
+    /** Runs one set-family request in the binding and returns its reply specification. */
+    setCommand(db, protocol, args) {
+        return JSON.parse(this.native.setCommand(db, protocol, args.map(bytes)));
+    }
 }
