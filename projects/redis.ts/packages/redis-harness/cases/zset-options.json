@@ -1,0 +1,3263 @@
+{
+ "format": "redis.case/v1",
+ "table": "zset-options",
+ "cases": [
+  {
+   "id": "command.zadd.nx-skips-existing",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "NX",
+    "9",
+    "a",
+    "4",
+    "d"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 1
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "040000000100000061000000000000f03f010000006200000000000000400100000063000000000000084001000000640000000000001040"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zadd.xx-skips-missing",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "XX",
+    "9",
+    "a",
+    "9",
+    "x"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 0
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.gt-only-rising",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "GT",
+    "0",
+    "a",
+    "5",
+    "b"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 0
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.lt-only-falling",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "LT",
+    "0",
+    "a",
+    "5",
+    "b"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 0
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "03000000010000006100000000000000000100000062000000000000004001000000630000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zadd.ch-counts-updated",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "CH",
+    "4",
+    "a",
+    "2",
+    "b"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 1
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.incr",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "INCR",
+    "2.5",
+    "a"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     51,
+     46,
+     53
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.incr-nx-existing-returns-null",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "NX",
+    "INCR",
+    "1",
+    "a"
+   ],
+   "reply": {
+    "type": "null"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.nx-xx-conflict",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "NX",
+    "XX",
+    "1",
+    "a"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR XX and NX options at the same time are not compatible"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.gt-lt-conflict",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "GT",
+    "LT",
+    "1",
+    "a"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR GT, LT, and/or NX options at the same time are not compatible"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.nx-gt-conflict",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "NX",
+    "GT",
+    "1",
+    "a"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR GT, LT, and/or NX options at the same time are not compatible"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.incr-multiple-pairs",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "z1",
+    "INCR",
+    "1",
+    "a",
+    "2",
+    "b"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR INCR option supports a single increment-element pair"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.wrong-type",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "s1",
+    "1",
+    "a"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "",
+     "keyHex": "7331",
+     "valueHex": "76"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zadd.hash-conflict",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZADD",
+    "h1",
+    "1",
+    "a"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "hash",
+     "keyHex": "6831",
+     "valueHex": "01000000660100000076"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zincrby.basic",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZINCRBY",
+    "z1",
+    "2.5",
+    "a"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     51,
+     46,
+     53
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zincrby.new-member",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZINCRBY",
+    "z1",
+    "2",
+    "d"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     50
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zincrby.nan-result",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZINCRBY",
+    "scores",
+    "-inf",
+    "pinf"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR resulting score is not a number (NaN)"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zcount.all",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZCOUNT",
+    "z1",
+    "-inf",
+    "+inf"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 3
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zcount.exclusive",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZCOUNT",
+    "z1",
+    "(1",
+    "3"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 2
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zcount.bad-bound",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZCOUNT",
+    "z1",
+    "bad",
+    "+inf"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR min or max is not a float"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zlexcount.all",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZLEXCOUNT",
+    "lex",
+    "-",
+    "+"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 4
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zlexcount.bounds",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZLEXCOUNT",
+    "lex",
+    "[b",
+    "(d"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 2
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zlexcount.bad-bound",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZLEXCOUNT",
+    "lex",
+    "b",
+    "+"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR min or max not valid string range item"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.byscore",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "z1",
+    "1",
+    "3",
+    "BYSCORE"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.byscore-rev-limit",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "z1",
+    "+inf",
+    "-inf",
+    "BYSCORE",
+    "REV",
+    "LIMIT",
+    "0",
+    "2"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.byscore-withscores",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "z1",
+    "(1",
+    "3",
+    "BYSCORE",
+    "WITHSCORES"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       50
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       51
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.byscore-limit-negative-count",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "z1",
+    "-inf",
+    "+inf",
+    "BYSCORE",
+    "LIMIT",
+    "1",
+    "-1"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.bylex",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "lex",
+    "-",
+    "+",
+    "BYLEX"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       100
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.bylex-rev-limit",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "lex",
+    "+",
+    "-",
+    "BYLEX",
+    "REV",
+    "LIMIT",
+    "1",
+    "2"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.bylex-withscores-rejected",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "lex",
+    "-",
+    "+",
+    "BYLEX",
+    "WITHSCORES"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR syntax error, WITHSCORES not supported in combination with BYLEX"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.negative-rank",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "z1",
+    "-2",
+    "-1"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.byscore-on-lex-key",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "lex",
+    "0",
+    "0",
+    "BYSCORE"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       100
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.bylex-mixed-score-order",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "mixed",
+    "-",
+    "+",
+    "BYLEX"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       109
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6d69786564",
+     "valueHex": "03000000010000007a000000000000f03f01000000610000000000000040010000006d0000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.bylex-first-past-max",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "mixed",
+    "-",
+    "[a",
+    "BYLEX"
+   ],
+   "reply": {
+    "type": "array",
+    "value": []
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6d69786564",
+     "valueHex": "03000000010000007a000000000000f03f01000000610000000000000040010000006d0000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zremrangebylex.first-past-max",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZREMRANGEBYLEX",
+    "mixed",
+    "-",
+    "[a"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 0
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6d69786564",
+     "valueHex": "03000000010000007a000000000000f03f01000000610000000000000040010000006d0000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6d69786564",
+     "expect": {
+      "bytes": "03000000010000007a000000000000f03f01000000610000000000000040010000006d0000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zrevrange.all",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZREVRANGE",
+    "z1",
+    "0",
+    "-1"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrevrange.withscores",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZREVRANGE",
+    "z1",
+    "0",
+    "-1",
+    "WITHSCORES"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       51
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       50
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrangestore.basic",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGESTORE",
+    "dst",
+    "z1",
+    "0",
+    "-1"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 3
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+     }
+    },
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "647374",
+     "expect": {
+      "bytes": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zrangestore.byscore-rev",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGESTORE",
+    "dst",
+    "z1",
+    "+inf",
+    "(1",
+    "BYSCORE",
+    "REV",
+    "LIMIT",
+    "0",
+    "2"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 2
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrangestore.empty-drops-destination",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGESTORE",
+    "dst",
+    "z1",
+    "5",
+    "10"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 0
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "",
+     "keyHex": "647374",
+     "valueHex": "6f6c64"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "647374",
+     "expect": null
+    }
+   ]
+  },
+  {
+   "id": "command.zrangestore.wrong-type",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGESTORE",
+    "dst",
+    "s1",
+    "0",
+    "-1"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "",
+     "keyHex": "7331",
+     "valueHex": "76"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrank.found",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANK",
+    "z1",
+    "b"
+   ],
+   "reply": {
+    "type": "int",
+    "value": 1
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrank.missing-member",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANK",
+    "z1",
+    "x"
+   ],
+   "reply": {
+    "type": "null"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrank.missing-key",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANK",
+    "z9",
+    "a"
+   ],
+   "reply": {
+    "type": "null"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.zrank.withscore",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANK",
+    "z1",
+    "b",
+    "WITHSCORE"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "int",
+      "value": 1
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       50
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrank.withscore-missing-member",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANK",
+    "z1",
+    "x",
+    "WITHSCORE"
+   ],
+   "reply": {
+    "type": "null-array"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrank.withscore-missing-key",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANK",
+    "z9",
+    "a",
+    "WITHSCORE"
+   ],
+   "reply": {
+    "type": "null-array"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.zrevrank.withscore",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZREVRANK",
+    "z1",
+    "b",
+    "WITHSCORE"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "int",
+      "value": 1
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       50
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zmscore.mixed",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZMSCORE",
+    "z1",
+    "a",
+    "x",
+    "c"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     },
+     {
+      "type": "null"
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       51
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zpopmin.single",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZPOPMIN",
+    "z1"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "020000000100000062000000000000004001000000630000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zpopmin.count",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZPOPMIN",
+    "z1",
+    "2"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       50
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "0100000001000000630000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zpopmax.count",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZPOPMAX",
+    "z1",
+    "2"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       51
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       50
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "010000000100000061000000000000f03f"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zpopmin.missing",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZPOPMIN",
+    "z9"
+   ],
+   "reply": {
+    "type": "array",
+    "value": []
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.zpopmin.bad-count",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZPOPMIN",
+    "z1",
+    "x"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR value is out of range, must be positive"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zmpop.min",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZMPOP",
+    "1",
+    "z1",
+    "MIN"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       49
+      ]
+     },
+     {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           49
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "020000000100000062000000000000004001000000630000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zmpop.count",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZMPOP",
+    "1",
+    "z5",
+    "MIN",
+    "COUNT",
+    "2"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       53
+      ]
+     },
+     {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           49
+          ]
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           50
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a35",
+     "valueHex": "050000000100000061000000000000f03f01000000620000000000000040010000006300000000000008400100000064000000000000104001000000650000000000001440"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a35",
+     "expect": {
+      "bytes": "03000000010000006300000000000008400100000064000000000000104001000000650000000000001440"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zmpop.missing",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZMPOP",
+    "1",
+    "z9",
+    "MIN"
+   ],
+   "reply": {
+    "type": "null-array"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.zmpop.numkeys-zero",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZMPOP",
+    "0",
+    "z1",
+    "MIN"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR numkeys should be greater than 0"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zmpop.wrong-type",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZMPOP",
+    "1",
+    "s1",
+    "MIN"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "",
+     "keyHex": "7331",
+     "valueHex": "76"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.bzpopmin.immediate",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMIN",
+    "z1",
+    "0"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       49
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "020000000100000062000000000000004001000000630000000000000840"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.bzpopmax.immediate",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMAX",
+    "z1",
+    "0"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       49
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       51
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "expect": {
+      "bytes": "020000000100000061000000000000f03f01000000620000000000000040"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.bzmpop.immediate",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0",
+    "1",
+    "z5",
+    "MIN",
+    "COUNT",
+    "2"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       53
+      ]
+     },
+     {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           49
+          ]
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           50
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a35",
+     "valueHex": "050000000100000061000000000000f03f01000000620000000000000040010000006300000000000008400100000064000000000000104001000000650000000000001440"
+    }
+   ],
+   "effect": [
+    {
+     "call": "get_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a35",
+     "expect": {
+      "bytes": "03000000010000006300000000000008400100000064000000000000104001000000650000000000001440"
+     }
+    }
+   ]
+  },
+  {
+   "id": "command.zunion.withscores",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZUNION",
+    "2",
+    "z1",
+    "z2",
+    "WITHSCORES"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       100
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       53
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       55
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49,
+       48
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "030000000100000062000000000000144001000000630000000000001c4001000000640000000000001440"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zinter.weights",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZINTER",
+    "2",
+    "z1",
+    "z2",
+    "WEIGHTS",
+    "2",
+    "3"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "030000000100000062000000000000144001000000630000000000001c4001000000640000000000001440"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zunion.aggregate-max",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZUNION",
+    "2",
+    "z1",
+    "z2",
+    "AGGREGATE",
+    "MAX"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       97
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       100
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       99
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "030000000100000062000000000000144001000000630000000000001c4001000000640000000000001440"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.negative",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "neg"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     45,
+     49
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.zero",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "zero"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     48
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.fraction",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "frac"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     49,
+     46,
+     53
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.positive-infinity",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "pinf"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     105,
+     110,
+     102
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.negative-infinity",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "ninf"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     45,
+     105,
+     110,
+     102
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.tiny",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "tiny"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     49,
+     101,
+     45,
+     50,
+     48
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.huge",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "huge"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     51,
+     101,
+     43,
+     51,
+     48,
+     48
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.scientific-boundary",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "big"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     53,
+     101,
+     43,
+     49,
+     56
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.integer-boundary",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "plain"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     52,
+     53,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48,
+     48
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.exact-integer-limit",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "edge"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     52,
+     54,
+     49,
+     49,
+     54,
+     56,
+     54,
+     48,
+     49,
+     56,
+     52,
+     50,
+     55,
+     51,
+     56,
+     55,
+     57,
+     48,
+     52
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zscore.int64-limit",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZSCORE",
+    "scores",
+    "low"
+   ],
+   "reply": {
+    "type": "bulk",
+    "bytes": [
+     45,
+     57,
+     50,
+     50,
+     51,
+     51,
+     55,
+     50,
+     48,
+     51,
+     54,
+     56,
+     53,
+     52,
+     55,
+     55,
+     54,
+     48,
+     48,
+     48
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.zrange.withscores-formats-every-score",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "ZRANGE",
+    "scores",
+    "0",
+    "-1",
+    "WITHSCORES"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       110,
+       105,
+       110,
+       102
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       45,
+       105,
+       110,
+       102
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       108,
+       111,
+       119
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       45,
+       57,
+       50,
+       50,
+       51,
+       51,
+       55,
+       50,
+       48,
+       51,
+       54,
+       56,
+       53,
+       52,
+       55,
+       55,
+       54,
+       48,
+       48,
+       48
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       110,
+       101,
+       103
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       45,
+       49
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       110,
+       122,
+       101,
+       114,
+       111
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       48
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       101,
+       114,
+       111
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       48
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       116,
+       105,
+       110,
+       121
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49,
+       101,
+       45,
+       50,
+       48
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       111,
+       110,
+       101
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       102,
+       114,
+       97,
+       99
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       49,
+       46,
+       53
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       112,
+       108,
+       97,
+       105,
+       110
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       52,
+       53,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48,
+       48
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       101,
+       100,
+       103,
+       101
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       52,
+       54,
+       49,
+       49,
+       54,
+       56,
+       54,
+       48,
+       49,
+       56,
+       52,
+       50,
+       55,
+       51,
+       56,
+       55,
+       57,
+       48,
+       52
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       98,
+       105,
+       103
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       53,
+       101,
+       43,
+       49,
+       56
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       104,
+       117,
+       103,
+       101
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       51,
+       101,
+       43,
+       51,
+       48,
+       48
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       112,
+       105,
+       110,
+       102
+      ]
+     },
+     {
+      "type": "bulk",
+      "bytes": [
+       105,
+       110,
+       102
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "0d000000030000006e6567000000000000f0bf040000007a65726f0000000000000000030000006f6e65000000000000f03f0400000066726163000000000000f83f050000006e7a65726f00000000000000800400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf430400000065646765000000000000d043030000006c6f77000000000000e0c3"
+    }
+   ],
+   "effect": []
+  }
+ ]
+}

@@ -167,4 +167,9 @@ export class Store {
     listCommand(db, protocol, args) {
         return JSON.parse(this.native.listCommand(db, protocol, args.map(bytes)));
     }
+
+    /** Runs one zset-family request in the binding and returns its reply specification. */
+    zsetCommand(db, protocol, args) {
+        return JSON.parse(this.native.zsetCommand(db, protocol, args.map(bytes)));
+    }
 }

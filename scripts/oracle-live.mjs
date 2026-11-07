@@ -46,7 +46,7 @@ function parseFrame(bytes, offset) {
         }
         case '_': return [{ kind: 'null', value: null }, next];
         case '#': return [{ kind: 'bool', value: line === 't' }, next];
-        case ',': return [{ kind: 'double', value: Number(line) }, next];
+        case ',': return [{ kind: 'double', value: Number(line), text: line }, next];
         case '(': return [{ kind: 'int', value: Number(line) }, next];
         case '%': {
             const count = Number(line);
@@ -726,6 +726,14 @@ async function replayScanContract(link, entry) {
     return problems;
 }
 
+/** Reads a RESP3 double token, including the `inf` spellings JavaScript rejects. */
+function asDouble(value) {
+    const token = String(value).trim().toLowerCase();
+    if (token === 'inf' || token === '+inf') return Infinity;
+    if (token === '-inf') return -Infinity;
+    return Number(token);
+}
+
 /** Compares one expected reply spec with the frame the real server sent. */
 function compareReply(expected, actual, protocol = PROTOCOL, unordered = false) {
     if (expected.type === 'null-array') {
@@ -745,6 +753,12 @@ function compareReply(expected, actual, protocol = PROTOCOL, unordered = false) 
     }
     if (expected.type === 'int') {
         return actual.kind === 'int' && actual.value === expected.value ? null : `expected ${expected.value}, read ${describe(actual)}`;
+    }
+    if (expected.type === 'double') {
+        if (actual.kind !== 'double') return `expected the double ${expected.value}, read ${describe(actual)}`;
+        return Object.is(asDouble(expected.value), asDouble(actual.text ?? actual.value))
+            ? null
+            : `expected the double ${expected.value}, read ${describe(actual)}`;
     }
     if (expected.type === 'bulk') {
         const text = Buffer.from(expected.bytes).toString('utf8');

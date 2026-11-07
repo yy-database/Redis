@@ -721,4 +721,37 @@ impl Store {
             .ok_or_else(|| reason("list command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
     }
+
+    /// Executes one zset-family request and returns the reply specification as JSON.
+    ///
+    /// `protocol` is `2` or `3`, matching the connection that issued the request.
+    /// Blocking commands answer at once in their non-blocking form, so the host owns
+    /// the wait loop while the facade keeps the command semantics.
+    #[napi]
+    pub fn zset_command(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
+        let arguments = args
+            .iter()
+            .map(|argument| argument.as_ref())
+            .collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        database_server::yyds::redis::execute_zset_command(
+            &mut frame,
+            &arguments,
+            &executor,
+            &namespace,
+            protocol,
+        )
+        .map_err(reason)?;
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("zset command produced an empty reply frame"))?;
+        Ok(reply.to_spec().to_string())
+    }
 }

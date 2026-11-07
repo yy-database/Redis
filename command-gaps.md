@@ -8,9 +8,10 @@ classified. A command that is forwarded to the facade is not repeated here.
 Upstream means the `database-server` crate, module `yyds::redis`
 (`src/yyds/redis/collections.rs` and `src/yyds/redis/mod.rs`). The public family
 entries are `execute_hash_command` (`mod.rs`, line 56), `execute_set_command`
-(line 76) and `execute_list_command` (line 95); they forward to `handle_hash`
-(line 560), `handle_set` (line 2114) and `handle_list` (line 1476), which own
-command semantics, type checks and reply framing.
+(line 76), `execute_list_command` (line 95) and `execute_zset_command`
+(line 115); they forward to `handle_hash` (line 647), `handle_set` (line 2201),
+`handle_list` (line 1563) and `handle_zset` (line 4179), which own command
+semantics, type checks and reply framing.
 
 ## Hash family
 
@@ -36,6 +37,19 @@ honours `LEFT`, `RIGHT` and `COUNT`, drops the key once it empties and replies a
 null array when nothing was popped. `BLPOP`, `BRPOP`, `BLMOVE`, `BRPOPLPUSH` and
 `BLMPOP` are forwarded in their non-blocking form, with the wait loop staying in
 the planner exactly as before.
+
+## ZSet family
+
+No gaps left. `ZREVRANGE`, `ZLEXCOUNT`, `ZRANGESTORE`, `ZMSCORE`, `ZPOPMIN`,
+`ZPOPMAX`, `ZRANDMEMBER`, `ZREMRANGEBYLEX`, the read-only `ZUNION` / `ZINTER`,
+`ZMPOP` and the blocking `BZPOPMIN` / `BZPOPMAX` / `BZMPOP` were absent from
+`is_zset_command` (line 350) and `handle_zset` (line 4179). They are implemented
+there now, so every zset command is forwarded to the facade and the planner keeps
+only queued-time argument checks. The blocking family is forwarded in its
+non-blocking form, with the wait loop staying in the planner.
+
+`ZADD` owns its option grammar upstream: `NX` / `XX` / `GT` / `LT` / `CH` /
+`INCR` and their mutual exclusions, including the single-pair rule for `INCR`.
 
 ## Storage revision drift
 
@@ -67,6 +81,26 @@ facade checks the source first, matching a real server: a missing source replies
 `0` without looking at the destination, so a wrong-typed destination is only an
 error when the source exists and holds the member. The planner now forwards the
 command, so the divergence is gone.
+
+Under RESP3 the sorted-set scores are native doubles and `WITHSCORES` answers
+nested `[member, double]` pairs, matching a real server byte for byte. The reply
+codec keeps the raw score text so the shortest form survives the round trip.
+
+A missing member under `ZRANK` / `ZREVRANK ... WITHSCORE` replies a null array
+under RESP2 (`*-1`) rather than a null bulk, because a hit is an array. RESP3
+answers `_` for both.
+
+Lexicographic ranges (`ZRANGEBYLEX`, `ZREVRANGEBYLEX`, `ZRANGE ... BYLEX`,
+`ZREMRANGEBYLEX`) walk the stored score order and only then apply the member
+bounds, which is what a real server does. With mixed scores this keeps score
+order, and a first element already past `max` empties the range.
+
+Scores keep the integer form up to and including `2^62` and switch to the
+shortest round-trip digits above it, as measured against Redis 8.10.3.
+
+Option conflicts inside `MULTI` are rejected while the command is queued, while a
+real server queues the command and reports the error inside `EXEC`. Arity errors
+abort the queue on both sides.
 
 ## Verifying a gap
 

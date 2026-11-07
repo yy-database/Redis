@@ -32,6 +32,11 @@ pub enum Reply {
     Null,
     /// Null array (`*-1` on RESP2, `_` on RESP3).
     NullArray,
+    /// Double (a comma-prefixed double on RESP3, a bulk string on RESP2).
+    ///
+    /// The original text is kept so a reply round-trips byte for byte, which
+    /// matters for sorted-set scores whose formatting is part of the contract.
+    Double(String),
     /// Ordered array.
     Array(Vec<Reply>),
     /// Set aggregate (`~` on RESP3, a plain array on RESP2).
@@ -67,6 +72,18 @@ impl Reply {
             }
             Self::NullArray => {
                 out.extend_from_slice(if protocol >= 3 { b"_\r\n" } else { b"*-1\r\n" });
+            }
+            Self::Double(value) => {
+                if protocol >= 3 {
+                    out.push(b',');
+                    out.extend_from_slice(value.as_bytes());
+                    out.extend_from_slice(b"\r\n");
+                }
+                else {
+                    out.extend_from_slice(format!("${}\r\n", value.len()).as_bytes());
+                    out.extend_from_slice(value.as_bytes());
+                    out.extend_from_slice(b"\r\n");
+                }
             }
             Self::Array(values) => {
                 out.extend_from_slice(format!("*{}\r\n", values.len()).as_bytes());
@@ -111,6 +128,7 @@ impl Reply {
             Self::Bulk(value) => serde_json::json!({ "type": "bulk", "bytes": value }),
             Self::Null => serde_json::json!({ "type": "null" }),
             Self::NullArray => serde_json::json!({ "type": "null-array" }),
+            Self::Double(value) => serde_json::json!({ "type": "double", "value": value }),
             Self::Array(values) => {
                 serde_json::json!({ "type": "array", "value": values.iter().map(Self::to_spec).collect::<Vec<_>>() })
             }
@@ -161,6 +179,7 @@ impl Reply {
             }
             "null" => Ok(Self::Null),
             "null-array" => Ok(Self::NullArray),
+            "double" => Ok(Self::Double(text(spec)?)),
             "array" => {
                 let values = spec
                     .get("value")
@@ -330,6 +349,10 @@ fn parse_reply(kind: u8, header: &[u8], next: usize, input: &[u8]) -> Result<Opt
             Ok(Some((Reply::Integer(value), next)))
         }
         b'_' => Ok(Some((Reply::Null, next))),
+        b',' => Ok(Some((
+            Reply::Double(String::from_utf8_lossy(header).into_owned()),
+            next,
+        ))),
         b'$' => {
             let length = parse_count(header).ok_or("reply bulk length is not canonical")?;
             if length < 0 {

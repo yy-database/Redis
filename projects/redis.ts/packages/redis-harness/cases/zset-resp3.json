@@ -1,0 +1,580 @@
+{
+ "format": "redis.case/v1",
+ "table": "zset-resp3",
+ "cases": [
+  {
+   "id": "dispatch.zset.range-withscores-nested",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZRANGE",
+      "z1",
+      "0",
+      "-1",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "double",
+          "value": "1"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "double",
+          "value": "2"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           99
+          ]
+         },
+         {
+          "type": "double",
+          "value": "3"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.range-byscore-withscores",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZRANGE",
+      "z1",
+      "(1",
+      "3",
+      "BYSCORE",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "double",
+          "value": "2"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           99
+          ]
+         },
+         {
+          "type": "double",
+          "value": "3"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.score-double",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZSCORE",
+      "z1",
+      "b"
+     ],
+     "reply": {
+      "type": "double",
+      "value": "2"
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.score-infinity",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "09000000030000006e6567000000000000f0bf040000007a65726f00000000000000000400000066726163000000000000f83f0400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf43"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZSCORE",
+      "scores",
+      "pinf"
+     ],
+     "reply": {
+      "type": "double",
+      "value": "inf"
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.score-tiny",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "73636f726573",
+     "valueHex": "09000000030000006e6567000000000000f0bf040000007a65726f00000000000000000400000066726163000000000000f83f0400000070696e66000000000000f07f040000006e696e66000000000000f0ff0400000074696e792342920ca19cc73b0400000068756765355800662deb517e03000000626967003d9160e458d14305000000706c61696e00a138149b39cf43"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZSCORE",
+      "scores",
+      "tiny"
+     ],
+     "reply": {
+      "type": "double",
+      "value": "1e-20"
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.popmin-single-flat",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZPOPMIN",
+      "z1"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "bulk",
+        "bytes": [
+         97
+        ]
+       },
+       {
+        "type": "double",
+        "value": "1"
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.popmin-count-nested",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZPOPMIN",
+      "z1",
+      "2"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "double",
+          "value": "1"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "double",
+          "value": "2"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.mpop-nested",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZMPOP",
+      "1",
+      "z1",
+      "MIN"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "bulk",
+        "bytes": [
+         122,
+         49
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "array",
+          "value": [
+           {
+            "type": "bulk",
+            "bytes": [
+             97
+            ]
+           },
+           {
+            "type": "double",
+            "value": "1"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.rank-withscore",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZRANK",
+      "z1",
+      "b",
+      "WITHSCORE"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "int",
+        "value": 1
+       },
+       {
+        "type": "double",
+        "value": "2"
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.rank-withscore-missing",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZRANK",
+      "z1",
+      "x",
+      "WITHSCORE"
+     ],
+     "reply": {
+      "type": "null"
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.scan-bulk-scores",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "6c6578",
+     "valueHex": "0400000001000000610000000000000000010000006200000000000000000100000063000000000000000001000000640000000000000000"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZSCAN",
+      "lex",
+      "0"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "bulk",
+        "bytes": [
+         48
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           48
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           48
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           99
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           48
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           100
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           48
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  }
+ ]
+}

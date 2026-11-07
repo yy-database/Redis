@@ -102,31 +102,6 @@ function decodeSet(body) {
     return decodeChunks(body);
 }
 
-/**
- * Frames a sorted set as `u32 count` plus one `u32 length + member + f64 LE score` per entry.
- *
- * `null` means one member or the score array does not fit the storage layout.
- */
-function encodeZSet(entries) {
-    let total = 4;
-    for (const [member] of entries) {
-        if (member.length > MAX_CHUNK) return null;
-        total += 4 + member.length + 8;
-    }
-    const body = Buffer.allocUnsafe(total);
-    body.writeUInt32LE(entries.length, 0);
-    let offset = 4;
-    for (const [member, score] of entries) {
-        body.writeUInt32LE(member.length, offset);
-        offset += 4;
-        member.copy(body, offset);
-        offset += member.length;
-        body.writeDoubleLE(score, offset);
-        offset += 8;
-    }
-    return body;
-}
-
 function decodeZSet(body) {
     if (body.length < 4) {
         return null;
@@ -1404,12 +1379,6 @@ function plan(store, session, name, args) {
         case 'smove':
         case 'srandmember':
         case 'sscan':
-        case 'zadd':
-        case 'zscore':
-        case 'zrem':
-        case 'zcard':
-        case 'zrange':
-        case 'zscan':
             return planCollection(store, session, name, args);
 
         case 'lpos':
@@ -1449,26 +1418,42 @@ function plan(store, session, name, args) {
         case 'pfmerge':
             return planHyperLogLog(store, session, name, args);
 
+        case 'zadd':
+        case 'zincrby':
+        case 'zcard':
+        case 'zcount':
+        case 'zlexcount':
+        case 'zrange':
+        case 'zrevrange':
         case 'zrangebyscore':
         case 'zrevrangebyscore':
         case 'zrangebylex':
         case 'zrevrangebylex':
-            return planZSetRange(store, session, name, args);
-
+        case 'zrangestore':
+        case 'zrank':
+        case 'zrevrank':
+        case 'zrem':
         case 'zremrangebyrank':
         case 'zremrangebyscore':
         case 'zremrangebylex':
-            return planZSetRemoveRange(store, session, name, args);
-
+        case 'zscore':
+        case 'zmscore':
+        case 'zpopmin':
+        case 'zpopmax':
         case 'zrandmember':
-            return planZRandMember(store, session, args);
-
+        case 'zscan':
         case 'zunionstore':
         case 'zinterstore':
-        case 'zdiff':
         case 'zdiffstore':
+        case 'zunion':
+        case 'zinter':
+        case 'zdiff':
         case 'zintercard':
-            return planZSetAggregate(store, session, name, args);
+        case 'zmpop':
+        case 'bzpopmin':
+        case 'bzpopmax':
+        case 'bzmpop':
+            return planZSet(store, session, name, args);
 
         case 'sort':
         case 'sort_ro':
@@ -2843,6 +2828,25 @@ function forwardBlockingList(store, session, args, keys) {
     };
 }
 
+/** Forwards one zset request to the upstream facade after rejecting a stream key. */
+function forwardZSet(store, session, args, keys) {
+    return () => {
+        for (const key of keys) {
+            if (store.existsKind(session.db, SUFFIX.stream, key)) return wrongType();
+        }
+        return store.zsetCommand(session.db, session.protocol ?? 2, args);
+    };
+}
+
+/** One non-blocking attempt for a blocking zset command, mapping the empty reply to `null`. */
+function forwardBlockingZSet(store, session, args, keys) {
+    return () => {
+        const reply = forwardZSet(store, session, args, keys)();
+        if (reply.type === 'null' || reply.type === 'null-array') return null;
+        return reply;
+    };
+}
+
 /** Plans `SINTERCARD`, whose keys are counted from a leading length and may carry `LIMIT`. */
 function planSInterCard(store, session, args) {
     if (args.length < 3) return { error: wrongArity('sintercard') };
@@ -2919,21 +2923,6 @@ function parseScanOptions(args, from) {
     return { pattern, count };
 }
 
-/** Pages one collection scan by cursor, filtering and rendering each selected entry. */
-function scanReply(entries, cursor, count, pattern, subject, render) {
-    const start = Math.min(cursor, entries.length);
-    if (start >= entries.length) return array([bulk('0'), array([])]);
-    const end = Math.min(start + count, entries.length);
-    const next = end >= entries.length ? '0' : String(end);
-    const page = [];
-    for (let index = start; index < end; index += 1) {
-        const entry = entries[index];
-        if (pattern !== null && !globMatch(pattern, subject(entry))) continue;
-        page.push(...render(entry));
-    }
-    return array([bulk(next), array(page)]);
-}
-
 /** Picks one random member, `null` when the collection is empty. */
 function randomMember(members) {
     if (members.length === 0) return null;
@@ -2959,446 +2948,323 @@ function sampleMembers(members, count) {
     return pool.slice(0, take);
 }
 
-/** Parses one score range bound, accepting an exclusive `(` prefix and infinities. */
-function parseScoreBound(raw) {
-    const value = text(raw);
-    const exclusive = value.startsWith('(');
-    const body = Buffer.from(exclusive ? value.slice(1) : value, 'utf8');
-    const score = parseScore(body);
-    return score === null ? null : { score, exclusive };
-}
-
-/** Parses one lexicographic range bound: `-`, `+`, `[value` or `(value`. */
-function parseLexBound(raw) {
-    const value = text(raw);
-    if (value === '-') return { infinity: -1, bytes: null, exclusive: false };
-    if (value === '+') return { infinity: 1, bytes: null, exclusive: false };
-    if (value.startsWith('[') || value.startsWith('(')) {
-        return { infinity: 0, bytes: Buffer.from(value.slice(1), 'utf8'), exclusive: value.startsWith('(') };
-    }
-    return null;
-}
-
-/** Whether one score falls inside the inclusive or exclusive bounds. */
-function scoreInRange(score, min, max) {
-    const above = min.exclusive ? score > min.score : score >= min.score;
-    const below = max.exclusive ? score < max.score : score <= max.score;
-    return above && below;
-}
-
-/** Whether one member falls inside the lexicographic bounds. */
-function lexInRange(member, min, max) {
-    if (min.infinity === 1) return false;
-    if (max.infinity === -1) return false;
-    if (min.infinity === 0) {
-        const order = Buffer.compare(member, min.bytes);
-        if (min.exclusive ? order <= 0 : order < 0) return false;
-    }
-    if (max.infinity === 0) {
-        const order = Buffer.compare(member, max.bytes);
-        if (max.exclusive ? order >= 0 : order > 0) return false;
-    }
-    return true;
-}
-
 /**
- * Reads `WITHSCORES` and `LIMIT` options of the score and lex range commands.
+ * Validates the option tail of one range command.
  *
- * `allowScores` is false for the lex commands, where `WITHSCORES` is a syntax
- * error just like the gateway answers.
+ * Only the queue-time rules live here: an unknown option, `LIMIT` outside a
+ * score or lex mode, and `WITHSCORES` on a lex command are rejected while the
+ * command is queued. Range selection and reply framing run upstream.
+ *
+ * `scores` tells how the command treats `WITHSCORES`: `allowed` accepts it,
+ * `lex-error` answers the dedicated lex message, and `none` keeps it a plain
+ * syntax error.
  */
-function parseZRangeOptions(args, from, allowScores) {
+function checkZSetRangeOptions(args, from, scores, initial) {
+    let mode = initial;
     let withScores = false;
-    let offset = 0;
-    let count = -1;
+    let limited = false;
     for (let index = from; index < args.length;) {
         const option = text(args[index]).toLowerCase();
-        if (option === 'withscores') {
-            if (!allowScores) {
+        if (option === 'byscore') {
+            mode = 'score';
+            index += 1;
+        }
+        else if (option === 'bylex') {
+            mode = 'lex';
+            index += 1;
+        }
+        else if (option === 'rev') {
+            index += 1;
+        }
+        else if (option === 'withscores') {
+            if (scores === 'allowed') {
+                withScores = true;
+                index += 1;
+            }
+            else if (scores === 'lex-error') {
                 return { error: replyError('ERR syntax error, WITHSCORES not supported in combination with BYLEX') };
             }
-            withScores = true;
-            index += 1;
-            continue;
+            else {
+                return { error: replyError('ERR syntax error') };
+            }
         }
-        if (option === 'limit') {
+        else if (option === 'limit') {
             if (index + 2 >= args.length) return { error: replyError('ERR syntax error') };
-            const start = parseInteger(args[index + 1]);
-            if (start === null) return { error: integerError() };
-            const amount = parseInteger(args[index + 2]);
-            if (amount === null) return { error: integerError() };
-            offset = Math.max(start, 0);
-            count = amount;
+            limited = true;
             index += 3;
-            continue;
-        }
-        return { error: replyError('ERR syntax error') };
-    }
-    return { withScores, offset, count };
-}
-
-/** Applies a parsed `LIMIT` to one ordered result, where a negative count means all. */
-function limitResult(entries, offset, count) {
-    if (count < 0) return entries.slice(offset);
-    return entries.slice(offset, offset + count);
-}
-
-/** Renders sorted-set entries as members, optionally interleaved with their score text. */
-function renderZSet(entries, withScores) {
-    const items = [];
-    for (const [member, score] of entries) {
-        items.push(bulk(member));
-        if (withScores) items.push(bulk(scoreText(score)));
-    }
-    return array(items);
-}
-
-/** Plans one sorted-set range command over scores or lexicographic member bounds. */
-function planZSetRange(store, session, name, args) {
-    if (args.length < 4) return { error: wrongArity(name) };
-    const reverse = name.startsWith('zrevrange');
-    const lexicographic = name.includes('bylex');
-    const allowScores = !lexicographic;
-    const options = parseZRangeOptions(args, 4, allowScores);
-    if (options.error !== undefined) return { error: options.error };
-    let min;
-    let max;
-    if (lexicographic) {
-        const first = parseLexBound(args[2]);
-        const second = parseLexBound(args[3]);
-        if (first === null || second === null) {
-            return { error: replyError('ERR min or max not valid string range item') };
-        }
-        min = reverse ? second : first;
-        max = reverse ? first : second;
-    }
-    else {
-        const first = parseScoreBound(args[2]);
-        const second = parseScoreBound(args[3]);
-        if (first === null || second === null) return { error: replyError('ERR min or max is not a float') };
-        min = reverse ? second : first;
-        max = reverse ? first : second;
-    }
-    const db = session.db;
-    const key = args[1];
-    return {
-        run: () => {
-            const kind = kindOf(store, db, key);
-            if (kind !== null && kind !== 'zset') return wrongType();
-            if (kind === null) return array([]);
-            const entries = readZSet(store, db, key);
-            if (entries === null) return replyError('ERR stored zset value is corrupt');
-            const ordered = entries.slice().sort((left, right) => (left[1] - right[1]) || Buffer.compare(left[0], right[0]));
-            const matched = ordered.filter(([member, score]) => (lexicographic
-                ? lexInRange(member, min, max)
-                : scoreInRange(score, min, max)));
-            if (reverse) matched.reverse();
-            return renderZSet(limitResult(matched, options.offset, options.count), options.withScores);
-        },
-    };
-}
-
-/** Plans one sorted-set range removal and rewrites or deletes the key. */
-function planZSetRemoveRange(store, session, name, args) {
-    if (args.length !== 4) return { error: wrongArity(name) };
-    const mode = name.endsWith('byrank') ? 'rank' : name.endsWith('byscore') ? 'score' : 'lex';
-    let start = null;
-    let stop = null;
-    let min = null;
-    let max = null;
-    if (mode === 'rank') {
-        start = parseInteger(args[2]);
-        stop = parseInteger(args[3]);
-        if (start === null || stop === null) return { error: integerError() };
-    }
-    else if (mode === 'score') {
-        min = parseScoreBound(args[2]);
-        max = parseScoreBound(args[3]);
-        if (min === null || max === null) return { error: replyError('ERR min or max is not a float') };
-    }
-    else {
-        min = parseLexBound(args[2]);
-        max = parseLexBound(args[3]);
-        if (min === null || max === null) {
-            return { error: replyError('ERR min or max not valid string range item') };
-        }
-    }
-    const db = session.db;
-    const key = args[1];
-    return {
-        run: () => {
-            const kind = kindOf(store, db, key);
-            if (kind !== null && kind !== 'zset') return wrongType();
-            if (kind === null) return integer(0);
-            const entries = readZSet(store, db, key);
-            if (entries === null) return replyError('ERR stored zset value is corrupt');
-            let kept;
-            if (mode === 'rank') {
-                const ordered = entries.slice().sort((left, right) => (left[1] - right[1]) || Buffer.compare(left[0], right[0]));
-                const length = ordered.length;
-                const begin = start < 0 ? Math.max(0, length + start) : start;
-                const end = stop < 0 ? length + stop : Math.min(stop, length - 1);
-                if (begin > end || begin >= length || end < 0) return integer(0);
-                const removed = new Set(ordered.slice(begin, end + 1).map(([member]) => text(member)));
-                kept = entries.filter(([member]) => !removed.has(text(member)));
-            }
-            else if (mode === 'score') {
-                kept = entries.filter(([, score]) => !scoreInRange(score, min, max));
-            }
-            else {
-                kept = entries.filter(([member]) => !lexInRange(member, min, max));
-            }
-            const removedCount = entries.length - kept.length;
-            if (removedCount === 0) return integer(0);
-            if (kept.length === 0) store.deleteKind(db, SUFFIX.zset, key);
-            else {
-                const body = encodeZSet(kept);
-                if (body === null) return replyError('ERR zset value exceeds the storage limit');
-                rewriteKind(store, db, 'zset', key, body);
-            }
-            return integer(removedCount);
-        },
-    };
-}
-
-/** Plans `ZRANDMEMBER`, whose optional count controls repeats and score rendering. */
-function planZRandMember(store, session, args) {
-    if (args.length < 2 || args.length > 4) return { error: wrongArity('zrandmember') };
-    let count = null;
-    let withScores = false;
-    if (args.length >= 3) {
-        count = parseInteger(args[2]);
-        if (count === null) return { error: integerError() };
-        if (args.length === 4) {
-            if (text(args[3]).toLowerCase() !== 'withscores') return { error: replyError('ERR syntax error') };
-            withScores = true;
         }
         else {
-            withScores = false;
+            return { error: replyError('ERR syntax error') };
         }
     }
-    const db = session.db;
-    const key = args[1];
-    return {
-        run: () => {
-            const kind = kindOf(store, db, key);
-            if (kind !== null && kind !== 'zset') return wrongType();
-            const entries = kind === null ? [] : readZSet(store, db, key);
-            if (entries === null) return replyError('ERR stored zset value is corrupt');
-            if (count === null) {
-                if (entries.length === 0) return nullReply();
-                return bulk(randomMember(entries)[0]);
-            }
-            const picked = sampleMembers(entries, count);
-            return renderZSet(picked, withScores);
-        },
-    };
+    if (mode === 'lex' && withScores) {
+        return { error: replyError('ERR syntax error, WITHSCORES not supported in combination with BYLEX') };
+    }
+    if (limited && mode === 'rank') {
+        return { error: replyError('ERR syntax error, LIMIT is only supported in combination with either BYSCORE or BYLEX') };
+    }
+    return {};
+}
+
+/** Validates one positive key count shared by the aggregate commands. */
+function checkZSetKeyCount(raw, message) {
+    const numkeys = parseInteger(raw);
+    if (numkeys === null || numkeys <= 0) return { error: replyError(message) };
+    return { numkeys };
 }
 
 /**
- * Plans one sorted-set aggregate: union, intersection or difference, optionally stored.
+ * Plans one sorted-set command.
  *
- * Sources are read before the destination is touched, so a wrong type aborts the
- * whole command, and the store forms drop every representation plus the deadline
- * the destination may hold.
+ * Arity, option exclusivity and the scan cursor stay here because a transaction
+ * rejects a malformed command while it is queued. Scores, range selection, pop
+ * order and reply framing all run upstream, so the facade holds one implementation.
  */
-function planZSetAggregate(store, session, name, args) {
-    const db = session.db;
-    if (name === 'zunionstore' || name === 'zinterstore') {
-        if (args.length < 4) return { error: wrongArity(name) };
-        const plan = parseZSetStorePlan(args, name);
-        if (plan.error !== undefined) return { error: plan.error };
-        const destination = args[1];
-        const mode = name === 'zunionstore' ? 'union' : 'inter';
-        return {
-            run: () => {
-                const sets = readZSetsForAggregate(store, db, plan.keys);
-                if (sets === null) return wrongType();
-                return storeZSetResult(store, db, destination, combineZSets(sets, plan.weights, plan.aggregate, mode));
-            },
-        };
-    }
-    if (name === 'zdiff' || name === 'zdiffstore') {
-        const keeps = name === 'zdiffstore';
-        const numkeysIndex = keeps ? 2 : 1;
-        if (keeps ? args.length < 4 : args.length < 3) return { error: wrongArity(name) };
-        const numkeys = parseInteger(args[numkeysIndex]);
-        if (numkeys === null || numkeys <= 0) {
-            return { error: replyError(`ERR at least 1 input key is needed for '${keeps ? 'zdiffstore' : 'zdiff'}' command`) };
-        }
-        if (args.length < numkeysIndex + 1 + numkeys) return { error: replyError('ERR syntax error') };
-        const keys = args.slice(numkeysIndex + 1, numkeysIndex + 1 + numkeys);
-        const next = numkeysIndex + 1 + numkeys;
-        let withScores = false;
-        if (keeps) {
-            if (next !== args.length) return { error: replyError('ERR syntax error') };
-        }
-        else if (args.length - next === 1) {
-            if (text(args[next]).toLowerCase() !== 'withscores') return { error: replyError('ERR syntax error') };
-            withScores = true;
-        }
-        else if (args.length - next > 1) {
-            return { error: replyError('ERR syntax error') };
-        }
-        const destination = keeps ? args[1] : null;
-        return {
-            run: () => {
-                const sets = readZSetsForAggregate(store, db, keys);
-                if (sets === null) return wrongType();
-                const result = combineZSets(sets, keys.map(() => 1), 'sum', 'diff');
-                if (keeps) return storeZSetResult(store, db, destination, result);
-                return renderZSet(result, withScores);
-            },
-        };
-    }
-    // zintercard counts only the intersection and never reads scores.
-    if (args.length < 3) return { error: wrongArity('zintercard') };
-    const numkeys = parseInteger(args[1]);
-    if (numkeys === null) return { error: integerError() };
-    if (numkeys <= 0) {
-        return { error: replyError("ERR at least 1 input key is needed for 'zintercard' command") };
-    }
-    if (args.length < 2 + numkeys) {
-        return { error: replyError('ERR syntax error') };
-    }
-    const keys = args.slice(2, 2 + numkeys);
-    let limit = 0;
-    const next = 2 + numkeys;
-    if (next < args.length) {
-        if (text(args[next]).toLowerCase() !== 'limit' || next + 2 !== args.length) {
-            return { error: replyError('ERR syntax error') };
-        }
-        limit = parseInteger(args[next + 1]);
-        if (limit === null || limit < 0) return { error: replyError("ERR LIMIT can't be negative") };
-    }
-    return {
-        run: () => {
-            const sets = readZSetsForAggregate(store, db, keys);
-            if (sets === null) return wrongType();
-            if (sets.length === 0) return integer(0);
-            let found = 0;
-            for (const [member] of sets[0]) {
-                if (!sets.slice(1).every(set => set.some(([candidate]) => candidate.equals(member)))) continue;
-                found += 1;
-                if (limit > 0 && found >= limit) break;
+function planZSet(store, session, name, args) {
+    const length = args.length;
+    const forward = keys => ({ run: forwardZSet(store, session, args, keys) });
+    switch (name) {
+        case 'zadd': {
+            if (length < 4) return { error: wrongArity(name) };
+            const options = { nx: false, xx: false, gt: false, lt: false, ch: false, incr: false };
+            let index = 2;
+            for (; index < length; index += 1) {
+                const option = text(args[index]).toLowerCase();
+                if (option === 'nx') options.nx = true;
+                else if (option === 'xx') options.xx = true;
+                else if (option === 'gt') options.gt = true;
+                else if (option === 'lt') options.lt = true;
+                else if (option === 'ch') options.ch = true;
+                else if (option === 'incr') options.incr = true;
+                else break;
             }
-            return integer(found);
-        },
-    };
-}
+            if (options.nx && options.xx) {
+                return { error: replyError('ERR XX and NX options at the same time are not compatible') };
+            }
+            if ((options.gt || options.lt) && (options.nx || (options.gt && options.lt))) {
+                return { error: replyError('ERR GT, LT, and/or NX options at the same time are not compatible') };
+            }
+            const remaining = length - index;
+            if (remaining === 0 || remaining % 2 !== 0) return { error: replyError('ERR syntax error') };
+            if (options.incr && remaining !== 2) {
+                return { error: replyError('ERR INCR option supports a single increment-element pair') };
+            }
+            return forward([args[1]]);
+        }
 
-/** Parses `numkeys` plus optional `WEIGHTS` and `AGGREGATE` for the sorted-set stores. */
-function parseZSetStorePlan(args, name) {
-    const numkeys = parseInteger(args[2]);
-    if (numkeys === null || numkeys <= 0) {
-        return { error: replyError(`ERR at least 1 input key is needed for '${name}' command`) };
-    }
-    if (args.length < 3 + numkeys) return { error: replyError('ERR syntax error') };
-    const keys = args.slice(3, 3 + numkeys);
-    const weights = keys.map(() => 1);
-    let aggregate = 'sum';
-    let index = 3 + numkeys;
-    while (index < args.length) {
-        const option = text(args[index]).toLowerCase();
-        if (option === 'weights') {
-            if (index + numkeys >= args.length) return { error: replyError('ERR syntax error') };
-            for (let slot = 0; slot < numkeys; slot += 1) {
-                const weight = parseScore(args[index + 1 + slot]);
-                if (weight === null) return { error: replyError('ERR weight value is not a float') };
-                weights[slot] = weight;
-            }
-            index += 1 + numkeys;
-            continue;
-        }
-        if (option === 'aggregate') {
-            const mode = args[index + 1] === undefined ? '' : text(args[index + 1]).toLowerCase();
-            if (mode !== 'sum' && mode !== 'min' && mode !== 'max') {
+        case 'zincrby':
+            if (length !== 4) return { error: wrongArity(name) };
+            return forward([args[1]]);
+
+        case 'zcard':
+            if (length !== 2) return { error: wrongArity(name) };
+            return forward([args[1]]);
+
+        case 'zscore':
+            if (length !== 3) return { error: wrongArity(name) };
+            return forward([args[1]]);
+
+        case 'zcount':
+        case 'zlexcount':
+        case 'zremrangebyrank':
+        case 'zremrangebyscore':
+        case 'zremrangebylex':
+            if (length !== 4) return { error: wrongArity(name) };
+            return forward([args[1]]);
+
+        case 'zrank':
+        case 'zrevrank':
+            if (length !== 3 && length !== 4) return { error: wrongArity(name) };
+            if (length === 4 && text(args[3]).toLowerCase() !== 'withscore') {
                 return { error: replyError('ERR syntax error') };
             }
-            aggregate = mode;
-            index += 2;
-            continue;
-        }
-        return { error: replyError('ERR syntax error') };
-    }
-    return { keys, weights, aggregate };
-}
+            return forward([args[1]]);
 
-/** Reads every named sorted set, `null` when one holds another kind or a corrupt body. */
-function readZSetsForAggregate(store, db, keys) {
-    const sets = [];
-    for (const key of keys) {
-        const kind = kindOf(store, db, key);
-        if (kind === null) {
-            sets.push([]);
-            continue;
-        }
-        if (kind !== 'zset') return null;
-        const entries = readZSet(store, db, key);
-        if (entries === null) return null;
-        sets.push(entries);
-    }
-    return sets;
-}
+        case 'zrem':
+        case 'zmscore':
+            if (length < 3) return { error: wrongArity(name) };
+            return forward([args[1]]);
 
-/** Computes the weighted union, intersection or difference, sorted by score then member. */
-function combineZSets(sets, weights, aggregate, mode) {
-    const weighted = (score, weight) => {
-        const value = score * weight;
-        return Number.isNaN(value) ? 0 : value;
-    };
-    const combine = (left, right) => {
-        const value = aggregate === 'min' ? Math.min(left, right) : aggregate === 'max' ? Math.max(left, right) : left + right;
-        return Number.isNaN(value) ? 0 : value;
-    };
-    const result = [];
-    if (mode === 'union') {
-        sets.forEach((set, index) => {
-            const weight = weights[index] ?? 1;
-            for (const [member, score] of set) {
-                const value = weighted(score, weight);
-                const hit = result.find(([existing]) => existing.equals(member));
-                if (hit === undefined) result.push([member, value]);
-                else hit[1] = combine(hit[1], value);
+        case 'zrange': {
+            if (length < 4) return { error: wrongArity(name) };
+            const checked = checkZSetRangeOptions(args, 4, 'allowed', 'rank');
+            if (checked.error !== undefined) return checked;
+            return forward([args[1]]);
+        }
+
+        case 'zrevrange':
+            if (length !== 4 && length !== 5) return { error: wrongArity(name) };
+            if (length === 5 && text(args[4]).toLowerCase() !== 'withscores') {
+                return { error: replyError('ERR syntax error') };
             }
-        });
-    }
-    else if (mode === 'inter') {
-        if (sets.length > 0) {
-            for (const [member, score] of sets[0]) {
-                let combined = weighted(score, weights[0] ?? 1);
-                let present = true;
-                for (let index = 1; index < sets.length; index += 1) {
-                    const hit = sets[index].find(([candidate]) => candidate.equals(member));
-                    if (hit === undefined) {
-                        present = false;
-                        break;
-                    }
-                    combined = combine(combined, weighted(hit[1], weights[index] ?? 1));
+            return forward([args[1]]);
+
+        case 'zrangebyscore':
+        case 'zrevrangebyscore': {
+            if (length < 4) return { error: wrongArity(name) };
+            const checked = checkZSetRangeOptions(args, 4, 'allowed', 'score');
+            if (checked.error !== undefined) return checked;
+            return forward([args[1]]);
+        }
+
+        case 'zrangebylex':
+        case 'zrevrangebylex': {
+            if (length < 4) return { error: wrongArity(name) };
+            const checked = checkZSetRangeOptions(args, 4, 'lex-error', 'lex');
+            if (checked.error !== undefined) return checked;
+            return forward([args[1]]);
+        }
+
+        case 'zrangestore': {
+            if (length < 5) return { error: wrongArity(name) };
+            const checked = checkZSetRangeOptions(args, 5, 'none', 'rank');
+            if (checked.error !== undefined) return checked;
+            return forward([args[1], args[2]]);
+        }
+
+        case 'zpopmin':
+        case 'zpopmax': {
+            if (length !== 2 && length !== 3) return { error: wrongArity(name) };
+            if (length === 3) {
+                // 真机对非整数与负数使用同一条「必须为正」的提示。
+                const count = parseInteger(args[2]);
+                if (count === null || count < 0) {
+                    return { error: replyError('ERR value is out of range, must be positive') };
                 }
-                if (present) result.push([member, combined]);
             }
+            return forward([args[1]]);
         }
-    }
-    else if (sets.length > 0) {
-        for (const [member, score] of sets[0]) {
-            if (sets.slice(1).some(set => set.some(([candidate]) => candidate.equals(member))) === false) {
-                result.push([member, score]);
+
+        case 'zrandmember':
+            if (length < 2 || length > 4) return { error: wrongArity(name) };
+            if (length >= 3 && parseInteger(args[2]) === null) return { error: integerError() };
+            if (length === 4 && text(args[3]).toLowerCase() !== 'withscores') {
+                return { error: replyError('ERR syntax error') };
             }
+            return forward([args[1]]);
+
+        case 'zscan': {
+            if (length < 3) return { error: wrongArity(name) };
+            if (parseScanCursor(args[2]) === null) return { error: replyError('ERR invalid cursor') };
+            const options = parseScanOptions(args, 3);
+            if (options.error !== undefined) return { error: options.error };
+            return forward([args[1]]);
         }
+
+        case 'zunionstore':
+        case 'zinterstore': {
+            if (length < 4) return { error: wrongArity(name) };
+            const counted = checkZSetKeyCount(args[2], `ERR at least 1 input key is needed for '${name}' command`);
+            if (counted.error !== undefined) return counted;
+            if (length < 3 + counted.numkeys) return { error: replyError('ERR syntax error') };
+            return forward([args[1], ...args.slice(3, 3 + counted.numkeys)]);
+        }
+
+        case 'zunion':
+        case 'zinter': {
+            if (length < 3) return { error: wrongArity(name) };
+            const counted = checkZSetKeyCount(args[1], `ERR at least 1 input key is needed for '${name}' command`);
+            if (counted.error !== undefined) return counted;
+            if (length < 2 + counted.numkeys) return { error: replyError('ERR syntax error') };
+            return forward(args.slice(2, 2 + counted.numkeys));
+        }
+
+        case 'zdiffstore': {
+            if (length < 4) return { error: wrongArity(name) };
+            const counted = checkZSetKeyCount(args[2], "ERR at least 1 input key is needed for 'zdiffstore' command");
+            if (counted.error !== undefined) return counted;
+            if (length < 3 + counted.numkeys) return { error: replyError('ERR syntax error') };
+            return forward([args[1], ...args.slice(3, 3 + counted.numkeys)]);
+        }
+
+        case 'zdiff': {
+            if (length < 3) return { error: wrongArity(name) };
+            const counted = checkZSetKeyCount(args[1], "ERR at least 1 input key is needed for 'zdiff' command");
+            if (counted.error !== undefined) return counted;
+            if (length < 2 + counted.numkeys) return { error: replyError('ERR syntax error') };
+            return forward(args.slice(2, 2 + counted.numkeys));
+        }
+
+        case 'zintercard': {
+            if (length < 3) return { error: wrongArity(name) };
+            const counted = checkZSetKeyCount(args[1], "ERR at least 1 input key is needed for 'zintercard' command");
+            if (counted.error !== undefined) return counted;
+            if (length < 2 + counted.numkeys) return { error: replyError('ERR syntax error') };
+            const tail = length - (2 + counted.numkeys);
+            if (tail !== 0) {
+                if (tail !== 2 || text(args[2 + counted.numkeys]).toLowerCase() !== 'limit') {
+                    return { error: replyError('ERR syntax error') };
+                }
+                // 真机对非整数与负数统一回复「不能为负」。
+                const limit = parseInteger(args[3 + counted.numkeys]);
+                if (limit === null || limit < 0) {
+                    return { error: replyError("ERR LIMIT can't be negative") };
+                }
+            }
+            return forward(args.slice(2, 2 + counted.numkeys));
+        }
+
+        case 'zmpop': {
+            if (length < 4) return { error: wrongArity(name) };
+            const counted = checkZSetKeyCount(args[1], 'ERR numkeys should be greater than 0');
+            if (counted.error !== undefined) return counted;
+            const counter = checkZSetMpopTail(args, 2 + counted.numkeys, length);
+            if (counter.error !== undefined) return counter;
+            return forward(args.slice(2, 2 + counted.numkeys));
+        }
+
+        case 'bzpopmin':
+        case 'bzpopmax': {
+            if (length < 3) return { error: wrongArity(name) };
+            const timeout = parseBlockingTimeout(args[length - 1]);
+            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            const keys = args.slice(1, length - 1);
+            return blockingPlan(
+                session.db,
+                keys,
+                timeout.timeoutMs,
+                forwardBlockingZSet(store, session, args, keys),
+                nullArray(),
+            );
+        }
+
+        case 'bzmpop': {
+            if (length < 5) return { error: wrongArity(name) };
+            const timeout = parseBlockingTimeout(args[1]);
+            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            const counted = checkZSetKeyCount(args[2], 'ERR numkeys should be greater than 0');
+            if (counted.error !== undefined) return counted;
+            const counter = checkZSetMpopTail(args, 3 + counted.numkeys, length);
+            if (counter.error !== undefined) return counter;
+            const keys = args.slice(3, 3 + counted.numkeys);
+            return blockingPlan(
+                session.db,
+                keys,
+                timeout.timeoutMs,
+                forwardBlockingZSet(store, session, args, keys),
+                nullArray(),
+            );
+        }
+
+        default:
+            return { error: unknownCommand(args) };
     }
-    sortZSet(result);
-    return result;
 }
 
-/** Overwrites the store destination: an empty result removes the key entirely. */
-function storeZSetResult(store, db, destination, result) {
-    dropEveryKind(store, db, destination);
-    if (result.length === 0) return integer(0);
-    const body = encodeZSet(result);
-    if (body === null) return replyError('ERR zset value exceeds the storage limit');
-    store.setKind(db, 'zset', destination, body, null);
-    return integer(result.length);
+/** Validates the `MIN|MAX [COUNT n]` tail shared by `ZMPOP` and `BZMPOP`. */
+function checkZSetMpopTail(args, sideIndex, length) {
+    if (sideIndex >= length) return { error: replyError('ERR syntax error') };
+    const side = text(args[sideIndex]).toLowerCase();
+    if (side !== 'min' && side !== 'max') return { error: replyError('ERR syntax error') };
+    if (sideIndex + 1 < length) {
+        if (text(args[sideIndex + 1]).toLowerCase() !== 'count' || sideIndex + 3 !== length) {
+            return { error: replyError('ERR syntax error') };
+        }
+        const count = parseInteger(args[sideIndex + 2]);
+        if (count === null) return { error: integerError() };
+        if (count <= 0) return { error: replyError('ERR count should be greater than 0') };
+    }
+    return {};
 }
 
 /**
@@ -5496,150 +5362,6 @@ function planCollection(store, session, name, args) {
             const options = parseScanOptions(args, 3);
             if (options.error !== undefined) return { error: options.error };
             return { run: forwardSet(store, session, args, [key]) };
-        }
-
-        case 'zscan': {
-            if (args.length < 3) return { error: wrongArity('zscan') };
-            const cursor = parseScanCursor(args[2]);
-            if (cursor === null) return { error: replyError('ERR invalid cursor') };
-            const options = parseScanOptions(args, 3);
-            if (options.error !== undefined) return { error: options.error };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'zset') return wrongType();
-                    const entries = kind === null ? [] : readZSet(store, db, key);
-                    if (entries === null) return replyError('ERR stored zset value is corrupt');
-                    return scanReply(
-                        entries,
-                        cursor,
-                        options.count,
-                        options.pattern,
-                        entry => entry[0],
-                        entry => [bulk(entry[0]), bulk(scoreText(entry[1]))],
-                    );
-                },
-            };
-        }
-
-        case 'zadd': {
-            if (args.length < 4 || (args.length - 2) % 2 !== 0) return { error: wrongArity('zadd') };
-            const incoming = [];
-            for (let index = 2; index < args.length; index += 2) {
-                const score = parseScore(args[index]);
-                if (score === null) return { error: replyError('ERR value is not a valid float') };
-                incoming.push([args[index + 1], score]);
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'zset') return wrongType();
-                    const entries = readZSet(store, db, key);
-                    if (entries === null) return replyError('ERR stored zset value is corrupt');
-                    let added = 0;
-                    for (const [member, score] of incoming) {
-                        const position = entries.findIndex(entry => entry[0].equals(member));
-                        if (position >= 0) {
-                            entries[position] = [member, score];
-                        }
-                        else {
-                            entries.push([member, score]);
-                            added += 1;
-                        }
-                    }
-                    const body = encodeZSet(entries);
-                    if (body === null) return replyError('ERR zset value exceeds the storage limit');
-                    rewriteKind(store, db, 'zset', key, body);
-                    return integer(added);
-                },
-            };
-        }
-
-        case 'zscore': {
-            if (args.length !== 3) return { error: wrongArity('zscore') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return nullReply();
-                    if (kind !== 'zset') return wrongType();
-                    const entries = readZSet(store, db, key);
-                    if (entries === null) return replyError('ERR stored zset value is corrupt');
-                    const entry = entries.find(candidate => candidate[0].equals(args[2]));
-                    return entry ? bulk(scoreText(entry[1])) : nullReply();
-                },
-            };
-        }
-
-        case 'zrem': {
-            if (args.length < 3) return { error: wrongArity('zrem') };
-            const dropping = args.slice(2);
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'zset') return wrongType();
-                    const entries = readZSet(store, db, key);
-                    if (entries === null) return replyError('ERR stored zset value is corrupt');
-                    const kept = entries.filter(([member]) => !dropping.some(candidate => candidate.equals(member)));
-                    const removed = entries.length - kept.length;
-                    if (kept.length === 0) {
-                        store.deleteKind(db, SUFFIX.zset, key);
-                    }
-                    else if (removed > 0) {
-                        const body = encodeZSet(kept);
-                        if (body === null) return replyError('ERR zset value exceeds the storage limit');
-                        rewriteKind(store, db, 'zset', key, body);
-                    }
-                    return integer(removed);
-                },
-            };
-        }
-
-        case 'zcard': {
-            if (args.length !== 2) return { error: wrongArity('zcard') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'zset') return wrongType();
-                    const entries = readZSet(store, db, key);
-                    if (entries === null) return replyError('ERR stored zset value is corrupt');
-                    return integer(entries.length);
-                },
-            };
-        }
-
-        case 'zrange': {
-            let withScores = false;
-            if (args.length === 5) {
-                if (text(args[4]).toLowerCase() !== 'withscores') return { error: replyError('ERR syntax error') };
-                withScores = true;
-            }
-            else if (args.length !== 4) {
-                return { error: wrongArity('zrange') };
-            }
-            const start = parseInteger(args[2]);
-            const stop = parseInteger(args[3]);
-            if (start === null || stop === null) return { error: integerError() };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return array([]);
-                    if (kind !== 'zset') return wrongType();
-                    const entries = readZSet(store, db, key);
-                    if (entries === null) return replyError('ERR stored zset value is corrupt');
-                    sortZSet(entries);
-                    let begin = start < 0 ? entries.length + start : start;
-                    let end = stop < 0 ? entries.length + stop : stop;
-                    if (begin < 0) begin = 0;
-                    if (end >= entries.length) end = entries.length - 1;
-                    if (begin > end || begin >= entries.length || end < 0) return array([]);
-                    const slice = entries.slice(begin, end + 1);
-                    return array(slice.flatMap(([member, score]) => (
-                        withScores ? [bulk(member), bulk(scoreText(score))] : [bulk(member)]
-                    )));
-                },
-            };
         }
 
         default:
