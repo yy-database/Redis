@@ -134,6 +134,20 @@ impl Node {
         }])
     }
 
+    /// Inserts or replaces one kind and returns the revision assigned to the record.
+    pub fn set_kind_revision(
+        &mut self,
+        db: u8,
+        kind: &str,
+        key: &[u8],
+        value: &[u8],
+        expires_at: Option<i64>,
+    ) -> io::Result<u64> {
+        let revision = self.next_revision;
+        self.set_kind(db, kind, key, value, expires_at)?;
+        Ok(revision)
+    }
+
     /// Deletes one kind of the key, reporting whether a live record was removed.
     pub fn delete_kind(&mut self, db: u8, kind: &str, key: &[u8]) -> io::Result<bool> {
         let record_key = (kind_namespace(db, kind), key.to_vec());

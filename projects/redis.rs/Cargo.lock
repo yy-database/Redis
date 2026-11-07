@@ -14,10 +14,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
+
+[[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "bitflags"
@@ -45,6 +60,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
+dependencies = [
+ "hybrid-array",
 ]
 
 [[package]]
@@ -79,6 +103,12 @@ dependencies = [
  "cpufeatures 0.3.1",
  "rand_core",
 ]
+
+[[package]]
+name = "const-oid"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "constant_time_eq"
@@ -124,15 +154,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
 name = "ctor"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 
 [[package]]
+name = "database-cluster"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-formats",
+ "database-types",
+ "serde",
+ "serde_json",
+ "vos",
+]
+
+[[package]]
+name = "database-execution"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-cluster",
+ "database-formats",
+ "database-query",
+ "database-storage",
+ "database-types",
+ "database-udf",
+ "js-sys",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185)",
+ "oak-sql",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "uuid",
+ "vos",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "database-formats"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=647d97a19492a2e8701d58e6738e75284c5e73d2#647d97a19492a2e8701d58e6738e75284c5e73d2"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
 dependencies = [
  "blake3",
  "database-types",
@@ -140,14 +213,146 @@ dependencies = [
 ]
 
 [[package]]
+name = "database-protocol"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-protocol-mongo",
+ "database-protocol-mysql",
+ "database-protocol-pgsql",
+ "database-protocol-redis",
+ "database-protocol-yy",
+]
+
+[[package]]
+name = "database-protocol-mongo"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "database-protocol-mysql"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-types",
+ "serde",
+ "serde_json",
+ "sha1",
+]
+
+[[package]]
+name = "database-protocol-pgsql"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "database-protocol-redis"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "database-protocol-yy"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "base64",
+ "database-types",
+ "database-udf",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "database-query"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-cluster",
+ "database-types",
+ "js-sys",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185)",
+ "oak-sql",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+ "vos",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "database-server"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "base64",
+ "database-cluster",
+ "database-execution",
+ "database-protocol",
+ "database-protocol-mongo",
+ "database-protocol-mysql",
+ "database-protocol-pgsql",
+ "database-protocol-redis",
+ "database-protocol-yy",
+ "database-query",
+ "database-storage",
+ "database-types",
+ "database-udf",
+ "mongo",
+ "serde",
+ "serde_json",
+ "sha1",
+ "vos",
+]
+
+[[package]]
+name = "database-storage"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "blake3",
+ "database-formats",
+ "database-types",
+ "libc",
+ "serde_json",
+ "sha2 0.11.1",
+ "vos",
+ "windows-sys",
+]
+
+[[package]]
 name = "database-types"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=647d97a19492a2e8701d58e6738e75284c5e73d2#647d97a19492a2e8701d58e6738e75284c5e73d2"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
 dependencies = [
  "serde",
  "serde_json",
  "uuid",
  "vos",
+]
+
+[[package]]
+name = "database-udf"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -231,8 +436,19 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer",
- "crypto-common",
+ "block-buffer 0.10.4",
+ "crypto-common 0.1.7",
+]
+
+[[package]]
+name = "digest"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
+dependencies = [
+ "block-buffer 0.12.1",
+ "const-oid",
+ "crypto-common 0.2.2",
 ]
 
 [[package]]
@@ -245,6 +461,12 @@ dependencies = [
  "quote",
  "syn 3.0.9",
 ]
+
+[[package]]
+name = "equivalent"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826"
 
 [[package]]
 name = "find-msvc-tools"
@@ -295,6 +517,12 @@ checksum = "2a530c4694a6a8d528794ee9bbd8ba0122e779629ac908d15ad5a7ae7763a33d"
 dependencies = [
  "thiserror 1.0.69",
 ]
+
+[[package]]
+name = "foldhash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "futures"
@@ -429,10 +657,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+
+[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
+name = "hybrid-array"
+version = "0.4.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
+name = "indexmap"
+version = "2.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
+dependencies = [
+ "equivalent",
+ "hashbrown 0.17.1",
+]
 
 [[package]]
 name = "intl-memoizer"
@@ -492,7 +745,7 @@ version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e999beba7b6e8345721bd280141ed958096a2e4abdf74f67ff4ce49b4b54e47a"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -500,6 +753,19 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "mongo"
+version = "0.0.1"
+source = "git+https://github.com/oovm/database.rs.git?rev=1746a0c57793827f7a86e5a827c2a382e0d43a26#1746a0c57793827f7a86e5a827c2a382e0d43a26"
+dependencies = [
+ "database-cluster",
+ "database-protocol-mongo",
+ "database-storage",
+ "database-types",
+ "regex",
+ "serde_json",
+]
 
 [[package]]
 name = "napi"
@@ -576,11 +842,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "oak-core"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185#d33f38e6f6118446a4deeb6a0682999e594d8185"
+dependencies = [
+ "serde",
+ "smallvec",
+ "triomphe",
+ "twox-hash",
+]
+
+[[package]]
+name = "oak-sql"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185#d33f38e6f6118446a4deeb6a0682999e594d8185"
+dependencies = [
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185)",
+ "serde",
+]
+
+[[package]]
 name = "oak-vos"
 version = "0.0.12"
 source = "git+https://github.com/yggdrasil-language/oaks.git?rev=820bb47292f08d4304607d730f7c32969e17639a#820bb47292f08d4304607d730f7c32969e17639a"
 dependencies = [
- "oak-core",
+ "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=820bb47292f08d4304607d730f7c32969e17639a)",
 ]
 
 [[package]]
@@ -703,6 +989,10 @@ checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 name = "redis-napi"
 version = "0.0.0"
 dependencies = [
+ "database-execution",
+ "database-query",
+ "database-server",
+ "database-types",
  "napi",
  "napi-build",
  "napi-derive",
@@ -728,6 +1018,35 @@ dependencies = [
  "getrandom 0.4.3",
  "serde_json",
 ]
+
+[[package]]
+name = "regex"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rustc-hash"
@@ -804,11 +1123,24 @@ version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
+ "foldhash",
+ "indexmap",
  "itoa",
  "memchr",
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -819,7 +1151,18 @@ checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.2.17",
- "digest",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.1",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -1066,7 +1409,7 @@ source = "git+https://github.com/voml/vos-language.git?rev=387d9fc3c9a556ddb8a43
 dependencies = [
  "serde",
  "serde_json",
- "sha2",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -1124,6 +1467,15 @@ name = "windows-link"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
+
+[[package]]
+name = "windows-sys"
+version = "0.61.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
+dependencies = [
+ "windows-link",
+]
 
 [[package]]
 name = "zerofrom"

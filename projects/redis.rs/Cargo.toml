@@ -15,12 +15,16 @@ license = "MPL-2.0"
 repository = "https://github.com/yy-database/Redis"
 
 [workspace.dependencies]
-# Upstream byte layouts for the `.yyds` catalog and the `.yykv` shard, pinned to
-# the `dev` tip that carries all five Redis value kinds, `SCAN`, `RENAME`, the
-# string range, float and bit command family, the zset algebra, sort and
-# bitfield families, `LPOS`, and the HyperLogLog family.
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "647d97a19492a2e8701d58e6738e75284c5e73d2", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "647d97a19492a2e8701d58e6738e75284c5e73d2", package = "database-types" }
+# Upstream byte layouts for the `.yyds` catalog and the `.yykv` shard plus the
+# executor contract and the Redis command facade, pinned to the `dev` tip that
+# carries all five Redis value kinds, `SCAN`, `RENAME`, the string range, float
+# and bit command family, the zset algebra, sort and bitfield families, `LPOS`,
+# the HyperLogLog family, and the public hash command entry.
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "1746a0c57793827f7a86e5a827c2a382e0d43a26", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "1746a0c57793827f7a86e5a827c2a382e0d43a26", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "1746a0c57793827f7a86e5a827c2a382e0d43a26", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "1746a0c57793827f7a86e5a827c2a382e0d43a26", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "1746a0c57793827f7a86e5a827c2a382e0d43a26", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

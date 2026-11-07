@@ -3,6 +3,11 @@
 //! The binding owns no listener, no command dispatcher, and no process entry
 //! point. A host composes these calls into a server loop or a client.
 
+use std::sync::{Mutex, MutexGuard};
+
+use database_execution::cluster::KeyValueExecutor;
+use database_query::cluster_kv::{KeyValueAction, KeyValueCommand, KeyValueResult};
+use database_types::cluster::{Error as ClusterError, FenceToken, Namespace};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use redis_wasm::resp::Reply;
@@ -92,7 +97,278 @@ pub fn parse_integer(value: Buffer) -> Option<i64> {
 /// A `.yyds` catalog plus `.yykv` shard opened by the host.
 #[napi]
 pub struct Store {
-    node: Node,
+    node: Mutex<Node>,
+}
+
+impl Store {
+    /// Locks the shard for one call, recovering the guard when a panic poisoned it.
+    fn shard(&self) -> MutexGuard<'_, Node> {
+        self.node
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+/// Routes the upstream executor contract onto the shard owned by the binding.
+///
+/// Only namespace-scoped reads, kind writes and deletes are expressed here. The
+/// command semantics, reply framing and type checks stay in the upstream facade;
+/// this type carries no command knowledge of its own.
+#[derive(Debug)]
+struct StoreExecutor<'a> {
+    node: &'a Mutex<Node>,
+}
+
+/// Splits `redis:db<db>[:kind]` back into the database index and value kind.
+fn locate(namespace: &Namespace) -> Option<(u8, &'static str)> {
+    let rest = namespace.0.strip_prefix(redis_wasm::store::NAMESPACE_PREFIX)?;
+    let (index, kind) = match rest.split_once(':') {
+        Some((index, kind)) => (index, kind),
+        None => (rest, ""),
+    };
+    let db = index.parse::<u8>().ok()?;
+    redis_wasm::store::KINDS
+        .into_iter()
+        .find(|candidate| *candidate == kind)
+        .map(|kind| (db, kind))
+}
+
+/// Counts the length-framed chunks of a flat collection blob.
+fn count_chunks(flat: &[u8]) -> Option<usize> {
+    let mut offset = 0;
+    let mut chunks = 0;
+    while offset < flat.len() {
+        let raw = flat.get(offset..offset + 4)?;
+        let length = u32::from_le_bytes(raw.try_into().ok()?) as usize;
+        offset = offset.checked_add(4)?.checked_add(length)?;
+        if offset > flat.len() {
+            return None;
+        }
+        chunks += 1;
+    }
+    Some(chunks)
+}
+
+/// Presents a flat hash blob in the counted form expected by the upstream handler.
+///
+/// The shard keeps collection values as flat length-framed chunks, while the upstream
+/// handler frames a hash with its field count. The conversion is byte-only: field
+/// order, field bytes and value bytes are untouched. A malformed blob is handed over
+/// unchanged so the upstream decoder reports it as corrupt.
+fn hash_with_count(flat: &[u8]) -> Vec<u8> {
+    let Some(chunks) = count_chunks(flat) else {
+        return flat.to_vec();
+    };
+    let mut out = Vec::with_capacity(flat.len() + 4);
+    out.extend_from_slice(&((chunks / 2) as u32).to_le_bytes());
+    out.extend_from_slice(flat);
+    out
+}
+
+/// Drops the upstream field count and returns the flat layout stored by the shard.
+fn hash_without_count(counted: &[u8]) -> Vec<u8> {
+    if counted.len() >= 4 {
+        counted[4..].to_vec()
+    }
+    else {
+        counted.to_vec()
+    }
+}
+
+fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
+    if kind == "hash" {
+        hash_with_count(value)
+    }
+    else {
+        value.to_vec()
+    }
+}
+
+fn downstream_value(kind: &str, value: Vec<u8>) -> Vec<u8> {
+    if kind == "hash" {
+        hash_without_count(&value)
+    }
+    else {
+        value
+    }
+}
+
+impl KeyValueExecutor for StoreExecutor<'_> {
+    fn execute(
+        &self,
+        fence: Option<&FenceToken>,
+        command: KeyValueCommand,
+    ) -> database_types::cluster::Result<KeyValueResult> {
+        // This executor serves one local shard, so there is no lease to fence.
+        let _ = fence;
+        let (db, kind) = locate(&command.namespace)
+            .ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
+        let mut node = self
+            .node
+            .lock()
+            .map_err(|_| ClusterError::Unsupported("store lock poisoned"))?;
+        let key = command.key.as_slice();
+        match command.action {
+            KeyValueAction::Get => Ok(KeyValueResult::Get(
+                node.get_kind(db, kind, key)
+                    .map(|record| upstream_value(kind, &record.value)),
+            )),
+            KeyValueAction::Exists => Ok(KeyValueResult::Exists(node.contains_kind(db, kind, key))),
+            KeyValueAction::GetDelete => {
+                let value = node
+                    .get_kind(db, kind, key)
+                    .map(|record| upstream_value(kind, &record.value));
+                if value.is_some() {
+                    node.delete_kind(db, kind, key).map_err(ClusterError::Io)?;
+                }
+                Ok(KeyValueResult::GetDelete(value))
+            }
+            KeyValueAction::GetSet(value) => {
+                let previous = node
+                    .get_kind(db, kind, key)
+                    .map(|record| upstream_value(kind, &record.value));
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, None)
+                    .map_err(ClusterError::Io)?;
+                let _ = revision;
+                Ok(KeyValueResult::GetSet(previous))
+            }
+            KeyValueAction::Put(value) => {
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, None)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::Put { revision })
+            }
+            KeyValueAction::PutKeepingExpiry(value) => {
+                let value = downstream_value(kind, value);
+                let expires_at = node.deadline_kind(db, kind, key);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, expires_at)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::Put { revision })
+            }
+            KeyValueAction::PutIfAbsent(value) => {
+                if node.contains_kind(db, kind, key) {
+                    return Ok(KeyValueResult::PutIfAbsent { revision: None });
+                }
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, None)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::PutIfAbsent {
+                    revision: Some(revision),
+                })
+            }
+            KeyValueAction::PutIfPresent(value) => {
+                if !node.contains_kind(db, kind, key) {
+                    return Ok(KeyValueResult::PutIfPresent { revision: None });
+                }
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, None)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::PutIfPresent {
+                    revision: Some(revision),
+                })
+            }
+            KeyValueAction::PutIfPresentKeepingExpiry(value) => {
+                if !node.contains_kind(db, kind, key) {
+                    return Ok(KeyValueResult::PutIfPresent { revision: None });
+                }
+                let value = downstream_value(kind, value);
+                let expires_at = node.deadline_kind(db, kind, key);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, expires_at)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::PutIfPresent {
+                    revision: Some(revision),
+                })
+            }
+            KeyValueAction::PutExpiring { value, expires_at } => {
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, Some(expires_at))
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::Put { revision })
+            }
+            KeyValueAction::PutIfAbsentExpiring { value, expires_at } => {
+                if node.contains_kind(db, kind, key) {
+                    return Ok(KeyValueResult::PutIfAbsent { revision: None });
+                }
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, Some(expires_at))
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::PutIfAbsent {
+                    revision: Some(revision),
+                })
+            }
+            KeyValueAction::PutIfPresentExpiring { value, expires_at } => {
+                if !node.contains_kind(db, kind, key) {
+                    return Ok(KeyValueResult::PutIfPresent { revision: None });
+                }
+                let value = downstream_value(kind, value);
+                let revision = node
+                    .set_kind_revision(db, kind, key, &value, Some(expires_at))
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::PutIfPresent {
+                    revision: Some(revision),
+                })
+            }
+            KeyValueAction::Delete => Ok(KeyValueResult::Delete {
+                removed: node.delete_kind(db, kind, key).map_err(ClusterError::Io)?,
+            }),
+            KeyValueAction::SetExpiry { expires_at } => Ok(KeyValueResult::Expiry {
+                present: node
+                    .set_deadline_kind(db, kind, key, Some(expires_at))
+                    .map_err(ClusterError::Io)?,
+                expires_at: Some(expires_at),
+            }),
+            KeyValueAction::ClearExpiry => Ok(KeyValueResult::Expiry {
+                present: node
+                    .set_deadline_kind(db, kind, key, None)
+                    .map_err(ClusterError::Io)?,
+                expires_at: None,
+            }),
+            KeyValueAction::GetExpiry => Ok(KeyValueResult::Expiry {
+                present: node.contains_kind(db, kind, key),
+                expires_at: node.deadline_kind(db, kind, key),
+            }),
+            KeyValueAction::IncrementBy(delta) => {
+                if kind != "" {
+                    return Err(ClusterError::Unsupported(
+                        "increments are only defined for the string kind",
+                    ));
+                }
+                let outcome = node.incr_by(db, key, delta).map_err(ClusterError::Io)?;
+                match outcome {
+                    Ok(value) => Ok(KeyValueResult::Increment { value }),
+                    Err(message) if message.contains("not an integer") => {
+                        Err(ClusterError::InvalidIntegerValue)
+                    }
+                    Err(_) => Err(ClusterError::IntegerOverflow),
+                }
+            }
+            KeyValueAction::Rename {
+                destination,
+                if_absent,
+            } => {
+                if kind != "" {
+                    return Err(ClusterError::Unsupported(
+                        "renames are only defined for the string kind",
+                    ));
+                }
+                let outcome = node
+                    .rename(db, key, &destination, if_absent)
+                    .map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::Delete {
+                    removed: matches!(outcome, RenameOutcome::Renamed),
+                })
+            }
+        }
+    }
 }
 
 /// Creates the shard registered by an existing `.yyds` catalog when it is missing.
@@ -110,14 +386,16 @@ impl Store {
     #[napi(constructor)]
     pub fn new(data_dir: String) -> std::result::Result<Self, napi::Error> {
         Ok(Self {
-            node: Node::open(data_dir).map_err(reason)?,
+            node: Mutex::new(Node::open(data_dir).map_err(reason)?),
         })
     }
 
     /// Returns the live value for one key.
     #[napi]
     pub fn get(&self, db: u8, key: Buffer) -> Option<Buffer> {
-        self.node.get(db, &key).map(|record| Buffer::from(record.value.clone()))
+        self.shard()
+            .get(db, &key)
+            .map(|record| Buffer::from(record.value.clone()))
     }
 
     /// Inserts or replaces a value with an optional absolute deadline in epoch milliseconds.
@@ -129,31 +407,33 @@ impl Store {
         value: Buffer,
         expires_at: Option<i64>,
     ) -> std::result::Result<(), napi::Error> {
-        self.node.set(db, &key, &value, expires_at).map_err(reason)
+        self.shard()
+            .set(db, &key, &value, expires_at)
+            .map_err(reason)
     }
 
     /// Deletes one key, reporting whether a live record was removed.
     #[napi]
     pub fn delete(&mut self, db: u8, key: Buffer) -> std::result::Result<bool, napi::Error> {
-        self.node.delete(db, &key).map_err(reason)
+        self.shard().delete(db, &key).map_err(reason)
     }
 
     /// Whether the key exists and is live.
     #[napi]
     pub fn exists(&self, db: u8, key: Buffer) -> bool {
-        self.node.contains(db, &key)
+        self.shard().contains(db, &key)
     }
 
     /// Absolute deadline in epoch milliseconds, `null` when the key carries none.
     #[napi]
     pub fn deadline(&self, db: u8, key: Buffer) -> Option<i64> {
-        self.node.deadline(db, &key)
+        self.shard().deadline(db, &key)
     }
 
     /// Sets or clears the deadline of a live key.
     #[napi]
     pub fn expire(&mut self, db: u8, key: Buffer, expires_at: Option<i64>) -> std::result::Result<bool, napi::Error> {
-        self.node.set_deadline(db, &key, expires_at).map_err(reason)
+        self.shard().set_deadline(db, &key, expires_at).map_err(reason)
     }
 
     /// Returns the live value of one kind (`""`, `hash`, `list`, `set`, `zset` or `stream`).
@@ -161,7 +441,7 @@ impl Store {
     pub fn get_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<Buffer>, napi::Error> {
         check_kind(&kind)?;
         Ok(self
-            .node
+            .shard()
             .get_kind(db, &kind, &key)
             .map(|record| Buffer::from(record.value.clone())))
     }
@@ -177,28 +457,32 @@ impl Store {
         expires_at: Option<i64>,
     ) -> std::result::Result<(), napi::Error> {
         check_kind(&kind)?;
-        self.node.set_kind(db, &kind, &key, &value, expires_at).map_err(reason)
+        self.shard()
+            .set_kind(db, &kind, &key, &value, expires_at)
+            .map_err(reason)
     }
 
     /// Deletes one kind, reporting whether a live record was removed.
     #[napi]
     pub fn delete_kind(&mut self, db: u8, kind: String, key: Buffer) -> std::result::Result<bool, napi::Error> {
         check_kind(&kind)?;
-        self.node.delete_kind(db, &kind, &key).map_err(reason)
+        self.shard()
+            .delete_kind(db, &kind, &key)
+            .map_err(reason)
     }
 
     /// Whether one kind of the key exists and is live.
     #[napi]
     pub fn exists_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<bool, napi::Error> {
         check_kind(&kind)?;
-        Ok(self.node.contains_kind(db, &kind, &key))
+        Ok(self.shard().contains_kind(db, &kind, &key))
     }
 
     /// Absolute deadline of one kind, `null` when it carries none.
     #[napi]
     pub fn deadline_kind(&self, db: u8, kind: String, key: Buffer) -> std::result::Result<Option<i64>, napi::Error> {
         check_kind(&kind)?;
-        Ok(self.node.deadline_kind(db, &kind, &key))
+        Ok(self.shard().deadline_kind(db, &kind, &key))
     }
 
     /// Sets or clears the deadline of a live kind.
@@ -211,7 +495,9 @@ impl Store {
         expires_at: Option<i64>,
     ) -> std::result::Result<bool, napi::Error> {
         check_kind(&kind)?;
-        self.node.set_deadline_kind(db, &kind, &key, expires_at).map_err(reason)
+        self.shard()
+            .set_deadline_kind(db, &kind, &key, expires_at)
+            .map_err(reason)
     }
 
     /// Moves one key, carrying its deadline. `if_absent` implements `RENAMENX`.
@@ -224,7 +510,7 @@ impl Store {
         if_absent: Option<bool>,
     ) -> std::result::Result<String, napi::Error> {
         let outcome = self
-            .node
+            .shard()
             .rename(db, &source, &destination, if_absent.unwrap_or(false))
             .map_err(reason)?;
         Ok(match outcome {
@@ -238,7 +524,7 @@ impl Store {
     /// Appends bytes to a live value, preserving its deadline.
     #[napi]
     pub fn append(&mut self, db: u8, key: Buffer, suffix: Buffer) -> std::result::Result<u32, napi::Error> {
-        self.node
+        self.shard()
             .append(db, &key, &suffix)
             .map(|length| length as u32)
             .map_err(reason)
@@ -247,7 +533,7 @@ impl Store {
     /// Live keys of one database in ascending byte order.
     #[napi]
     pub fn keys(&self, db: u8) -> Vec<Buffer> {
-        self.node.keys(db).into_iter().map(Buffer::from).collect()
+        self.shard().keys(db).into_iter().map(Buffer::from).collect()
     }
 
     /// Inserts or replaces many values with one durable commit.
@@ -261,19 +547,19 @@ impl Store {
             .zip(values)
             .map(|(key, value)| (key.to_vec(), value.to_vec()))
             .collect::<Vec<_>>();
-        self.node.set_many(db, &entries).map_err(reason)
+        self.shard().set_many(db, &entries).map_err(reason)
     }
 
     /// Writes counter updates buffered since the last flush, marking the durability boundary.
     #[napi]
     pub fn flush(&mut self) -> std::result::Result<(), napi::Error> {
-        self.node.flush().map_err(reason)
+        self.shard().flush().map_err(reason)
     }
 
     /// Adds `delta` to an integer value, preserving its deadline.
     #[napi]
     pub fn incr_by(&mut self, db: u8, key: Buffer, delta: i64) -> std::result::Result<Increment, napi::Error> {
-        let outcome = self.node.incr_by(db, &key, delta).map_err(reason)?;
+        let outcome = self.shard().incr_by(db, &key, delta).map_err(reason)?;
         Ok(match outcome {
             Ok(value) => Increment {
                 value: Some(value),
@@ -289,18 +575,51 @@ impl Store {
     /// Drops every live record of one database.
     #[napi]
     pub fn flush_db(&mut self, db: u8) -> std::result::Result<(), napi::Error> {
-        self.node.flush_db(db).map_err(reason)
+        self.shard().flush_db(db).map_err(reason)
     }
 
     /// Number of live keys in one database.
     #[napi]
     pub fn size(&self, db: u8) -> u32 {
-        self.node.len(db) as u32
+        self.shard().len(db) as u32
     }
 
     /// Directory holding the catalog and the shard.
     #[napi]
     pub fn data_dir(&self) -> String {
-        self.node.data_dir().display().to_string()
+        self.shard().data_dir().display().to_string()
+    }
+
+    /// Executes one hash-family request and returns the reply specification as JSON.
+    ///
+    /// `protocol` is `2` or `3`, matching the connection that issued the request.
+    /// The binding only forwards the arguments and serializes the reply, so the
+    /// command semantics stay in the upstream facade.
+    #[napi]
+    pub fn hash_command(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
+        let arguments = args
+            .iter()
+            .map(|argument| argument.as_ref())
+            .collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        database_server::yyds::redis::execute_hash_command(
+            &mut frame,
+            &arguments,
+            &executor,
+            &namespace,
+            protocol,
+        )
+        .map_err(reason)?;
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("hash command produced an empty reply frame"))?;
+        Ok(reply.to_spec().to_string())
     }
 }

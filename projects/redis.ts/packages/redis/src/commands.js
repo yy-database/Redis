@@ -5209,37 +5209,6 @@ function planCollection(store, session, name, args) {
             };
         }
 
-        case 'hkeys':
-        case 'hvals': {
-            if (args.length !== 2) return { error: wrongArity(name) };
-            const byName = name === 'hkeys';
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    if (kind === null) return array([]);
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    return array(fields.map(([field, value]) => bulk(byName ? field : value)));
-                },
-            };
-        }
-
-        case 'hexists': {
-            if (args.length !== 3) return { error: wrongArity('hexists') };
-            const field = args[2];
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    if (kind === null) return integer(0);
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    return integer(fields.some(([name]) => name.equals(field)) ? 1 : 0);
-                },
-            };
-        }
-
         case 'hincrbyfloat': {
             if (args.length !== 4) return { error: wrongArity('hincrbyfloat') };
             const increment = parseLongDouble(args[3]);
@@ -5306,166 +5275,53 @@ function planCollection(store, session, name, args) {
             };
         }
 
-        case 'hscan': {
-            if (args.length < 3) return { error: wrongArity('hscan') };
-            const cursor = parseScanCursor(args[2]);
-            if (cursor === null) return { error: replyError('ERR invalid cursor') };
-            const options = parseScanOptions(args, 3);
-            if (options.error !== undefined) return { error: options.error };
+        case 'hscan':
+        case 'hset':
+        case 'hget':
+        case 'hgetall':
+        case 'hdel':
+        case 'hlen':
+        case 'hincrby':
+        case 'hkeys':
+        case 'hvals':
+        case 'hexists': {
+            // Arity, cursor syntax and delta parsing stay here because they run
+            // while a transaction queues the command, so `MULTI` still rejects
+            // such a command instead of deferring the error to `EXEC`. Field
+            // encoding, type checks and reply framing all run upstream.
+            if (name === 'hset' && (args.length < 4 || (args.length - 2) % 2 !== 0)) {
+                return { error: wrongArity('hset') };
+            }
+            if (name === 'hdel' && args.length < 3) {
+                return { error: wrongArity('hdel') };
+            }
+            const fixed = { hget: 3, hgetall: 2, hlen: 2, hincrby: 4, hkeys: 2, hvals: 2, hexists: 3 }[name];
+            if (fixed !== undefined && args.length !== fixed) {
+                return { error: wrongArity(name) };
+            }
+            if (name === 'hincrby' && parseInteger(args[3]) === null) {
+                return { error: integerError() };
+            }
+            if (name === 'hscan') {
+                if (args.length < 3) {
+                    return { error: wrongArity('hscan') };
+                }
+                if (parseScanCursor(args[2]) === null) {
+                    return { error: replyError('ERR invalid cursor') };
+                }
+                const options = parseScanOptions(args, 3);
+                if (options.error !== undefined) {
+                    return { error: options.error };
+                }
+            }
+            // The upstream type probe knows the five kinds its facade implements
+            // and has no stream kind, so a stream key is rejected here until the
+            // stream family moves upstream. Without this guard a hash write would
+            // fork the key into two live representations.
             return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields = kind === null ? [] : readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    return scanReply(
-                        fields,
-                        cursor,
-                        options.count,
-                        options.pattern,
-                        entry => entry[0],
-                        entry => [bulk(entry[0]), bulk(entry[1])],
-                    );
-                },
-            };
-        }
-
-        case 'hset': {
-            if (args.length < 4 || (args.length - 2) % 2 !== 0) return { error: wrongArity('hset') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    let added = 0;
-                    for (let index = 2; index < args.length; index += 2) {
-                        const field = args[index];
-                        const value = args[index + 1];
-                        const position = fields.findIndex(entry => entry[0].equals(field));
-                        if (position >= 0) {
-                            fields[position] = [field, value];
-                        }
-                        else {
-                            fields.push([field, value]);
-                            added += 1;
-                        }
-                    }
-                    const body = encodeHash(fields);
-                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
-                    rewriteKind(store, db, 'hash', key, body);
-                    return integer(added);
-                },
-            };
-        }
-
-        case 'hget': {
-            if (args.length !== 3) return { error: wrongArity('hget') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    const field = fields.find(entry => entry[0].equals(args[2]));
-                    return bulk(field ? field[1] : null);
-                },
-            };
-        }
-
-        case 'hgetall': {
-            if (args.length !== 2) return { error: wrongArity('hgetall') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    return array(fields.flatMap(([field, value]) => [bulk(field), bulk(value)]));
-                },
-            };
-        }
-
-        case 'hdel': {
-            if (args.length < 3) return { error: wrongArity('hdel') };
-            const names = args.slice(2);
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'hash') return wrongType();
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    let removed = 0;
-                    const kept = [];
-                    for (const [field, value] of fields) {
-                        if (names.some(candidate => candidate.equals(field))) {
-                            removed += 1;
-                        }
-                        else {
-                            kept.push([field, value]);
-                        }
-                    }
-                    if (kept.length === 0) {
-                        store.deleteKind(db, SUFFIX.hash, key);
-                    }
-                    else {
-                        const body = encodeHash(kept);
-                        if (body === null) return replyError('ERR hash value exceeds the storage limit');
-                        rewriteKind(store, db, 'hash', key, body);
-                    }
-                    return integer(removed);
-                },
-            };
-        }
-
-        case 'hlen': {
-            if (args.length !== 2) return { error: wrongArity('hlen') };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind === null) return integer(0);
-                    if (kind !== 'hash') return wrongType();
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    return integer(fields.length);
-                },
-            };
-        }
-
-        case 'hincrby': {
-            if (args.length !== 4) return { error: wrongArity('hincrby') };
-            const delta = parseInteger(args[3]);
-            if (delta === null) return { error: integerError() };
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields = readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    const position = fields.findIndex(entry => entry[0].equals(args[2]));
-                    let current = 0;
-                    if (position >= 0) {
-                        const parsed = parseInteger(fields[position][1]);
-                        if (parsed === null) return replyError('ERR hash value is not an integer');
-                        current = parsed;
-                    }
-                    const updated = current + delta;
-                    if (!Number.isSafeInteger(updated)) {
-                        return replyError('ERR increment or decrement would overflow');
-                    }
-                    const encoded = Buffer.from(String(updated));
-                    if (position >= 0) {
-                        fields[position] = [args[2], encoded];
-                    }
-                    else {
-                        fields.push([args[2], encoded]);
-                    }
-                    const body = encodeHash(fields);
-                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
-                    rewriteKind(store, db, 'hash', key, body);
-                    return integer(updated);
-                },
+                run: () => (key !== null && store.existsKind(db, SUFFIX.stream, key)
+                    ? wrongType()
+                    : store.hashCommand(db, session.protocol ?? 2, args)),
             };
         }
 

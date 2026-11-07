@@ -152,4 +152,9 @@ export class Store {
     dataDir() {
         return this.native.dataDir();
     }
+
+    /** Runs one hash-family request in the binding and returns its reply specification. */
+    hashCommand(db, protocol, args) {
+        return JSON.parse(this.native.hashCommand(db, protocol, args.map(bytes)));
+    }
 }
