@@ -263,6 +263,12 @@ function encodeInto(spec, protocol, parts) {
                 encodeInto(value, protocol, parts);
             }
             return;
+        case 'set':
+            parts.push(Buffer.from(`${protocol >= 3 ? '~' : '*'}${spec.value.length}\r\n`));
+            for (const value of spec.value) {
+                encodeInto(value, protocol, parts);
+            }
+            return;
         case 'push':
             parts.push(Buffer.from(`${protocol >= 3 ? '>' : '*'}${spec.value.length}\r\n`));
             for (const value of spec.value) {
@@ -325,7 +331,7 @@ export function decodeReply(bytes) {
         }
         return { spec: { type: 'bulk', bytes: Array.from(bytes.subarray(next, end)) }, consumed: end + 2 };
     }
-    if (prefix === 0x2a || prefix === 0x25 || prefix === 0x3e) {
+    if (prefix === 0x2a || prefix === 0x25 || prefix === 0x3e || prefix === 0x7e) {
         const total = count(raw);
         if (total === null || total < 0) {
             throw new Error('reply aggregate length is not canonical');
@@ -350,6 +356,9 @@ export function decodeReply(bytes) {
         }
         if (prefix === 0x3e) {
             return { spec: { type: 'push', value: values }, consumed: offset };
+        }
+        if (prefix === 0x7e) {
+            return { spec: { type: 'set', value: values }, consumed: offset };
         }
         return { spec: { type: 'array', value: values }, consumed: offset };
     }

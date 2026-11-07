@@ -3423,6 +3423,32 @@
       }
     },
     {
+      "id": "wire.decode_reply.set-two",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "7e320d0a24310d0a610d0a24310d0a620d0a",
+      "expect": {
+        "consumed": 18,
+        "spec": {
+          "type": "set",
+          "value": [
+            {
+              "type": "bulk",
+              "bytes": [
+                97
+              ]
+            },
+            {
+              "type": "bulk",
+              "bytes": [
+                98
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "wire.decode_reply.array-empty",
       "face": "resp",
       "op": "decode_reply",
@@ -3799,12 +3825,12 @@
       }
     },
     {
-      "id": "wire.decode_reply.error.unknown-prefix-tilde",
+      "id": "wire.decode_reply.error.unknown-prefix-caret",
       "face": "error",
       "op": "decode_reply",
-      "inputHex": "7e350d0a",
+      "inputHex": "5e350d0a",
       "expect": {
-        "error": "unknown reply prefix '~'"
+        "error": "unknown reply prefix '^'"
       }
     },
     {

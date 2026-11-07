@@ -508,6 +508,156 @@
         { "call": "set", "db": 0, "keyHex": "6131", "valueHex": "76" }
       ],
       "effect": []
+    },
+    {
+      "id": "command.smismember.mixed",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMISMEMBER", "a1", "a", "b", "z"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 1 }, { "type": "int", "value": 1 }, { "type": "int", "value": 0 }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "01000000610100000062" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.smismember.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMISMEMBER", "a9", "a", "b"],
+      "reply": { "type": "array", "value": [{ "type": "int", "value": 0 }, { "type": "int", "value": 0 }] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.smismember.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMISMEMBER", "a1"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'smismember' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.smismember.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SMISMEMBER", "a1", "a"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6131", "valueHex": "76" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.spop.single",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a1"],
+      "reply": { "type": "bulk", "bytes": [97] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.spop.count-all",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a1", "100"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.spop.count-zero",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a1", "0"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": [
+        { "call": "get_kind", "db": 0, "kind": "set", "keyHex": "6131", "expect": { "bytes": "0100000061" } }
+      ]
+    },
+    {
+      "id": "command.spop.missing",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a9"],
+      "reply": { "type": "null" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.spop.missing-with-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a9", "2"],
+      "reply": { "type": "array", "value": [] },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.spop.negative-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a1", "-1"],
+      "reply": { "type": "error", "value": "ERR value is out of range, must be positive" },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "set", "keyHex": "6131", "valueHex": "0100000061" }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.spop.non-integer-count",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a1", "abc"],
+      "reply": { "type": "error", "value": "ERR value is not an integer or out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.spop.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'spop' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.spop.wrong-type",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SPOP", "a1"],
+      "reply": { "type": "error", "value": "WRONGTYPE Operation against a key holding the wrong kind of value" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "6131", "valueHex": "76" }
+      ],
+      "effect": []
     }
   ]
 }

@@ -21,13 +21,30 @@ entries are `execute_hash_command` (`mod.rs`, line 56) and `execute_set_command`
 
 ## Set family
 
-| Command | Upstream coordinate | Real server behavior | Class |
-| ------- | ------------------- | -------------------- | ----- |
-| `SPOP` | absent from `is_set_command` (line 316) and `handle_set` (line 2027) | Removes and replies one random member, or up to `count` members when a count is given, and removes the key once it empties | upstream-missing, not implemented on either side; the command answers `ERR unknown command 'SPOP'` |
-| `SMISMEMBER` | absent from `is_set_command` and `handle_set` | Replies one integer per asked member, `1` when present and `0` when not | upstream-missing, not implemented on either side; the command answers `ERR unknown command 'SMISMEMBER'` |
-| `SINTERCARD` | absent from `is_set_command` and `handle_set` | Replies the cardinality of the intersection, with `LIMIT` stopping the count as soon as it is reached | upstream-missing, served by the TypeScript planner |
+No gaps left. `SPOP`, `SMISMEMBER` and `SINTERCARD` used to be absent from
+`is_set_command` (line 316) and `handle_set` (line 2027). They now live in
+`handle_set` with the rest of the family, so every set command is forwarded to
+the facade and the TypeScript planner keeps only queued-time argument checks.
+
+## Storage revision drift
+
+`.yykv` records carry a per-record revision counter taken from `next_revision`.
+The old path deleted and re-created a set on `SADD` and `SMOVE`, while the
+facade writes each command in place once. Eight comparison fixtures therefore
+show a different revision counter in `local-0.yykv` than before the move, even
+though the member payload, kind and deadline are byte-identical.
+
+This is an observable difference caused by the number of writes, not a behavior
+change: a raw snapshot comparison of `local-0.yykv` will see it, while logical
+reads, TTLs and replies do not. It is expected and not a defect. Comparing
+snapshots by payload (`get` / `getKind` / deadline) is the supported way to
+detect real regressions.
 
 ## Settled divergences
+
+RESP3 set aggregation now uses the `~` prefix for `SMEMBERS`, `SINTER`,
+`SUNION`, `SDIFF` and `SPOP` with a count, matching a real server; RESP2 still
+degrades to `*`.
 
 `SMOVE` used to probe the destination type before checking the source. The
 facade checks the source first, matching a real server: a missing source replies

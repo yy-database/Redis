@@ -1478,6 +1478,12 @@ function plan(store, session, name, args) {
         case 'sdiffstore':
             return planSetAggregate(store, session, name, args);
 
+        case 'spop':
+            return planSPop(store, session, args);
+
+        case 'smismember':
+            return planSMisMember(store, session, args);
+
         case 'incr':
             if (args.length !== 2) return { error: wrongArity('incr') };
             return incremental(store, session, args[1], 1);
@@ -2804,36 +2810,6 @@ function forwardSet(store, session, args, keys) {
     };
 }
 
-/** Reads every named set, `null` when one of them holds another kind or a corrupt body. */
-function readSetsForAggregate(store, db, keys) {
-    const sets = [];
-    for (const key of keys) {
-        const kind = kindOf(store, db, key);
-        if (kind === null) {
-            sets.push([]);
-            continue;
-        }
-        if (kind !== 'set') return null;
-        const members = readSet(store, db, key);
-        if (members === null) return null;
-        sets.push(members);
-    }
-    return sets;
-}
-
-function uniqueMembers(members) {
-    const seen = [];
-    for (const member of members) {
-        if (!seen.some(existing => existing.equals(member))) seen.push(member);
-    }
-    return seen;
-}
-
-function intersectMembers(sets) {
-    if (sets.length === 0) return [];
-    return uniqueMembers(sets[0]).filter(member => sets.every(set => set.some(entry => entry.equals(member))));
-}
-
 /** Plans `SINTERCARD`, whose keys are counted from a leading length and may carry `LIMIT`. */
 function planSInterCard(store, session, args) {
     if (args.length < 3) return { error: wrongArity('sintercard') };
@@ -2844,25 +2820,32 @@ function planSInterCard(store, session, args) {
     if (count > args.length - 2) {
         return { error: replyError("ERR Number of keys can't be greater than number of args") };
     }
-    let limit = 0;
     const index = 2 + count;
     if (index < args.length) {
         if (text(args[index]).toLowerCase() !== 'limit' || index + 2 !== args.length) {
             return { error: replyError('ERR syntax error') };
         }
-        limit = parseInteger(args[index + 1]);
+        const limit = parseInteger(args[index + 1]);
         if (limit === null || limit < 0) return { error: replyError("ERR LIMIT can't be negative") };
     }
-    const keys = args.slice(2, 2 + count);
-    const db = session.db;
-    return {
-        run: () => {
-            const sets = readSetsForAggregate(store, db, keys);
-            if (sets === null) return wrongType();
-            const found = intersectMembers(sets).length;
-            return integer(limit > 0 ? Math.min(found, limit) : found);
-        },
-    };
+    return { run: forwardSet(store, session, args, args.slice(2, 2 + count)) };
+}
+
+/** Plans `SPOP`, whose optional count decides between the bulk and set reply forms. */
+function planSPop(store, session, args) {
+    if (args.length < 2 || args.length > 3) return { error: wrongArity('spop') };
+    if (args.length === 3) {
+        const count = parseInteger(args[2]);
+        if (count === null) return { error: replyError('ERR value is not an integer or out of range') };
+        if (count < 0) return { error: replyError('ERR value is out of range, must be positive') };
+    }
+    return { run: forwardSet(store, session, args, [args[1]]) };
+}
+
+/** Plans `SMISMEMBER`, which answers one integer per asked member. */
+function planSMisMember(store, session, args) {
+    if (args.length < 3) return { error: wrongArity('smismember') };
+    return { run: forwardSet(store, session, args, [args[1]]) };
 }
 
 /** Removes every representation of one logical key, whatever kind currently holds it. */
