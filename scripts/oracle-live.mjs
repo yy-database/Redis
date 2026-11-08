@@ -247,6 +247,165 @@ async function blockingScenario() {
             problems.push(`${name}: expected ${JSON.stringify(expected)}, read ${JSON.stringify(rows)}`);
         }
     };
+    const expectMember = (name, pair, expected) => {
+        if (pair[1] !== expected) {
+            problems.push(`${name}: expected ${JSON.stringify(expected)}, read ${JSON.stringify(pair)}`);
+        }
+    };
+
+    // 亚毫秒超时：正的亚毫秒值必须超时，零与负的亚毫秒值必须一直阻塞到 push。
+    const positiveStarted = Date.now();
+    const positiveTiny = await first.send(['BLPOP', 'tiny:positive', '0.0005']);
+    observed.submillisecond_positive = { kind: positiveTiny.kind, elapsed: Date.now() - positiveStarted };
+    if (positiveTiny.kind !== 'null-array') problems.push(`submillisecond positive: expected null-array, read ${positiveTiny.kind}`);
+    if (observed.submillisecond_positive.elapsed < 20) problems.push(`submillisecond positive returned after ${observed.submillisecond_positive.elapsed}ms`);
+    const nanosecondTiny = await first.send(['BLPOP', 'tiny:nanosecond', '1e-9']);
+    observed.nanosecond_positive = nanosecondTiny.kind;
+    if (nanosecondTiny.kind !== 'null-array') problems.push(`nanosecond positive: expected null-array, read ${nanosecondTiny.kind}`);
+
+    const infiniteCases = [
+        ['zero', '0'],
+        ['zero_decimal', '0.000'],
+        ['negative_zero', '-0'],
+        ['negative_tiny', '-0.0001'],
+        ['negative_tiny_five', '-0.0005'],
+    ];
+    for (const [name, value] of infiniteCases) {
+        const parked = first.send(['BLPOP', `tiny:${name}`, value]);
+        const early = await Promise.race([parked, sleep(350).then(() => null)]);
+        if (early !== null) {
+            observed[`timeout_${name}`] = early.kind;
+            problems.push(`timeout ${value}: returned ${early.kind} instead of staying blocked`);
+            continue;
+        }
+        await third.send(['RPUSH', `tiny:${name}`, 'v']);
+        const released = readBlockingPop(await parked);
+        observed[`timeout_${name}`] = released[1];
+        if (released[1] !== 'v') problems.push(`timeout ${value}: released with ${JSON.stringify(released)}`);
+    }
+
+    const negativeTinyZ = first.send(['BZPOPMIN', 'tiny:zset', '-0.0005']);
+    const earlyZ = await Promise.race([negativeTinyZ, sleep(350).then(() => null)]);
+    if (earlyZ !== null) {
+        observed.timeout_zset_negative_tiny = earlyZ.kind;
+        problems.push(`zset timeout -0.0005: returned ${earlyZ.kind} instead of staying blocked`);
+    }
+    else {
+        await third.send(['ZADD', 'tiny:zset', '1', 'z']);
+        const releasedZ = readBlockingPop(await negativeTinyZ);
+        observed.timeout_zset_negative_tiny = releasedZ[1];
+        if (releasedZ[1] !== 'z') problems.push(`zset timeout -0.0005: released with ${JSON.stringify(releasedZ)}`);
+    }
+
+    const negativeError = await first.send(['BLPOP', 'tiny:error', '-1']);
+    observed.negative_error = negativeError.value;
+    if (negativeError.kind !== 'error' || negativeError.value !== 'ERR timeout is negative') {
+        problems.push(`timeout -1: read ${JSON.stringify([negativeError.kind, negativeError.value])}`);
+    }
+    const rangeError = await first.send(['BLPOP', 'tiny:error', 'inf']);
+    observed.range_error = rangeError.value;
+    if (rangeError.kind !== 'error' || rangeError.value !== 'ERR timeout is out of range') {
+        problems.push(`timeout inf: read ${JSON.stringify([rangeError.kind, rangeError.value])}`);
+    }
+    const floatError = await first.send(['BLPOP', 'tiny:error', 'nan']);
+    observed.float_error = floatError.value;
+    if (floatError.kind !== 'error' || floatError.value !== 'ERR timeout is not a float or out of range') {
+        problems.push(`timeout nan: read ${JSON.stringify([floatError.kind, floatError.value])}`);
+    }
+
+    // 写 zset 的命令都要唤醒同键的阻塞弹出：ZADD、ZINCRBY 与四个 STORE 命令。
+    const parkedZmin = first.send(['BZPOPMIN', 'zw:min', '0']);
+    await sleep(100);
+    await third.send(['ZADD', 'zw:min', '1', 'one']);
+    observed.bzpopmin_zadd = readBlockingPop(await parkedZmin);
+    expectMember('bzpopmin zadd', observed.bzpopmin_zadd, 'one');
+
+    const parkedZmax = first.send(['BZPOPMAX', 'zw:max', '0']);
+    await sleep(100);
+    await third.send(['ZADD', 'zw:max', '1', 'two']);
+    observed.bzpopmax_zadd = readBlockingPop(await parkedZmax);
+    expectMember('bzpopmax zadd', observed.bzpopmax_zadd, 'two');
+
+    const parkedZincr = first.send(['BZPOPMIN', 'zw:incr', '0']);
+    await sleep(100);
+    await third.send(['ZINCRBY', 'zw:incr', '2', 'three']);
+    observed.bzpopmin_zincrby = readBlockingPop(await parkedZincr);
+    expectMember('bzpopmin zincrby', observed.bzpopmin_zincrby, 'three');
+
+    const parkedZmpop = first.send(['BZMPOP', '0', '2', 'zw:mpop:missing', 'zw:mpop', 'MIN']);
+    await sleep(100);
+    await third.send(['ZADD', 'zw:mpop', '1', 'four']);
+    const mpop = await parkedZmpop;
+    observed.bzmpop_zadd = mpop.kind === 'array'
+        ? [mpop.value[0].value, mpop.value[1].value[0].value[0].value]
+        : [mpop.kind, null];
+    expectMember('bzmpop zadd', observed.bzmpop_zadd, 'four');
+
+    await third.send(['ZADD', 'zw:src1', '1', 'a', '2', 'b']);
+    await third.send(['ZADD', 'zw:src2', '1', 'a', '3', 'c']);
+
+    const parkedUnion = first.send(['BZPOPMIN', 'zw:union', '0']);
+    await sleep(100);
+    await third.send(['ZUNIONSTORE', 'zw:union', '2', 'zw:src1', 'zw:src2']);
+    observed.zunionstore_wake = readBlockingPop(await parkedUnion);
+    expectMember('zunionstore wake', observed.zunionstore_wake, 'a');
+
+    const parkedInter = first.send(['BZPOPMIN', 'zw:inter', '0']);
+    await sleep(100);
+    await third.send(['ZINTERSTORE', 'zw:inter', '2', 'zw:src1', 'zw:src2']);
+    observed.zinterstore_wake = readBlockingPop(await parkedInter);
+    expectMember('zinterstore wake', observed.zinterstore_wake, 'a');
+
+    const parkedDiff = first.send(['BZPOPMIN', 'zw:diff', '0']);
+    await sleep(100);
+    await third.send(['ZDIFFSTORE', 'zw:diff', '2', 'zw:src1', 'zw:src2']);
+    observed.zdiffstore_wake = readBlockingPop(await parkedDiff);
+    expectMember('zdiffstore wake', observed.zdiffstore_wake, 'b');
+
+    const parkedRange = first.send(['BZPOPMIN', 'zw:range', '0']);
+    await sleep(100);
+    await third.send(['ZRANGESTORE', 'zw:range', 'zw:src1', '0', '-1']);
+    observed.zrangestore_wake = readBlockingPop(await parkedRange);
+    expectMember('zrangestore wake', observed.zrangestore_wake, 'a');
+
+    // 目的键写入同样要唤醒：RENAME、COPY（含跨库 DB）与 SORT ... STORE。
+    await third.send(['RPUSH', 'wk:rename:src', 'renamed']);
+    const parkedRename = first.send(['BLPOP', 'wk:rename:dest', '0']);
+    await sleep(100);
+    await third.send(['RENAME', 'wk:rename:src', 'wk:rename:dest']);
+    observed.rename_wake = readBlockingPop(await parkedRename);
+    expectMember('rename wake', observed.rename_wake, 'renamed');
+
+    await third.send(['ZADD', 'wk:rename:zsrc', '1', 'z']);
+    const parkedRenameZ = first.send(['BZPOPMIN', 'wk:rename:zdest', '0']);
+    await sleep(100);
+    await third.send(['RENAME', 'wk:rename:zsrc', 'wk:rename:zdest']);
+    observed.rename_zset_wake = readBlockingPop(await parkedRenameZ);
+    expectMember('rename zset wake', observed.rename_zset_wake, 'z');
+
+    await third.send(['RPUSH', 'wk:copy:src', 'copied']);
+    const parkedCopy = first.send(['BLPOP', 'wk:copy:dest', '0']);
+    await sleep(100);
+    await third.send(['COPY', 'wk:copy:src', 'wk:copy:dest']);
+    observed.copy_wake = readBlockingPop(await parkedCopy);
+    expectMember('copy wake', observed.copy_wake, 'copied');
+
+    await third.send(['RPUSH', 'wk:copydb:src', 'cross']);
+    await second.send(['SELECT', '1']);
+    const parkedCopyDb = second.send(['BLPOP', 'wk:copydb:dest', '0']);
+    await sleep(100);
+    await third.send(['COPY', 'wk:copydb:src', 'wk:copydb:dest', 'DB', '1']);
+    observed.copy_db_wake = readBlockingPop(await parkedCopyDb);
+    expectMember('copy db wake', observed.copy_db_wake, 'cross');
+    await second.send(['SELECT', '0']);
+
+    await third.send(['RPUSH', 'wk:sort:src', '2', '1']);
+    const parkedSort = first.send(['BLPOP', 'wk:sort:dest', '0']);
+    await sleep(100);
+    await third.send(['SORT', 'wk:sort:src', 'STORE', 'wk:sort:dest']);
+    observed.sort_store_wake = readBlockingPop(await parkedSort);
+    expectMember('sort store wake', observed.sort_store_wake, '1');
+
 
     await third.send(['XADD', 'xr', '1-1', 'seed', '1']);
     const parkedRead = first.send(['XREAD', 'BLOCK', '0', 'STREAMS', 'xr', '$']);

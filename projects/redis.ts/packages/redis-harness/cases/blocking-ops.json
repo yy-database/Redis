@@ -309,6 +309,160 @@
       "reply": { "type": "error", "value": "ERR count should be greater than 0" },
       "setup": [],
       "effect": []
+    },
+    {
+      "id": "command.blpop.positive-submillisecond",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "0.0005"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.positive-nanosecond",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "1e-9"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.positive-millisecond",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "0.001"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.positive-sign",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "+1"],
+      "reply": { "type": "null-array" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.negative-decimal",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "-0.01"],
+      "reply": { "type": "error", "value": "ERR timeout is negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.negative-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "-inf"],
+      "reply": { "type": "error", "value": "ERR timeout is negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.positive-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "inf"],
+      "reply": { "type": "error", "value": "ERR timeout is out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.out-of-range",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "1e100"],
+      "reply": { "type": "error", "value": "ERR timeout is out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.leading-space",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", " 1"],
+      "reply": { "type": "error", "value": "ERR timeout is not a float or out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blpop.nan",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLPOP", "missing", "nan"],
+      "reply": { "type": "error", "value": "ERR timeout is not a float or out of range" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmove.negative-timeout",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMOVE", "l1", "l2", "LEFT", "LEFT", "-1"],
+      "reply": { "type": "error", "value": "ERR timeout is negative" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmpop.binary-key",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "1", "\u0000l", "LEFT"],
+      "reply": { "type": "array", "value": [{ "type": "bulk", "bytes": [0, 108] }, { "type": "array", "value": [{ "type": "bulk", "bytes": [97] }] }] },
+      "setup": [
+        { "call": "set_kind", "db": 0, "kind": "list", "keyHex": "006c", "valueHex": "0100000061" }
+      ],
+      "effect": [
+        { "call": "exists_kind", "db": 0, "kind": "list", "keyHex": "006c", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.blmpop.bad-side",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "1", "l1", "MIDDLE"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmpop.count-syntax",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "1", "l1", "LEFT", "COUNT"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.blmpop.numkeys-non-integer",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BLMPOP", "0", "x", "l1", "LEFT"],
+      "reply": { "type": "error", "value": "ERR numkeys should be greater than 0" },
+      "setup": [],
+      "effect": []
     }
   ]
 }

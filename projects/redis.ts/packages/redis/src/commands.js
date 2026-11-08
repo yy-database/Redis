@@ -237,21 +237,32 @@ function longDoubleText(value) {
     return value.negative ? `-${body}` : body;
 }
 
+/** 真机的超时上限钉在 `i64::MAX` 毫秒，浮点表示即 `2^63`。 */
+const TIMEOUT_MAX_MILLIS = 2 ** 63;
+
 /**
  * Parses a blocking timeout in seconds.
  *
- * `0` means wait forever. Negative values and anything that is not a finite
- * decimal answer the upstream error strings.
+ * 真机先按浮点秒解析，再把毫秒向零截断：截断后为负才是「negative」，正的亚毫秒值
+ * 按最短 1 毫秒处理，`0` 与负的亚毫秒值表示无限等待。非数字、越界与截断后为负
+ * 分别回答上游的三条错误文案。
  */
 function parseBlockingTimeout(raw) {
-    const value = parseFloatText(raw);
-    if (value === null || !Number.isFinite(value)) {
+    const seconds = parseFloatText(raw);
+    if (seconds === null || Number.isNaN(seconds)) {
         return { error: 'ERR timeout is not a float or out of range' };
     }
-    if (value < 0) {
+    const whole = Math.trunc(seconds * 1000);
+    if (whole > TIMEOUT_MAX_MILLIS) {
+        return { error: 'ERR timeout is out of range' };
+    }
+    if (whole < 0) {
         return { error: 'ERR timeout is negative' };
     }
-    return { timeoutMs: value === 0 ? 0 : value * 1000 };
+    if (whole === 0) {
+        return { timeoutMs: seconds > 0 ? 1 : 0 };
+    }
+    return { timeoutMs: whole };
 }
 
 /** Wakes consumers parked on `key` once a push has landed. */
@@ -271,6 +282,16 @@ function blockingPlan(db, keys, timeoutMs, attempt, timeoutReply) {
         block: { db, keys, timeoutMs, attempt, timeoutReply },
         run: () => attempt() ?? timeoutReply,
     };
+}
+
+/**
+ * 把一条校验失败延后到 `run`，排队期只回 `QUEUED`。
+ *
+ * 真机在 `MULTI` 里只有参数个数错误会让整笔事务 `EXECABORT`，超时取值、方向与
+ * 计数一类的校验都要等 `EXEC` 复放时按元素级错误返回。
+ */
+function deferredFailure(reply) {
+    return { run: () => reply };
 }
 
 /** Live hash fields, `[]` when the hash is missing and `null` when the body is corrupt. */
@@ -863,8 +884,34 @@ function planString(store, session, name, args) {
         || (name === 'mset' && args.length % 2 === 0)
         || (name === 'bitcount' && args.length === 3);
     if (malformed) return { error: wrongArity(name) };
-    return { run: () => store.stringCommand(session.db, session.protocol ?? 2, args) };
+    const written = stringWriteTarget(session, name, args);
+    return {
+        run: () => {
+            const reply = store.stringCommand(session.db, session.protocol ?? 2, args);
+            if (written !== null && reply.type !== 'error') notifyPush(session, written.db, written.key);
+            return reply;
+        },
+    };
 }
+
+/**
+ * 字符串族里会写入目的键的命令落点，其余命令返回 `null`。
+ *
+ * `RENAME` / `RENAMENX` 写目的键，`COPY` 默认写当前库、带 `DB` 选项时写声明的库。
+ */
+function stringWriteTarget(session, name, args) {
+    if (name !== 'rename' && name !== 'renamenx' && name !== 'copy') return null;
+    let db = session.db;
+    if (name === 'copy') {
+        for (let index = 3; index < args.length; index += 1) {
+            if (text(args[index]).toLowerCase() !== 'db' || args[index + 1] === undefined) continue;
+            const target = parseInteger(args[index + 1]);
+            if (target !== null && target >= 0 && target < DATABASES) db = target;
+        }
+    }
+    return { db, key: args[2] };
+}
+
 /**
  * Plans one set aggregate: intersection, union or difference, optionally stored.
  *
@@ -929,12 +976,16 @@ function forwardBlockingList(store, session, args, keys) {
 }
 
 /** Forwards one zset request to the upstream facade after rejecting a stream key. */
-function forwardZSet(store, session, args, keys) {
+function forwardZSet(store, session, args, keys, notifyKeys = []) {
     return () => {
         for (const key of keys) {
             if (store.existsKind(session.db, SUFFIX.stream, key)) return wrongType();
         }
-        return store.zsetCommand(session.db, session.protocol ?? 2, args);
+        const reply = store.zsetCommand(session.db, session.protocol ?? 2, args);
+        if (reply.type !== 'error') {
+            for (const key of notifyKeys) notifyPush(session, session.db, key);
+        }
+        return reply;
     };
 }
 
@@ -1122,7 +1173,7 @@ function checkZSetKeyCount(raw, message) {
  */
 function planZSet(store, session, name, args) {
     const length = args.length;
-    const forward = keys => ({ run: forwardZSet(store, session, args, keys) });
+    const forward = (keys, notifyKeys = []) => ({ run: forwardZSet(store, session, args, keys, notifyKeys) });
     switch (name) {
         case 'zadd': {
             if (length < 4) return { error: wrongArity(name) };
@@ -1149,12 +1200,12 @@ function planZSet(store, session, name, args) {
             if (options.incr && remaining !== 2) {
                 return { error: replyError('ERR INCR option supports a single increment-element pair') };
             }
-            return forward([args[1]]);
+            return forward([args[1]], [args[1]]);
         }
 
         case 'zincrby':
             if (length !== 4) return { error: wrongArity(name) };
-            return forward([args[1]]);
+            return forward([args[1]], [args[1]]);
 
         case 'zcard':
             if (length !== 2) return { error: wrongArity(name) };
@@ -1219,7 +1270,7 @@ function planZSet(store, session, name, args) {
             if (length < 5) return { error: wrongArity(name) };
             const checked = checkZSetRangeOptions(args, 5, 'none', 'rank');
             if (checked.error !== undefined) return checked;
-            return forward([args[1], args[2]]);
+            return forward([args[1], args[2]], [args[1]]);
         }
 
         case 'zpopmin':
@@ -1257,7 +1308,7 @@ function planZSet(store, session, name, args) {
             const counted = checkZSetKeyCount(args[2], `ERR at least 1 input key is needed for '${name}' command`);
             if (counted.error !== undefined) return counted;
             if (length < 3 + counted.numkeys) return { error: replyError('ERR syntax error') };
-            return forward([args[1], ...args.slice(3, 3 + counted.numkeys)]);
+            return forward([args[1], ...args.slice(3, 3 + counted.numkeys)], [args[1]]);
         }
 
         case 'zunion':
@@ -1274,7 +1325,7 @@ function planZSet(store, session, name, args) {
             const counted = checkZSetKeyCount(args[2], "ERR at least 1 input key is needed for 'zdiffstore' command");
             if (counted.error !== undefined) return counted;
             if (length < 3 + counted.numkeys) return { error: replyError('ERR syntax error') };
-            return forward([args[1], ...args.slice(3, 3 + counted.numkeys)]);
+            return forward([args[1], ...args.slice(3, 3 + counted.numkeys)], [args[1]]);
         }
 
         case 'zdiff': {
@@ -1317,7 +1368,7 @@ function planZSet(store, session, name, args) {
         case 'bzpopmax': {
             if (length < 3) return { error: wrongArity(name) };
             const timeout = parseBlockingTimeout(args[length - 1]);
-            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            if (timeout.error !== undefined) return deferredFailure(replyError(timeout.error));
             const keys = args.slice(1, length - 1);
             return blockingPlan(
                 session.db,
@@ -1331,11 +1382,11 @@ function planZSet(store, session, name, args) {
         case 'bzmpop': {
             if (length < 5) return { error: wrongArity(name) };
             const timeout = parseBlockingTimeout(args[1]);
-            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            if (timeout.error !== undefined) return deferredFailure(replyError(timeout.error));
             const counted = checkZSetKeyCount(args[2], 'ERR numkeys should be greater than 0');
-            if (counted.error !== undefined) return counted;
+            if (counted.error !== undefined) return deferredFailure(counted.error);
             const counter = checkZSetMpopTail(args, 3 + counted.numkeys, length);
-            if (counter.error !== undefined) return counter;
+            if (counter.error !== undefined) return deferredFailure(counter.error);
             const keys = args.slice(3, 3 + counted.numkeys);
             return blockingPlan(
                 session.db,
@@ -1378,6 +1429,7 @@ function planSort(store, session, name, args) {
     const readonly = name === 'sort_ro';
     if (args.length < 2) return { error: wrongArity(name) };
     let stores = false;
+    let storeKey = null;
     let index = 2;
     while (index < args.length) {
         const option = text(args[index]).toLowerCase();
@@ -1403,13 +1455,14 @@ function planSort(store, session, name, args) {
         if (option === 'store') {
             if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
             stores = true;
+            storeKey = args[index + 1];
             index += 2;
             continue;
         }
         return { error: replyError('ERR syntax error') };
     }
     if (readonly && stores) return { error: replyError('ERR syntax error') };
-    return { run: forwardZSet(store, session, args, [args[1]]) };
+    return { run: forwardZSet(store, session, args, [args[1]], storeKey === null ? [] : [storeKey]) };
 }
 
 /**
@@ -3064,7 +3117,7 @@ function planCollection(store, session, name, args) {
         case 'brpop': {
             if (args.length < 3) return { error: wrongArity(name) };
             const timeout = parseBlockingTimeout(args[args.length - 1]);
-            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            if (timeout.error !== undefined) return deferredFailure(replyError(timeout.error));
             const keys = args.slice(1, args.length - 1);
             return blockingPlan(db, keys, timeout.timeoutMs, forwardBlockingList(store, session, args, keys), nullArray());
         }
@@ -3084,10 +3137,10 @@ function planCollection(store, session, name, args) {
                 return { error: wrongArity('brpoplpush') };
             }
             if ((sourceSide !== 'left' && sourceSide !== 'right') || (destinationSide !== 'left' && destinationSide !== 'right')) {
-                return { error: replyError('ERR syntax error') };
+                return deferredFailure(replyError('ERR syntax error'));
             }
             const timeout = parseBlockingTimeout(timeoutRaw);
-            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            if (timeout.error !== undefined) return deferredFailure(replyError(timeout.error));
             const source = args[1];
             const destination = args[2];
             return blockingPlan(
@@ -3102,22 +3155,21 @@ function planCollection(store, session, name, args) {
         case 'blmpop': {
             if (args.length < 5) return { error: wrongArity('blmpop') };
             const timeout = parseBlockingTimeout(args[1]);
-            if (timeout.error !== undefined) return { error: replyError(timeout.error) };
+            if (timeout.error !== undefined) return deferredFailure(replyError(timeout.error));
             const numkeys = parseInteger(args[2]);
-            if (numkeys === null) return { error: integerError() };
-            if (numkeys <= 0) return { error: replyError('ERR numkeys should be greater than 0') };
-            if (args.length < numkeys + 4) return { error: replyError('ERR syntax error') };
+            if (numkeys === null || numkeys <= 0) return deferredFailure(replyError('ERR numkeys should be greater than 0'));
+            if (args.length < numkeys + 4) return deferredFailure(replyError('ERR syntax error'));
             const keys = args.slice(3, 3 + numkeys);
             const side = text(args[3 + numkeys]).toLowerCase();
-            if (side !== 'left' && side !== 'right') return { error: replyError('ERR syntax error') };
+            if (side !== 'left' && side !== 'right') return deferredFailure(replyError('ERR syntax error'));
             const tail = 4 + numkeys;
             if (args.length > tail) {
                 if (text(args[tail]).toLowerCase() !== 'count' || tail + 2 !== args.length) {
-                    return { error: replyError('ERR syntax error') };
+                    return deferredFailure(replyError('ERR syntax error'));
                 }
                 const requested = parseInteger(args[tail + 1]);
                 if (requested === null || requested <= 0) {
-                    return { error: replyError('ERR count should be greater than 0') };
+                    return deferredFailure(replyError('ERR count should be greater than 0'));
                 }
             }
             return blockingPlan(db, keys, timeout.timeoutMs, forwardBlockingList(store, session, args, keys), nullArray());

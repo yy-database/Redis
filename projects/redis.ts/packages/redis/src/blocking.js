@@ -12,6 +12,12 @@ function slotOf(db, key) {
 }
 
 /**
+ * 32 位有符号定时器上限。Node 把超过它的延迟当成 1 毫秒立刻触发，所以更长的
+ * 超时只能按「等同不超时」处理；真机在 24.8 天这个量级也只是继续阻塞。
+ */
+const MAX_TIMER_MS = 2147483647;
+
+/**
  * One wait queue per logical key shared by every connection of a server.
  *
  * An entry is `{ db, keys, timeoutMs, attempt, timeoutReply, deliver }`.
@@ -36,7 +42,7 @@ export class BlockingHub {
             }
             queue.push(entry);
         }
-        if (entry.timeoutMs > 0) {
+        if (entry.timeoutMs > 0 && entry.timeoutMs <= MAX_TIMER_MS) {
             entry.timer = setTimeout(() => this.expire(entry), entry.timeoutMs);
             entry.timer.unref?.();
         }

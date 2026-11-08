@@ -6,6 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
@@ -15,7 +16,7 @@ import { prepareInstall } from '../src/install.mjs';
 
 const installed = await prepareInstall();
 const redis = await installed.load();
-const { Store, decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, execute, array, bulk, error: replyError, integer, map, nullReply } = redis;
+const { Store, decodeCommand, decodeReply, encodeCommand, encodeReply, parseInteger, execute, startServer, array, bulk, error: replyError, integer, map, nullReply } = redis;
 
 const directories = [];
 after(() => {
@@ -405,4 +406,166 @@ test('expired deadlines hide the value', () => {
     assert.equal(store.get(0, 'stale'), null);
     assert.equal(store.exists(0, 'stale'), false);
     assert.equal(store.deadline(0, 'stale'), null);
+});
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const textOf = spec => Buffer.from(spec.bytes ?? []).toString('utf8');
+
+/** 安装态服务端的裸 socket 客户端，逐帧解析回复供双连接场景断言。 */
+async function connectClient(port) {
+    const socket = net.connect({ host: '127.0.0.1', port });
+    await new Promise((resolve, reject) => {
+        socket.once('connect', resolve);
+        socket.once('error', reject);
+    });
+    let buffer = Buffer.alloc(0);
+    const frames = [];
+    const waiters = [];
+    const flush = () => {
+        while (frames.length > 0 && waiters.length > 0) waiters.shift()(frames.shift());
+    };
+    socket.on('data', chunk => {
+        buffer = Buffer.concat([buffer, chunk]);
+        for (;;) {
+            const decoded = decodeReply(buffer);
+            if (decoded === null) break;
+            buffer = buffer.subarray(decoded.consumed);
+            frames.push(JSON.parse(decoded.spec));
+        }
+        flush();
+    });
+    return {
+        send(...args) {
+            socket.write(encodeCommand(args.map(argument => (Buffer.isBuffer(argument) ? argument : String(argument)))));
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error(`timed out waiting for ${args[0]}`)), 5_000);
+                waiters.push(spec => {
+                    clearTimeout(timer);
+                    resolve(spec);
+                });
+                flush();
+            });
+        },
+        close() {
+            socket.destroy();
+        },
+    };
+}
+
+/** 在 `ms` 内没有回复就回 `null`，用于断言命令仍在阻塞。 */
+async function settledWithin(promise, ms) {
+    let timer;
+    const marker = new Promise(resolve => {
+        timer = setTimeout(() => resolve(null), ms);
+    });
+    const result = await Promise.race([promise, marker]);
+    clearTimeout(timer);
+    return result;
+}
+
+test('blocking commands wake across installed connections', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const first = await connectClient(server.port);
+    const second = await connectClient(server.port);
+    const writer = await connectClient(server.port);
+    try {
+        const parked = first.send('BLPOP', 'wq', '0');
+        await delay(50);
+        await writer.send('RPUSH', 'wq', 'one');
+        const popped = await parked;
+        assert.equal(popped.type, 'array');
+        assert.equal(textOf(popped.value[0]), 'wq');
+        assert.equal(textOf(popped.value[1]), 'one');
+
+        const firstParked = first.send('BLPOP', 'fq', '0');
+        await delay(50);
+        const secondParked = second.send('BLPOP', 'fq', '0');
+        await delay(50);
+        await writer.send('RPUSH', 'fq', 'a', 'b');
+        assert.equal(textOf((await firstParked).value[1]), 'a');
+        assert.equal(textOf((await secondParked).value[1]), 'b');
+
+        const zpark = first.send('BZPOPMIN', 'zq', '0');
+        await delay(50);
+        await writer.send('ZADD', 'zq', '1', 'm');
+        assert.equal(textOf((await zpark).value[1]), 'm');
+
+        const mpop = first.send('BZMPOP', '0', '2', 'zm', 'zm2', 'MIN');
+        await delay(50);
+        await writer.send('ZADD', 'zm2', '1', 'deep');
+        const mpopOut = await mpop;
+        assert.equal(textOf(mpopOut.value[0]), 'zm2');
+        assert.equal(textOf(mpopOut.value[1].value[0].value[0]), 'deep');
+
+        await writer.send('RPUSH', 'rsrc', 'renamed');
+        const renamePark = first.send('BLPOP', 'rdest', '0');
+        await delay(50);
+        await writer.send('RENAME', 'rsrc', 'rdest');
+        assert.equal(textOf((await renamePark).value[1]), 'renamed');
+
+        await writer.send('RPUSH', 'csrc', 'copied');
+        const copyPark = first.send('BLPOP', 'cdest', '0');
+        await delay(50);
+        await writer.send('COPY', 'csrc', 'cdest');
+        assert.equal(textOf((await copyPark).value[1]), 'copied');
+
+        await writer.send('RPUSH', 'ssrc', '2', '1');
+        const sortPark = first.send('BLPOP', 'sdest', '0');
+        await delay(50);
+        await writer.send('SORT', 'ssrc', 'STORE', 'sdest');
+        assert.equal(textOf((await sortPark).value[1]), '1');
+
+        await second.send('SELECT', '1');
+        await writer.send('RPUSH', 'dbsrc', 'cross');
+        const dbPark = second.send('BLPOP', 'dbdest', '0');
+        await delay(50);
+        await writer.send('COPY', 'dbsrc', 'dbdest', 'DB', '1');
+        assert.equal(textOf((await dbPark).value[1]), 'cross');
+        await second.send('SELECT', '0');
+    }
+    finally {
+        first.close();
+        second.close();
+        writer.close();
+        await server.close();
+    }
+});
+
+test('blocking timeouts truncate like the real server', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const first = await connectClient(server.port);
+    const writer = await connectClient(server.port);
+    try {
+        const positive = await settledWithin(first.send('BLPOP', 'tq', '0.0005'), 3_000);
+        assert.equal(positive.type, 'null-array');
+
+        const nanosecond = await first.send('BLPOP', 'tq', '1e-9');
+        assert.equal(nanosecond.type, 'null-array');
+
+        for (const value of ['0', '0.000', '-0', '-0.0001', '-0.0005']) {
+            const parked = first.send('BLPOP', `tq:${value}`, value);
+            assert.equal(await settledWithin(parked, 300), null, `${value} returned early`);
+            await writer.send('RPUSH', `tq:${value}`, 'v');
+            const popped = await parked;
+            assert.equal(popped.type, 'array');
+            assert.equal(textOf(popped.value[1]), 'v');
+        }
+
+        const negative = await first.send('BLPOP', 'tq', '-1');
+        assert.equal(negative.type, 'error');
+        assert.equal(negative.value, 'ERR timeout is negative');
+
+        const range = await first.send('BLPOP', 'tq', 'inf');
+        assert.equal(range.type, 'error');
+        assert.equal(range.value, 'ERR timeout is out of range');
+
+        const float = await first.send('BLPOP', 'tq', 'nan');
+        assert.equal(float.type, 'error');
+        assert.equal(float.value, 'ERR timeout is not a float or out of range');
+    }
+    finally {
+        first.close();
+        writer.close();
+        await server.close();
+    }
 });

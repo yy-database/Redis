@@ -3258,6 +3258,323 @@
     }
    ],
    "effect": []
+  },
+  {
+   "id": "command.bzpopmin.timeout",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMIN",
+    "z9",
+    "0.05"
+   ],
+   "reply": {
+    "type": "null-array"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzpopmax.timeout",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMAX",
+    "z9",
+    "0.05"
+   ],
+   "reply": {
+    "type": "null-array"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzpopmin.negative-timeout",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMIN",
+    "z9",
+    "-1"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR timeout is negative"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzpopmin.out-of-range",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMIN",
+    "z9",
+    "1e100"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR timeout is out of range"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzpopmin.non-float",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMIN",
+    "z9",
+    "abc"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR timeout is not a float or out of range"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzpopmin.wrong-type",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZPOPMIN",
+    "s1",
+    "0"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "WRONGTYPE Operation against a key holding the wrong kind of value"
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "",
+     "keyHex": "7331",
+     "valueHex": "76"
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.timeout",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0.05",
+    "1",
+    "z9",
+    "MIN"
+   ],
+   "reply": {
+    "type": "null-array"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.numkeys-zero",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0",
+    "0",
+    "z1",
+    "MIN"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR numkeys should be greater than 0"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.numkeys-non-integer",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0",
+    "x",
+    "z1",
+    "MIN"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR numkeys should be greater than 0"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.count-zero",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0",
+    "1",
+    "z1",
+    "MIN",
+    "COUNT",
+    "0"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR count should be greater than 0"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.bad-side",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0",
+    "1",
+    "z1",
+    "MIDDLE"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR syntax error"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.out-of-range",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "1e100",
+    "1",
+    "z1",
+    "MIN"
+   ],
+   "reply": {
+    "type": "error",
+    "value": "ERR timeout is out of range"
+   },
+   "setup": [],
+   "effect": []
+  },
+  {
+   "id": "command.bzmpop.second-key",
+   "face": "command",
+   "op": "command",
+   "sides": [
+    "ts"
+   ],
+   "argsText": [
+    "BZMPOP",
+    "0",
+    "2",
+    "z9",
+    "z2",
+    "MIN"
+   ],
+   "reply": {
+    "type": "array",
+    "value": [
+     {
+      "type": "bulk",
+      "bytes": [
+       122,
+       50
+      ]
+     },
+     {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "bulk",
+          "bytes": [
+           50
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "0100000001000000620000000000000040"
+    }
+   ],
+   "effect": [
+    {
+     "call": "exists_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "expect": {
+      "bool": false
+     }
+    }
+   ]
   }
  ]
 }

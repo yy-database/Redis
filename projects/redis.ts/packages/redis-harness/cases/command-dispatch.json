@@ -1627,6 +1627,421 @@
           }
         }
       ]
+    },
+    {
+      "id": "dispatch.multi.blocking-missing",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BLPOP",
+            "k",
+            "0"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "null-array"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.blocking-present",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c31",
+          "valueHex": "01000000610100000062"
+        }
+      ],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BLPOP",
+            "l1",
+            "0"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "array",
+                "value": [
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      108,
+                      49
+                    ]
+                  },
+                  {
+                    "type": "bulk",
+                    "bytes": [
+                      97
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6c31",
+          "expect": {
+            "bytes": "0100000062"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.blocking-timeout-element-error",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BLPOP",
+            "k",
+            "-1"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "error",
+                "value": "ERR timeout is negative"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.blocking-arity-abort",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BLPOP",
+            "k"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "ERR wrong number of arguments for 'blpop' command"
+          }
+        },
+        {
+          "argsText": [
+            "SET",
+            "k",
+            "v"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "error",
+            "value": "EXECABORT Transaction discarded because of previous errors."
+          }
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "",
+          "keyHex": "6b",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.blmove-syntax-element-error",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BLMOVE",
+            "l1",
+            "l2",
+            "MIDDLE",
+            "LEFT",
+            "0"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "error",
+                "value": "ERR syntax error"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.blmpop-numkeys-element-error",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BLMPOP",
+            "0",
+            "0",
+            "l1",
+            "LEFT"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "error",
+                "value": "ERR numkeys should be greater than 0"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.bzpopmin-negative-element-error",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BZPOPMIN",
+            "z1",
+            "-1"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "error",
+                "value": "ERR timeout is negative"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.multi.bzmpop-out-of-range-element-error",
+      "face": "command",
+      "op": "dispatch",
+      "sides": [
+        "ts"
+      ],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": [
+            "MULTI"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "OK"
+          }
+        },
+        {
+          "argsText": [
+            "BZMPOP",
+            "inf",
+            "1",
+            "z1",
+            "MIN"
+          ],
+          "reply": {
+            "type": "simple",
+            "value": "QUEUED"
+          }
+        },
+        {
+          "argsText": [
+            "EXEC"
+          ],
+          "reply": {
+            "type": "array",
+            "value": [
+              {
+                "type": "error",
+                "value": "ERR timeout is out of range"
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }
