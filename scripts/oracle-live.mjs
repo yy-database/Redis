@@ -649,6 +649,10 @@ function compareFrame(expected, actual, protocol) {
 
 /** Replays one setup step with the commands a client would issue. */
 function setupCommands(step) {
+    // 需要命令语义才能搭出的前置状态（例如 HLL 的寄存器积累）直接回放一条命令。
+    if (step.call === 'command') {
+        return [step.argsText.map(value => Buffer.from(value, 'utf8'))];
+    }
     // Keys and values stay Buffers so binary-safe fixtures replay byte for byte.
     const key = Buffer.from(step.keyHex, 'hex');
     const body = Buffer.from(step.valueHex ?? '', 'hex');

@@ -34,7 +34,8 @@ function commandStore(store) {
     return new Proxy(store, {
         get(target, property) {
             if (property === 'hashCommand' || property === 'setCommand' || property === 'listCommand'
-                || property === 'zsetCommand' || property === 'stringCommand' || property === 'serverCommand') {
+                || property === 'zsetCommand' || property === 'stringCommand' || property === 'hyperloglogCommand'
+                || property === 'serverCommand') {
                 return (...call) => JSON.parse(target[property](...call));
             }
             const value = Reflect.get(target, property);
@@ -153,6 +154,9 @@ function assertExpectation(observed, expected, label) {
 
 function perform(store, entry) {
     switch (entry.call) {
+        case 'command':
+            // 需要命令语义才能搭出的前置状态（例如 HLL 的寄存器积累）走真实命令路径。
+            return execute(store, session(), entry.argsText.map(value => Buffer.from(value, 'utf8'))).reply;
         case 'set':
             return store.set(entry.db, bytes(entry.keyHex), bytes(entry.valueHex), entry.expiresAt ?? null);
         case 'get':

@@ -178,6 +178,11 @@ export class Store {
         return JSON.parse(this.native.stringCommand(db, protocol, args.map(bytes)));
     }
 
+    /** Runs one HyperLogLog-family request in the binding and returns its reply specification. */
+    hyperloglogCommand(db, args) {
+        return JSON.parse(this.native.hyperloglogCommand(db, args.map(bytes)));
+    }
+
     /** Server-face commands keep their per-connection session state inside the binding. */
     serverCommand(session, db, protocol, args) {
         return JSON.parse(this.native.serverCommand(session, db, protocol, args.map(bytes)));

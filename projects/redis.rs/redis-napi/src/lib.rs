@@ -742,6 +742,25 @@ impl Store {
         Ok(reply.to_spec().to_string())
     }
 
+    /// Executes one HyperLogLog-family request and returns the reply specification as JSON.
+    ///
+    /// The family replies with integers, `OK` or errors only, so the connection
+    /// protocol does not change the frame. The binding forwards the arguments and
+    /// serializes the reply, leaving hashing, registers and estimation upstream.
+    #[napi]
+    pub fn hyperloglog_command(&self, db: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        database_server::yyds::redis::execute_hyperloglog_command(&mut frame, &arguments, &executor, &namespace)
+            .map_err(reason)?;
+        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+            .map_err(reason)?
+            .ok_or_else(|| reason("hyperloglog command produced an empty reply frame"))?;
+        Ok(reply.to_spec().to_string())
+    }
+
     /// Executes one server-face request and returns the reply specification as JSON.
     ///
     /// `session` is the host connection id. Each id gets its own embedded session, so
