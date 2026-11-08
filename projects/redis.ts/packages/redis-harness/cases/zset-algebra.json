@@ -1142,6 +1142,970 @@
           "expect": null
         }
       ]
+    },
+    {
+      "id": "command.zunion.binary-members",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "2",
+        "bz1",
+        "bz2",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              254
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              53
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              255,
+              0,
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              53
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "627a31",
+          "valueHex": "020000000400000061ff0062000000000000f03f0200000061fe0000000000000040"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "627a32",
+          "valueHex": "020000000200000061fe00000000000008400400000061ff00620000000000001040"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zinter.binary-members",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZINTER",
+        "2",
+        "bz1",
+        "bz2",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              254
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              53
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              255,
+              0,
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              53
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "627a31",
+          "valueHex": "020000000400000061ff0062000000000000f03f0200000061fe0000000000000040"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "627a32",
+          "valueHex": "020000000200000061fe00000000000008400400000061ff00620000000000001040"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zunion.weights-negative-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "2",
+        "z1",
+        "z2",
+        "WEIGHTS",
+        "-1",
+        "0",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              45,
+              51
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              45,
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              45,
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              100
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a32",
+          "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zunion.aggregate-sum-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "2",
+        "zi1",
+        "zi2",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a6931",
+          "valueHex": "030000000100000062000000000000f0ff0100000063000000000000f03f0100000061000000000000f07f"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a6932",
+          "valueHex": "030000000100000061000000000000f0ff010000006300000000000000400100000062000000000000f07f"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zunion.aggregate-min-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "2",
+        "zi1",
+        "zi2",
+        "AGGREGATE",
+        "MIN",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              45,
+              105,
+              110,
+              102
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              45,
+              105,
+              110,
+              102
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a6931",
+          "valueHex": "030000000100000062000000000000f0ff0100000063000000000000f03f0100000061000000000000f07f"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a6932",
+          "valueHex": "030000000100000061000000000000f0ff010000006300000000000000400100000062000000000000f07f"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zunion.aggregate-max-infinity",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "2",
+        "zi1",
+        "zi2",
+        "AGGREGATE",
+        "MAX",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              105,
+              110,
+              102
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              105,
+              110,
+              102
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a6931",
+          "valueHex": "030000000100000062000000000000f0ff0100000063000000000000f03f0100000061000000000000f07f"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a6932",
+          "valueHex": "030000000100000061000000000000f0ff010000006300000000000000400100000062000000000000f07f"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zunion.three-keys",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "3",
+        "z1",
+        "z2",
+        "z3",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              52
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              100
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              52
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              101
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              52
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              54
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49,
+              49
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a32",
+          "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a33",
+          "valueHex": "020000000100000065000000000000104001000000610000000000002440"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zinter.single-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZINTER",
+        "1",
+        "z1",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zdiff.single-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZDIFF",
+        "1",
+        "z1",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zintercard.single-key-limit-zero",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZINTERCARD",
+        "1",
+        "z1",
+        "LIMIT",
+        "0"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zinter.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZINTER",
+        "2",
+        "z1",
+        "missB",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zunion.missing-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNION",
+        "2",
+        "z1",
+        "missB",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zinter.withscores",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZINTER",
+        "2",
+        "z1",
+        "z2",
+        "WITHSCORES"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              52
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              54
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a32",
+          "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.zdiffstore.destination-is-source",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZDIFFSTORE",
+        "z1",
+        "2",
+        "z1",
+        "z2"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 1
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a32",
+          "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "expect": {
+            "bytes": "010000000100000061000000000000f03f"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.zunionstore.empty-result-deletes-destination",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "ZUNIONSTORE",
+        "dst",
+        "2",
+        "missA",
+        "missB"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "647374",
+          "valueHex": "6b656570"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "7a31",
+          "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "647374",
+          "expect": null
+        }
+      ]
     }
   ]
 }

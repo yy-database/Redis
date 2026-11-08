@@ -575,6 +575,366 @@
     }
    ],
    "effect": []
+  },
+  {
+   "id": "dispatch.zset.union-withscores-nested",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 2,
+     "argsText": [
+      "ZUNION",
+      "2",
+      "z1",
+      "z2",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "bulk",
+        "bytes": [
+         97
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         49
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         98
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         52
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         100
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         52
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         99
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         54
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZUNION",
+      "2",
+      "z1",
+      "z2",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "double",
+          "value": "1"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "double",
+          "value": "4"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           100
+          ]
+         },
+         {
+          "type": "double",
+          "value": "4"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           99
+          ]
+         },
+         {
+          "type": "double",
+          "value": "6"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.inter-withscores-nested",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 2,
+     "argsText": [
+      "ZINTER",
+      "2",
+      "z1",
+      "z2",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "bulk",
+        "bytes": [
+         98
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         52
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         99
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         54
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZINTER",
+      "2",
+      "z1",
+      "z2",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           98
+          ]
+         },
+         {
+          "type": "double",
+          "value": "4"
+         }
+        ]
+       },
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           99
+          ]
+         },
+         {
+          "type": "double",
+          "value": "6"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
+  },
+  {
+   "id": "dispatch.zset.diff-withscores-nested",
+   "face": "command",
+   "op": "dispatch",
+   "sides": [
+    "ts"
+   ],
+   "setup": [
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a31",
+     "valueHex": "030000000100000061000000000000f03f0100000062000000000000004001000000630000000000000840"
+    },
+    {
+     "call": "set_kind",
+     "db": 0,
+     "kind": "zset",
+     "keyHex": "7a32",
+     "valueHex": "03000000010000006200000000000000400100000063000000000000084001000000640000000000001040"
+    }
+   ],
+   "steps": [
+    {
+     "protocol": 2,
+     "argsText": [
+      "ZDIFF",
+      "2",
+      "z1",
+      "z2",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "bulk",
+        "bytes": [
+         97
+        ]
+       },
+       {
+        "type": "bulk",
+        "bytes": [
+         49
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "protocol": 3,
+     "argsText": [
+      "ZDIFF",
+      "2",
+      "z1",
+      "z2",
+      "WITHSCORES"
+     ],
+     "reply": {
+      "type": "array",
+      "value": [
+       {
+        "type": "array",
+        "value": [
+         {
+          "type": "bulk",
+          "bytes": [
+           97
+          ]
+         },
+         {
+          "type": "double",
+          "value": "1"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "effect": []
   }
  ]
 }
