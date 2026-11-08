@@ -116,9 +116,7 @@ pub struct Store {
 impl Store {
     /// Locks the shard for one call, recovering the guard when a panic poisoned it.
     fn shard(&self) -> MutexGuard<'_, Node> {
-        self.node
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.node.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 
@@ -182,8 +180,7 @@ fn hash_with_count(flat: &[u8]) -> Vec<u8> {
 fn hash_without_count(counted: &[u8]) -> Vec<u8> {
     if counted.len() >= 4 {
         counted[4..].to_vec()
-    }
-    else {
+    } else {
         counted.to_vec()
     }
 }
@@ -195,8 +192,7 @@ fn hash_without_count(counted: &[u8]) -> Vec<u8> {
 /// order and member bytes are untouched. A malformed blob is handed over unchanged
 /// so the upstream decoder reports it as corrupt.
 fn set_with_count(flat: &[u8]) -> Vec<u8> {
-    let Some(chunks) = count_chunks(flat)
-    else {
+    let Some(chunks) = count_chunks(flat) else {
         return flat.to_vec();
     };
     let mut out = Vec::with_capacity(flat.len() + 4);
@@ -209,8 +205,7 @@ fn set_with_count(flat: &[u8]) -> Vec<u8> {
 fn set_without_count(counted: &[u8]) -> Vec<u8> {
     if counted.len() >= 4 {
         counted[4..].to_vec()
-    }
-    else {
+    } else {
         counted.to_vec()
     }
 }
@@ -218,11 +213,9 @@ fn set_without_count(counted: &[u8]) -> Vec<u8> {
 fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
     if kind == "hash" {
         hash_with_count(value)
-    }
-    else if kind == "set" || kind == "list" {
+    } else if kind == "set" || kind == "list" {
         set_with_count(value)
-    }
-    else {
+    } else {
         value.to_vec()
     }
 }
@@ -230,11 +223,9 @@ fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
 fn downstream_value(kind: &str, value: Vec<u8>) -> Vec<u8> {
     if kind == "hash" {
         hash_without_count(&value)
-    }
-    else if kind == "set" || kind == "list" {
+    } else if kind == "set" || kind == "list" {
         set_without_count(&value)
-    }
-    else {
+    } else {
         value
     }
 }
@@ -247,8 +238,7 @@ impl KeyValueExecutor for StoreExecutor<'_> {
     ) -> database_types::cluster::Result<KeyValueResult> {
         // This executor serves one local shard, so there is no lease to fence.
         let _ = fence;
-        let (db, kind) = locate(&command.namespace)
-            .ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
+        let (db, kind) = locate(&command.namespace).ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
         let mut node = self
             .node
             .lock()
@@ -373,11 +363,8 @@ impl KeyValueExecutor for StoreExecutor<'_> {
             }),
             KeyValueAction::ClearExpiry => {
                 let had_deadline = node.contains_kind(db, kind, key) && node.deadline_kind(db, kind, key).is_some();
-                node.set_deadline_kind(db, kind, key, None)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::ExpiryChanged {
-                    applied: had_deadline,
-                })
+                node.set_deadline_kind(db, kind, key, None).map_err(ClusterError::Io)?;
+                Ok(KeyValueResult::ExpiryChanged { applied: had_deadline })
             }
             KeyValueAction::GetExpiry => Ok(KeyValueResult::Expiry {
                 present: node.contains_kind(db, kind, key),
@@ -392,16 +379,11 @@ impl KeyValueExecutor for StoreExecutor<'_> {
                 let outcome = node.incr_by(db, key, delta).map_err(ClusterError::Io)?;
                 match outcome {
                     Ok(value) => Ok(KeyValueResult::Increment { value }),
-                    Err(message) if message.contains("not an integer") => {
-                        Err(ClusterError::InvalidIntegerValue)
-                    }
+                    Err(message) if message.contains("not an integer") => Err(ClusterError::InvalidIntegerValue),
                     Err(_) => Err(ClusterError::IntegerOverflow),
                 }
             }
-            KeyValueAction::Rename {
-                destination,
-                if_absent,
-            } => {
+            KeyValueAction::Rename { destination, if_absent } => {
                 let outcome = node
                     .rename(db, key, &destination, if_absent)
                     .map_err(ClusterError::Io)?;
@@ -438,8 +420,7 @@ impl KeyValueExecutor for StoreExecutor<'_> {
     ) -> database_types::cluster::Result<Vec<(Vec<u8>, Vec<u8>)>> {
         // This executor serves one local shard, so there is no lease to fence.
         let _ = fence;
-        let (db, kind) = locate(namespace)
-            .ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
+        let (db, kind) = locate(namespace).ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
         let node = self
             .node
             .lock()
@@ -508,9 +489,7 @@ impl Store {
         value: Buffer,
         expires_at: Option<i64>,
     ) -> std::result::Result<(), napi::Error> {
-        self.shard()
-            .set(db, &key, &value, expires_at)
-            .map_err(reason)
+        self.shard().set(db, &key, &value, expires_at).map_err(reason)
     }
 
     /// Deletes one key, reporting whether a live record was removed.
@@ -567,9 +546,7 @@ impl Store {
     #[napi]
     pub fn delete_kind(&mut self, db: u8, kind: String, key: Buffer) -> std::result::Result<bool, napi::Error> {
         check_kind(&kind)?;
-        self.shard()
-            .delete_kind(db, &kind, &key)
-            .map_err(reason)
+        self.shard().delete_kind(db, &kind, &key).map_err(reason)
     }
 
     /// Whether one kind of the key exists and is live.
@@ -697,27 +674,13 @@ impl Store {
     /// The binding only forwards the arguments and serializes the reply, so the
     /// command semantics stay in the upstream facade.
     #[napi]
-    pub fn hash_command(
-        &self,
-        db: u8,
-        protocol: u8,
-        args: Vec<Buffer>,
-    ) -> std::result::Result<String, napi::Error> {
-        let arguments = args
-            .iter()
-            .map(|argument| argument.as_ref())
-            .collect::<Vec<&[u8]>>();
+    pub fn hash_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(redis_wasm::store::namespace(db));
         let executor = StoreExecutor { node: &self.node };
         let mut frame = Vec::new();
-        database_server::yyds::redis::execute_hash_command(
-            &mut frame,
-            &arguments,
-            &executor,
-            &namespace,
-            protocol,
-        )
-        .map_err(reason)?;
+        database_server::yyds::redis::execute_hash_command(&mut frame, &arguments, &executor, &namespace, protocol)
+            .map_err(reason)?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("hash command produced an empty reply frame"))?;
@@ -730,27 +693,13 @@ impl Store {
     /// The binding only forwards the arguments and serializes the reply, so the
     /// command semantics stay in the upstream facade.
     #[napi]
-    pub fn set_command(
-        &self,
-        db: u8,
-        protocol: u8,
-        args: Vec<Buffer>,
-    ) -> std::result::Result<String, napi::Error> {
-        let arguments = args
-            .iter()
-            .map(|argument| argument.as_ref())
-            .collect::<Vec<&[u8]>>();
+    pub fn set_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(redis_wasm::store::namespace(db));
         let executor = StoreExecutor { node: &self.node };
         let mut frame = Vec::new();
-        database_server::yyds::redis::execute_set_command(
-            &mut frame,
-            &arguments,
-            &executor,
-            &namespace,
-            protocol,
-        )
-        .map_err(reason)?;
+        database_server::yyds::redis::execute_set_command(&mut frame, &arguments, &executor, &namespace, protocol)
+            .map_err(reason)?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("set command produced an empty reply frame"))?;
@@ -763,27 +712,13 @@ impl Store {
     /// Blocking commands answer at once in their non-blocking form, so the host owns
     /// the wait loop while the facade keeps the command semantics.
     #[napi]
-    pub fn list_command(
-        &self,
-        db: u8,
-        protocol: u8,
-        args: Vec<Buffer>,
-    ) -> std::result::Result<String, napi::Error> {
-        let arguments = args
-            .iter()
-            .map(|argument| argument.as_ref())
-            .collect::<Vec<&[u8]>>();
+    pub fn list_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(redis_wasm::store::namespace(db));
         let executor = StoreExecutor { node: &self.node };
         let mut frame = Vec::new();
-        database_server::yyds::redis::execute_list_command(
-            &mut frame,
-            &arguments,
-            &executor,
-            &namespace,
-            protocol,
-        )
-        .map_err(reason)?;
+        database_server::yyds::redis::execute_list_command(&mut frame, &arguments, &executor, &namespace, protocol)
+            .map_err(reason)?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("list command produced an empty reply frame"))?;
@@ -794,27 +729,13 @@ impl Store {
     ///
     /// `protocol` is `2` or `3`, matching the connection that issued the request.
     #[napi]
-    pub fn string_command(
-        &self,
-        db: u8,
-        protocol: u8,
-        args: Vec<Buffer>,
-    ) -> std::result::Result<String, napi::Error> {
-        let arguments = args
-            .iter()
-            .map(|argument| argument.as_ref())
-            .collect::<Vec<&[u8]>>();
+    pub fn string_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(redis_wasm::store::namespace(db));
         let executor = StoreExecutor { node: &self.node };
         let mut frame = Vec::new();
-        database_server::yyds::redis::execute_string_command(
-            &mut frame,
-            &arguments,
-            &executor,
-            &namespace,
-            protocol,
-        )
-        .map_err(reason)?;
+        database_server::yyds::redis::execute_string_command(&mut frame, &arguments, &executor, &namespace, protocol)
+            .map_err(reason)?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("string command produced an empty reply frame"))?;
@@ -835,10 +756,7 @@ impl Store {
         protocol: u8,
         args: Vec<Buffer>,
     ) -> std::result::Result<String, napi::Error> {
-        let arguments = args
-            .iter()
-            .map(|argument| argument.as_ref())
-            .collect::<Vec<&[u8]>>();
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let executor = StoreExecutor { node: &self.node };
         let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let registry = Arc::clone(&sessions.registry);
@@ -848,12 +766,7 @@ impl Store {
             .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
         let mut frame = Vec::new();
         let close = !database_server::yyds::redis::execute_server_command(
-            face,
-            &mut frame,
-            &arguments,
-            &executor,
-            db,
-            protocol,
+            face, &mut frame, &arguments, &executor, db, protocol,
         )
         .map_err(reason)?;
         let killed = registry
@@ -864,12 +777,11 @@ impl Store {
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("server command produced an empty reply frame"))?;
-        let killed = killed
-            .iter()
-            .map(|id| id.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        Ok(format!("{{\"reply\":{},\"close\":{close},\"killed\":[{killed}]}}", reply.to_spec()))
+        let killed = killed.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",");
+        Ok(format!(
+            "{{\"reply\":{},\"close\":{close},\"killed\":[{killed}]}}",
+            reply.to_spec()
+        ))
     }
 
     /// Drops the embedded session opened for one host connection.
@@ -889,27 +801,13 @@ impl Store {
     /// Blocking commands answer at once in their non-blocking form, so the host owns
     /// the wait loop while the facade keeps the command semantics.
     #[napi]
-    pub fn zset_command(
-        &self,
-        db: u8,
-        protocol: u8,
-        args: Vec<Buffer>,
-    ) -> std::result::Result<String, napi::Error> {
-        let arguments = args
-            .iter()
-            .map(|argument| argument.as_ref())
-            .collect::<Vec<&[u8]>>();
+    pub fn zset_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(redis_wasm::store::namespace(db));
         let executor = StoreExecutor { node: &self.node };
         let mut frame = Vec::new();
-        database_server::yyds::redis::execute_zset_command(
-            &mut frame,
-            &arguments,
-            &executor,
-            &namespace,
-            protocol,
-        )
-        .map_err(reason)?;
+        database_server::yyds::redis::execute_zset_command(&mut frame, &arguments, &executor, &namespace, protocol)
+            .map_err(reason)?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("zset command produced an empty reply frame"))?;

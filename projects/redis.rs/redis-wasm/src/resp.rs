@@ -78,8 +78,7 @@ impl Reply {
                     out.push(b',');
                     out.extend_from_slice(value.as_bytes());
                     out.extend_from_slice(b"\r\n");
-                }
-                else {
+                } else {
                     out.extend_from_slice(format!("${}\r\n", value.len()).as_bytes());
                     out.extend_from_slice(value.as_bytes());
                     out.extend_from_slice(b"\r\n");

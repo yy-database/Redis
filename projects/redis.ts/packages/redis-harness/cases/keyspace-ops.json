@@ -298,7 +298,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["COPY", "src", "other", "DB", "nope"],
-      "reply": { "type": "error", "value": "ERR DB index is out of range" },
+      "reply": { "type": "error", "value": "ERR value is not an integer or out of range" },
       "setup": [],
       "effect": []
     },

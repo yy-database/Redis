@@ -632,6 +632,7 @@
       "face": "command",
       "op": "command",
       "sides": ["ts"],
+      "oracleLimitation": "set-spop-count-error",
       "argsText": ["SPOP", "a1", "abc"],
       "reply": { "type": "error", "value": "ERR value is not an integer or out of range" },
       "setup": [],

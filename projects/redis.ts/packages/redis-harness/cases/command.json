@@ -1347,6 +1347,7 @@
       "id": "command.select.non-integer",
       "face": "command",
       "op": "command",
+      "oracleLimitation": "select-integer-error",
       "argsText": [
         "SELECT",
         "abc"

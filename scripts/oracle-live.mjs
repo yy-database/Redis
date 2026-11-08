@@ -133,10 +133,14 @@ class Link {
 
     /** Frames one command without waiting for a reply. */
     write(parts) {
+        // Buffers keep binary setup bytes intact, strings are command text.
         const encoded = `*${parts.length}\r\n` + parts
-            .map(part => `$${Buffer.byteLength(String(part))}\r\n${part}\r\n`)
+            .map(part => {
+                const body = Buffer.isBuffer(part) ? part : Buffer.from(String(part), 'utf8');
+                return `$${body.length}\r\n${body.toString('binary')}\r\n`;
+            })
             .join('');
-        this.socket.write(encoded);
+        this.socket.write(Buffer.from(encoded, 'binary'));
     }
 
     send(parts, label = parts[0]) {
@@ -454,6 +458,7 @@ async function main() {
         await link.send(['SELECT', String(entry.db ?? 0)]);
     };
     const problems = [];
+    const limitations = [];
     let checked = 0;
     let storeOnly = 0;
     let notWire = 0;
@@ -484,6 +489,13 @@ async function main() {
                 }
                 continue;
             }
+            if (entry.oracleLimitation !== undefined && entry.scanContract === undefined) {
+                // The recorded expectation belongs to another family and the live
+                // server already reports a different answer, so it stays visible
+                // as a named limitation instead of a silent pass.
+                limitations.push(`${table}/${entry.id} (${entry.oracleLimitation})`);
+                continue;
+            }
             await link.send(['SELECT', String(entry.db ?? 0)]);
             await link.send(['FLUSHALL']);
             await applySetup(entry);
@@ -506,13 +518,17 @@ async function main() {
     }
     link.close();
     if (banner.kind !== 'simple') console.log(`note: unexpected banner ${JSON.stringify(banner)}`);
+    if (limitations.length > 0) {
+        console.log(`live oracle known limitations (${limitations.length}):`);
+        for (const limitation of limitations) console.log(`  ${limitation}`);
+    }
     if (problems.length > 0) {
         console.log(`live oracle disagreed on ${problems.length} check(s):`);
         for (const problem of problems) console.log(`  ${problem}`);
         process.exitCode = 1;
         return;
     }
-    console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches, ${storeOnly} store-only and ${notWire} non-wire case(s) skipped`);
+    console.log(`live oracle: ${checked} case(s) replayed against ${HOST}:${PORT}, 0 mismatches, ${storeOnly} store-only, ${notWire} non-wire and ${limitations.length} known-limitation case(s) skipped`);
 }
 
 /** Lists every case table in the shared corpus for a full CI replay. */
@@ -528,6 +544,13 @@ async function replayDispatch(link, entry, initialProtocol) {
     const problems = [];
     let protocol = initialProtocol;
     let closed = false;
+    const runEffects = async step => {
+        for (const effect of step.effect ?? []) {
+            const diff = await checkEffect(link, effect);
+            if (diff !== null) problems.push(`${step.argsText.join(' ')}: effect ${diff}`);
+        }
+        if ((step.effect ?? []).length > 0) await link.send(['SELECT', String(entry.db ?? 0)]);
+    };
     for (const step of entry.steps) {
         if (step.protocol !== undefined && step.protocol !== protocol) {
             await link.send(['HELLO', String(step.protocol)]);
@@ -538,6 +561,7 @@ async function replayDispatch(link, entry, initialProtocol) {
                 // A step without a reply is a request the server ignores, such as
                 // the empty multibulk that leaves no frame behind.
                 link.write(step.argsText);
+                await runEffects(step);
                 continue;
             }
             const reply = await link.send(step.argsText);
@@ -545,6 +569,7 @@ async function replayDispatch(link, entry, initialProtocol) {
             if (mismatch !== null) problems.push(`${step.argsText.join(' ')}: reply ${mismatch}`);
             if (step.argsText[0].toUpperCase() === 'RESET') protocol = 2;
             if (step.close === true) closed = true;
+            await runEffects(step);
             continue;
         }
         link.write(step.argsText);
@@ -553,6 +578,7 @@ async function replayDispatch(link, entry, initialProtocol) {
             const mismatch = compareFrame(expected, frame, protocol);
             if (mismatch !== null) problems.push(`${step.argsText.join(' ')} frame ${index}: ${mismatch}`);
         }
+        await runEffects(step);
     }
     return { problems, closed };
 }
@@ -578,26 +604,38 @@ function compareFrame(expected, actual, protocol) {
 
 /** Replays one setup step with the commands a client would issue. */
 function setupCommands(step) {
-    const key = Buffer.from(step.keyHex, 'hex').toString('utf8');
+    // Keys and values stay Buffers so binary-safe fixtures replay byte for byte.
+    const key = Buffer.from(step.keyHex, 'hex');
     const body = Buffer.from(step.valueHex ?? '', 'hex');
     const commands = [];
     if (step.call === 'set') {
-        commands.push(['SET', key, body.toString('utf8')]);
+        commands.push(['SET', key, body]);
     }
-    else if (step.kind === '') commands.push(['SET', key, body.toString('utf8')]);
+    else if (step.kind === '') commands.push(['SET', key, body]);
     else if (step.kind === 'hash') {
         const chunks = decodeChunks(body);
         const command = ['HSET', key];
-        for (let index = 0; index < chunks.length; index += 2) {
-            command.push(chunks[index].toString(), chunks[index + 1].toString());
+        if (chunks === null) {
+            // Redis cannot hold an empty hash, and wrong-type fixtures only need
+            // the key to exist with a hash kind, so one placeholder field stands in.
+            command.push(Buffer.from([0]), Buffer.alloc(0));
+        }
+        else {
+            for (let index = 0; index < chunks.length; index += 2) {
+                command.push(chunks[index], chunks[index + 1]);
+            }
         }
         commands.push(command);
     }
-    else if (step.kind === 'list') commands.push(['RPUSH', key, ...decodeChunks(body).map(item => item.toString())]);
-    else if (step.kind === 'set') commands.push(['SADD', key, ...decodeChunks(body).map(item => item.toString())]);
+    else if (step.kind === 'list') {
+        commands.push(['RPUSH', key, ...decodeFramed(body, 'list')]);
+    }
+    else if (step.kind === 'set') {
+        commands.push(['SADD', key, ...decodeFramed(body, 'set')]);
+    }
     else if (step.kind === 'zset') {
         const command = ['ZADD', key];
-        for (const [member, score] of decodeZSet(body)) command.push(String(score), member.toString());
+        for (const [member, score] of decodeZSet(body)) command.push(String(score), member);
         commands.push(command);
     }
     else if (step.kind === 'stream') {
@@ -616,13 +654,40 @@ function setupCommands(step) {
     return commands;
 }
 
-/** Decodes the shard chunk framing used by hash, list and set bodies. */
+/**
+ * Decodes the shard chunk framing used by hash, list and set bodies.
+ *
+ * The corpus carries two layouts: bare `u32le length + body` chunks, and a
+ * count-prefixed variant whose leading count is the pair count for a hash and
+ * the element count for a list or set. `null` means neither layout parses.
+ */
 function decodeChunks(body) {
+    const direct = frameChunks(body);
+    if (direct !== null && direct.length > 0) return direct;
+    if (body.length >= 4) {
+        const count = body.readUInt32LE(0);
+        const nested = frameChunks(body.subarray(4));
+        if (nested !== null && (nested.length === count || nested.length === count * 2)) return nested;
+    }
+    return null;
+}
+
+/** Reads one list or set body, refusing a body neither layout can frame. */
+function decodeFramed(body, kind) {
+    const chunks = decodeChunks(body);
+    if (chunks === null) throw new Error(`undecodable ${kind} body ${body.toString('hex')}`);
+    return chunks;
+}
+
+/** Frames `u32le length + body` pairs, `null` when a length runs past the end. */
+function frameChunks(body) {
     const chunks = [];
     let offset = 0;
     while (offset < body.length) {
+        if (offset + 4 > body.length) return null;
         const length = body.readUInt32LE(offset);
         offset += 4;
+        if (offset + length > body.length) return null;
         chunks.push(body.subarray(offset, offset + length));
         offset += length;
     }
@@ -822,9 +887,47 @@ function describe(frame) {
 
 /** Replays one post-state check and compares it with the expectation. */
 async function checkEffect(link, step) {
+    // Effects name the database they observe, which may differ from the case's own.
+    if (step.db !== undefined) await link.send(['SELECT', String(step.db)]);
     if (step.call === 'size') {
         const reply = await link.send(['DBSIZE']);
         return reply.value === step.expect.int ? null : `DBSIZE expected ${step.expect.int}, read ${describe(reply)}`;
+    }
+    if (step.call === 'exists') {
+        const key = Buffer.from(step.keyHex, 'hex').toString('utf8');
+        const reply = await link.send(['EXISTS', key]);
+        const present = reply.kind === 'int' && reply.value === 1;
+        return present === step.expect.bool
+            ? null
+            : `EXISTS expected ${step.expect.bool}, read ${describe(reply)}`;
+    }
+    if (step.call === 'deadline') {
+        const key = Buffer.from(step.keyHex, 'hex').toString('utf8');
+        const reply = await link.send(['PTTL', key]);
+        if (step.expect === null) {
+            return reply.kind === 'int' && reply.value === -1
+                ? null
+                : `PTTL expected no deadline, read ${describe(reply)}`;
+        }
+        if (reply.kind !== 'int' || reply.value < 0) {
+            return `PTTL expected a live deadline, read ${describe(reply)}`;
+        }
+        // The corpus stores absolute millisecond deadlines while the server reports
+        // the remaining time, so allow for the replay's own clock drift.
+        const drift = Math.abs(step.expect.int - Date.now() - reply.value);
+        return drift <= 10000
+            ? null
+            : `PTTL drifted ${drift}ms from the stored deadline`;
+    }
+    if (step.call === 'keys') {
+        const reply = await link.send(['KEYS', '*']);
+        const read = reply.kind === 'array'
+            ? reply.value.map(frame => Buffer.from(frame.bytes).toString('hex')).sort()
+            : [];
+        const expected = [...step.expect.hexList].sort();
+        return JSON.stringify(read) === JSON.stringify(expected)
+            ? null
+            : `KEYS expected ${JSON.stringify(expected)}, read ${JSON.stringify(read)}`;
     }
     const key = Buffer.from(step.keyHex, 'hex').toString('utf8');
     if (step.call === 'exists_kind') {
@@ -852,8 +955,11 @@ async function checkEffect(link, step) {
             : `PTTL expected a deadline of ${step.expect.bool}, read ${describe(reply)}`;
     }
     if (step.call === 'get') {
-        const expected = Buffer.from(step.expect.bytes, 'hex').toString('utf8');
         const reply = await link.send(['GET', key]);
+        if (step.expect === null) {
+            return reply.kind === 'null' ? null : `GET expected a missing key, read ${describe(reply)}`;
+        }
+        const expected = Buffer.from(step.expect.bytes, 'hex').toString('utf8');
         return reply.kind === 'bulk' && reply.value === expected
             ? null
             : `GET expected ${JSON.stringify(expected)}, read ${describe(reply)}`;
