@@ -790,6 +790,7 @@ function plan(store, session, name, args) {
         case 'hincrbyfloat':
         case 'hrandfield':
         case 'hscan':
+        case 'lpos':
         case 'lpush':
         case 'rpush':
         case 'lrange':
@@ -818,9 +819,6 @@ function plan(store, session, name, args) {
         case 'srandmember':
         case 'sscan':
             return planCollection(store, session, name, args);
-
-        case 'lpos':
-            return planLpos(store, session, args);
 
         case 'xadd':
         case 'xlen':
@@ -1623,36 +1621,6 @@ function planSort(store, session, name, args) {
     }
     if (readonly && stores) return { error: replyError('ERR syntax error') };
     return { run: forwardZSet(store, session, args, [args[1]]) };
-}
-
-/**
- * Plans one `LPOS` call.
- *
- * `RANK` counts matches from the head for positive values and from the tail for
- * negative ones, `COUNT 0` returns every match, and `MAXLEN` only caps the
- * number of elements compared in that direction.
- */
-function planLpos(store, session, args) {
-    if (args.length < 3) return { error: wrongArity('lpos') };
-    const key = args[1];
-    let index = 3;
-    while (index < args.length) {
-        const option = text(args[index]).toUpperCase();
-        if (option === 'RANK' || option === 'COUNT' || option === 'MAXLEN') {
-            if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
-            const value = parseInteger(args[index + 1]);
-            if (value === null) return { error: integerError() };
-            if (option === 'RANK' && value === 0) {
-                return { error: replyError("ERR RANK can't be zero: use 1 to start from the first match, 2 from the second ... or use negative to start from the end of the list") };
-            }
-            if (option === 'COUNT' && value < 0) return { error: replyError("ERR COUNT can't be negative") };
-            if (option === 'MAXLEN' && value < 0) return { error: replyError("ERR MAXLEN can't be negative") };
-            index += 2;
-            continue;
-        }
-        return { error: replyError('ERR syntax error') };
-    }
-    return { run: forwardList(store, session, args, [key]) };
 }
 
 /**
@@ -3364,6 +3332,11 @@ function planCollection(store, session, name, args) {
                 }
             }
             return blockingPlan(db, keys, timeout.timeoutMs, forwardBlockingList(store, session, args, keys), nullArray());
+        }
+
+        case 'lpos': {
+            if (args.length < 3) return { error: wrongArity('lpos') };
+            return { run: forwardList(store, session, args, [key]) };
         }
 
         case 'lpush':
