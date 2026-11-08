@@ -15,19 +15,17 @@ license = "MPL-2.0"
 repository = "https://github.com/yy-database/Redis"
 
 [workspace.dependencies]
-# Upstream byte layouts for the `.yyds` catalog and the `.yykv` shard plus the
-# executor contract and the Redis command facade, pinned to the `dev` tip that
-# carries all six Redis value kinds, `SCAN`, `RENAME`, the string and key family
-# entry with `SET ... GET`, `OBJECT ENCODING`, `SETNX`, `PSETEX`, `MSET` and
-# `FLUSHDB`, the zset algebra, sort and bitfield families, `LPOS`, the
-# HyperLogLog family, the public hash and set command entries, the list family
-# entry with `LMPOP`, and the embedded server-face session for `CLIENT`,
-# `COMMAND`, `INFO`, `CONFIG` and `ACL`.
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-server" }
+# 上游提供 `.yyds` 目录与 `.yykv` 分片的字节布局、执行器契约与 Redis 命令族入口，
+# 这里钉在 `dev` 的提交上，该提交同时携带六种 Redis 值类型、`SCAN`、`RENAME`、
+# 带 `SET ... GET` 的字符串与键族入口、`OBJECT ENCODING`、`SETNX`、`PSETEX`、
+# `MSET`、`FLUSHDB`、zset 集合运算、排序与 bitfield 族、`LPOS`、HyperLogLog
+# 族、hash 与 set 的公开命令入口、带 `LMPOP` 的 list 族入口，以及 `CLIENT`、
+# `COMMAND`、`INFO`、`CONFIG`、`ACL` 的内嵌服务端会话。
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

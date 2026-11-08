@@ -89,62 +89,6 @@ function decodeHash(body) {
     return fields;
 }
 
-function encodeList(elements) {
-    return encodeChunks(elements);
-}
-
-function decodeList(body) {
-    return decodeChunks(body);
-}
-
-/** Set members share the list framing and keep insertion order. */
-function decodeSet(body) {
-    return decodeChunks(body);
-}
-
-function decodeZSet(body) {
-    if (body.length < 4) {
-        return null;
-    }
-    const count = body.readUInt32LE(0);
-    const entries = [];
-    let offset = 4;
-    for (let index = 0; index < count; index += 1) {
-        if (offset + 4 > body.length) return null;
-        const length = body.readUInt32LE(offset);
-        offset += 4;
-        if (offset + length + 8 > body.length) return null;
-        const member = body.subarray(offset, offset + length);
-        offset += length;
-        entries.push([member, body.readDoubleLE(offset)]);
-        offset += 8;
-    }
-    return offset === body.length ? entries : null;
-}
-
-/**
- * Parses one ZADD score the way the gateway does.
- *
- * A decimal literal (optional sign, fraction and exponent) or an infinity word
- * is accepted. `NaN` and anything else is rejected, so a bad score never
- * reaches the shard.
- */
-function parseScore(raw) {
-    const value = text(raw).trim();
-    if (/^[+-]?inf(?:inity)?$/i.test(value)) {
-        return value.startsWith('-') ? -Infinity : Infinity;
-    }
-    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value)) {
-        return null;
-    }
-    return Number(value);
-}
-
-/** Ascending score order, ties broken by member bytes. */
-function sortZSet(entries) {
-    entries.sort((left, right) => (left[1] - right[1]) || Buffer.compare(left[0], right[0]));
-}
-
 /** Live string bytes, `null` when the key is missing. */
 function readString(store, db, key) {
     const body = store.getKind(db, SUFFIX.string, key);
@@ -333,24 +277,6 @@ function blockingPlan(db, keys, timeoutMs, attempt, timeoutReply) {
 function readHash(store, db, key) {
     const body = store.getKind(db, SUFFIX.hash, key);
     return body === null || body === undefined ? [] : decodeHash(body);
-}
-
-/** Live list elements, `[]` when the list is missing and `null` when the body is corrupt. */
-function readList(store, db, key) {
-    const body = store.getKind(db, SUFFIX.list, key);
-    return body === null || body === undefined ? [] : decodeList(body);
-}
-
-/** Live set members, `[]` when the set is missing and `null` when the body is corrupt. */
-function readSet(store, db, key) {
-    const body = store.getKind(db, SUFFIX.set, key);
-    return body === null || body === undefined ? [] : decodeSet(body);
-}
-
-/** Live sorted-set entries, `[]` when the key is missing and `null` when the body is corrupt. */
-function readZSet(store, db, key) {
-    const body = store.getKind(db, SUFFIX.zset, key);
-    return body === null || body === undefined ? [] : decodeZSet(body);
 }
 
 /** Replaces one kind while carrying the deadline it already holds. */
@@ -1655,128 +1581,48 @@ function checkZSetMpopTail(args, sideIndex, length) {
 }
 
 /**
- * Plans one `SORT` / `SORT_RO` command.
+ * 规划一条 `SORT` / `SORT_RO` 命令。
  *
- * Elements come from a list, set or sorted set, `BY` replaces `*` per element,
- * `GET` maps the selected elements, and `STORE` always writes a fresh list.
+ * 排队阶段只校验参数成形：选项是否带够取值、`LIMIT` 两个数是否为整数、
+ * `SORT_RO` 是否误带 `STORE`。取值来源、`BY` / `GET` 展开、排序与 `STORE`
+ * 写入一律由上游族入口执行，这里只把参数原样转发。
  */
 function planSort(store, session, name, args) {
-    const db = session.db;
     const readonly = name === 'sort_ro';
     if (args.length < 2) return { error: wrongArity(name) };
-    const options = { by: null, limit: null, get: [], descending: false, alpha: false, store: null };
+    let stores = false;
     let index = 2;
     while (index < args.length) {
         const option = text(args[index]).toLowerCase();
-        if (option === 'by') {
+        if (option === 'by' || option === 'get') {
             if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
-            options.by = args[index + 1];
             index += 2;
             continue;
         }
         if (option === 'limit') {
+            if (args[index + 1] === undefined || args[index + 2] === undefined) {
+                return { error: replyError('ERR syntax error') };
+            }
             const offset = parseInteger(args[index + 1]);
             const count = parseInteger(args[index + 2]);
-            if (offset === null || count === null) return { error: replyError('ERR syntax error') };
-            options.limit = [Math.max(offset, 0), count < 0 ? null : count];
+            if (offset === null || count === null) return { error: integerError() };
             index += 3;
             continue;
         }
-        if (option === 'get') {
-            if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
-            options.get.push(args[index + 1]);
-            index += 2;
-            continue;
-        }
-        if (option === 'asc') {
-            options.descending = false;
-            index += 1;
-            continue;
-        }
-        if (option === 'desc') {
-            options.descending = true;
-            index += 1;
-            continue;
-        }
-        if (option === 'alpha') {
-            options.alpha = true;
+        if (option === 'asc' || option === 'desc' || option === 'alpha') {
             index += 1;
             continue;
         }
         if (option === 'store') {
             if (args[index + 1] === undefined) return { error: replyError('ERR syntax error') };
-            options.store = args[index + 1];
+            stores = true;
             index += 2;
             continue;
         }
         return { error: replyError('ERR syntax error') };
     }
-    if (readonly && options.store !== null) {
-        return { error: replyError('ERR syntax error') };
-    }
-    return {
-        run: () => {
-            const kind = kindOf(store, db, args[1]);
-            let elements;
-            if (kind === null) elements = [];
-            else if (kind === 'list') elements = readList(store, db, args[1]);
-            else if (kind === 'set') elements = readSet(store, db, args[1]);
-            else if (kind === 'zset') {
-                const entries = readZSet(store, db, args[1]);
-                sortZSet(entries);
-                elements = entries.map(([member]) => member);
-            }
-            else return wrongType();
-            if (elements === null) return replyError('ERR stored collection value is corrupt');
-            const noSort = options.by !== null && !options.by.includes(0x2a);
-            const sortKeys = [];
-            for (const element of elements) {
-                if (noSort) {
-                    sortKeys.push(null);
-                    continue;
-                }
-                const lookedUp = options.by === null ? element : lookupSortPattern(store, db, options.by, element);
-                if (options.alpha) {
-                    sortKeys.push(lookedUp ?? Buffer.alloc(0));
-                    continue;
-                }
-                if (lookedUp === null) {
-                    sortKeys.push(0);
-                    continue;
-                }
-                const value = parseScore(lookedUp);
-                if (value === null) {
-                    return replyError("ERR One or more scores can't be converted into double");
-                }
-                sortKeys.push(value);
-            }
-            const order = elements.map((element, position) => ({ element, key: sortKeys[position], position }));
-            if (!noSort) {
-                order.sort((left, right) => {
-                    const compared = options.alpha ? Buffer.compare(left.key, right.key) : left.key - right.key;
-                    if (compared !== 0) return options.descending ? -compared : compared;
-                    return left.position - right.position;
-                });
-            }
-            const [offset, count] = options.limit ?? [0, null];
-            const selected = order.slice(offset, count === null ? undefined : offset + count);
-            const gathered = selected.flatMap(({ element }) => {
-                if (options.get.length === 0) return [element];
-                return options.get.map(pattern => pattern.equals(Buffer.from('#'))
-                    ? element
-                    : lookupSortPattern(store, db, pattern, element));
-            });
-            if (options.store !== null) {
-                dropEveryKind(store, db, options.store);
-                if (gathered.length === 0) return integer(0);
-                const body = encodeList(gathered.map(value => value ?? Buffer.alloc(0)));
-                if (body === null) return replyError('ERR list value exceeds the storage limit');
-                store.setKind(db, 'list', options.store, body, null);
-                return integer(gathered.length);
-            }
-            return array(gathered.map(value => (value === null ? nullReply() : bulk(value))));
-        },
-    };
+    if (readonly && stores) return { error: replyError('ERR syntax error') };
+    return { run: forwardZSet(store, session, args, [args[1]]) };
 }
 
 /**
@@ -1807,31 +1653,6 @@ function planLpos(store, session, args) {
         return { error: replyError('ERR syntax error') };
     }
     return { run: forwardList(store, session, args, [key]) };
-}
-
-/** Expands one `BY` / `GET` pattern: `*` becomes the element and `->` selects a hash field. */
-function lookupSortPattern(store, db, pattern, element) {
-    const parts = [];
-    let start = 0;
-    for (let position = 0; position < pattern.length; position += 1) {
-        if (pattern[position] !== 0x2a) continue;
-        parts.push(pattern.subarray(start, position), element);
-        start = position + 1;
-    }
-    parts.push(pattern.subarray(start));
-    const expanded = Buffer.concat(parts);
-    const arrow = expanded.indexOf('->');
-    const key = arrow === -1 ? expanded : expanded.subarray(0, arrow);
-    const kind = kindOf(store, db, key);
-    if (arrow === -1) {
-        return kind === 'string' ? readString(store, db, key) : null;
-    }
-    if (kind !== 'hash') return null;
-    const field = expanded.subarray(arrow + 2);
-    const fields = readHash(store, db, key);
-    if (fields === null) return null;
-    const hit = fields.find(([candidate]) => candidate.equals(field));
-    return hit === undefined ? null : hit[1];
 }
 
 /**

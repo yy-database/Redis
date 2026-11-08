@@ -1064,7 +1064,6 @@
       "sides": [
         "ts"
       ],
-      "oracleLimitation": "sort-limit-error",
       "argsText": [
         "SORT",
         "nums",
@@ -1074,7 +1073,767 @@
       ],
       "reply": {
         "type": "error",
-        "value": "ERR syntax error"
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6e756d73",
+          "valueHex": "010000003301000000310100000032020000003130"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.get-only",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "items",
+        "GET",
+        "data_*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              110,
+              101
+            ]
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              116,
+              104,
+              114,
+              101,
+              101
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6974656d73",
+          "valueHex": "010000003101000000320100000033"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f31",
+          "valueHex": "6f6e65"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f33",
+          "valueHex": "7468726565"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.get-multiple-self",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "items",
+        "GET",
+        "#",
+        "GET",
+        "data_*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              111,
+              110,
+              101
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              116,
+              119,
+              111
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              116,
+              104,
+              114,
+              101,
+              101
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6974656d73",
+          "valueHex": "010000003301000000310100000032"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f31",
+          "valueHex": "6f6e65"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f32",
+          "valueHex": "74776f"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f33",
+          "valueHex": "7468726565"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.by-hash-get-hash",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "items",
+        "BY",
+        "h_*->v",
+        "GET",
+        "h_*->v",
+        "GET",
+        "#"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              55
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              57
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6974656d73",
+          "valueHex": "010000006101000000620100000063"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "685f61",
+          "valueHex": "01000000760100000037"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "685f62",
+          "valueHex": "01000000760100000039"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "685f63",
+          "valueHex": "01000000760100000031"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.ro-alpha",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT_RO",
+        "words",
+        "ALPHA"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              97,
+              112,
+              112,
+              108,
+              101
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98,
+              97,
+              110,
+              97,
+              110,
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99,
+              104,
+              101,
+              114,
+              114,
+              121
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "776f726473",
+          "valueHex": "0600000062616e616e61050000006170706c6506000000636865727279"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.store-with-get",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "items",
+        "GET",
+        "data_*",
+        "STORE",
+        "out"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 3
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6974656d73",
+          "valueHex": "010000003301000000310100000032"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f31",
+          "valueHex": "6f6e65"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "646174615f33",
+          "valueHex": "7468726565"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6f7574",
+          "expect": {
+            "bytes": "030000006f6e6500000000050000007468726565"
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.sort.store-overwrites-zset",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "nums",
+        "STORE",
+        "out"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 4
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6e756d73",
+          "valueHex": "010000003301000000310100000032020000003130"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f7574",
+          "valueHex": "01000000030000006f6c640000000000001440"
+        }
+      ],
+      "effect": [
+        {
+          "call": "get_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6f7574",
+          "expect": {
+            "bytes": "010000003101000000320100000033020000003130"
+          }
+        },
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "zset",
+          "keyHex": "6f7574",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.sort.store-empty-deletes-hash",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "nope",
+        "STORE",
+        "out"
+      ],
+      "reply": {
+        "type": "int",
+        "value": 0
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6f7574",
+          "valueHex": "01000000660100000031"
+        }
+      ],
+      "effect": [
+        {
+          "call": "exists_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6f7574",
+          "expect": {
+            "bool": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.sort.by-nosort-list",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "nums",
+        "BY",
+        "nosort"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49,
+              48
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6e756d73",
+          "valueHex": "010000003301000000310100000032020000003130"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.set-by-hash",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "opts",
+        "BY",
+        "w_*->v"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "set",
+          "keyHex": "6f707473",
+          "valueHex": "010000006101000000620100000063"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "775f61",
+          "valueHex": "01000000760100000037"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "775f62",
+          "valueHex": "01000000760100000039"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "775f63",
+          "valueHex": "01000000760100000031"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.alpha-by-hash",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "items",
+        "BY",
+        "n_*->v",
+        "ALPHA"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              98
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              99
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6974656d73",
+          "valueHex": "010000006101000000620100000063"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6e5f61",
+          "valueHex": "01000000760400000070656172"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6e5f62",
+          "valueHex": "0100000076050000006170706c65"
+        },
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "hash",
+          "keyHex": "6e5f63",
+          "valueHex": "0100000076050000007a65627261"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.limit-negative-offset",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "nums",
+        "LIMIT",
+        "-1",
+        "2"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              49
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6e756d73",
+          "valueHex": "010000003301000000310100000032020000003130"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.limit-negative-count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "nums",
+        "LIMIT",
+        "1",
+        "-1"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              50
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              51
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              49,
+              48
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set_kind",
+          "db": 0,
+          "kind": "list",
+          "keyHex": "6e756d73",
+          "valueHex": "010000003301000000310100000032020000003130"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.sort.limit-zero-count",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SORT",
+        "nums",
+        "LIMIT",
+        "1",
+        "0"
+      ],
+      "reply": {
+        "type": "array",
+        "value": []
       },
       "setup": [
         {
