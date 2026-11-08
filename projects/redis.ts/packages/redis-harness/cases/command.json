@@ -1526,6 +1526,7 @@
         "KEYS",
         "*"
       ],
+      "replyUnordered": true,
       "reply": {
         "type": "array",
         "value": [
