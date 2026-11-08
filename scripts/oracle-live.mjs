@@ -34,6 +34,8 @@ function parseFrame(bytes, offset) {
         case '$': {
             const length = Number(line);
             if (length === -1) return [{ kind: 'null', value: null }, next];
+            // 分片到达时先等满整个 bulk，否则会从正文中间重新解析并把二进制字节当帧头。
+            if (next + length + 2 > bytes.length) throw new Error('truncated RESP frame');
             const body = bytes.subarray(next, next + length);
             return [{ kind: 'bulk', value: body.toString('utf8'), bytes: body }, next + length + 2];
         }
@@ -402,6 +404,16 @@ async function selfCheck() {
     expect('comparator accepts a match', acceptsMatch === null, String(acceptsMatch));
     const rejectsMismatch = compareReply({ type: 'simple', value: 'PONG' }, { kind: 'simple', value: 'NOT-PONG' });
     expect('comparator rejects a known mismatch', rejectsMismatch !== null, 'comparator returned null on a deliberate mismatch');
+
+    // 半截 bulk 必须先报 truncated 再由调用方等待，不能把正文中的字节当成下一帧。
+    let partialBulk = '';
+    try {
+        parseFrame(Buffer.from('$5\r\nab'), 0);
+    }
+    catch (error) {
+        partialBulk = String(error.message);
+    }
+    expect('partial bulk reports truncated', partialBulk.startsWith('truncated'), `read ${JSON.stringify(partialBulk)}`);
 
     if (problems.length > 0) {
         console.log('live oracle self-check failed, refusing to report results:');
