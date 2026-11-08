@@ -27,6 +27,7 @@ database-types = { git = "https://github.com/oovm/database.rs.git", rev = "27512
 database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-execution" }
 database-query = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-query" }
 database-server = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-server" }
+database = { git = "https://github.com/oovm/database.rs.git", rev = "1c950f333c09b7d27de284f30a4957480117935e", package = "database", default-features = false }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

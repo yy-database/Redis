@@ -17,6 +17,7 @@ database-execution = { workspace = true }
 database-query = { workspace = true }
 database-server = { workspace = true }
 database-types = { workspace = true }
+database = { workspace = true, features = ["harness"] }
 napi = { workspace = true }
 napi-derive = { workspace = true }
 redis-wasm = { path = "../redis-wasm" }

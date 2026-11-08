@@ -6,12 +6,12 @@
 //! check compares one implementation against another at run time.
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { after, test } from 'node:test';
 
+import { loadCases } from '../src/cases.mjs';
 import { prepareInstall } from '../src/install.mjs';
 
 const installed = await prepareInstall();
@@ -80,18 +80,6 @@ function writeReport() {
         cases: observations,
     };
     writeFileSync(target, `${JSON.stringify(payload, null, 2)}\n`);
-}
-
-function loadCases() {
-    const directory = join(dirname(fileURLToPath(import.meta.url)), '..', 'cases');
-    const rows = [];
-    for (const name of readdirSync(directory).filter(entry => entry.endsWith('.json')).sort()) {
-        const payload = JSON.parse(readFileSync(join(directory, name), 'utf8'));
-        for (const entry of payload.cases) {
-            rows.push({ ...entry, table: payload.table });
-        }
-    }
-    return rows;
 }
 
 const bytes = hex => Buffer.from(hex, 'hex');
