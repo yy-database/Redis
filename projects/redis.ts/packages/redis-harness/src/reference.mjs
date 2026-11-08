@@ -137,7 +137,9 @@ export function canonicalInteger(bytes) {
         return null;
     }
     const magnitude = BigInt(digits.toString('ascii'));
-    if (magnitude > 9223372036854775807n) {
+    // 负数下界比正数上界多一格，`-9223372036854775808` 同样是规范整数。
+    const limit = negative ? 9223372036854775808n : 9223372036854775807n;
+    if (magnitude > limit) {
         return null;
     }
     const value = Number(magnitude);
@@ -308,7 +310,8 @@ export function decodeReply(bytes) {
         return { spec: { type: 'error', value: raw.toString('utf8') }, consumed: next };
     }
     if (prefix === 0x3a) {
-        const value = count(raw);
+        // RESP 整数是有符号 64 位，`i64` 下限本身也是规范形态。
+        const value = canonicalInteger(raw);
         if (value === null) {
             throw new Error('reply integer is not canonical');
         }

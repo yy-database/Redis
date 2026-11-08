@@ -21,11 +21,11 @@ repository = "https://github.com/yy-database/Redis"
 # `MSET`、`FLUSHDB`、zset 集合运算、排序与 bitfield 族、`LPOS`、HyperLogLog
 # 族、hash 与 set 的公开命令入口、带 `LMPOP` 的 list 族入口，以及 `CLIENT`、
 # `COMMAND`、`INFO`、`CONFIG`、`ACL` 的内嵌服务端会话。
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "5513184a02e848e1443b4596e5972d0c76f51d9a", package = "database-server" }
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "023789f0780b2cca66bbac332017db1bc0b23fdf", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "023789f0780b2cca66bbac332017db1bc0b23fdf", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "023789f0780b2cca66bbac332017db1bc0b23fdf", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "023789f0780b2cca66bbac332017db1bc0b23fdf", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "023789f0780b2cca66bbac332017db1bc0b23fdf", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

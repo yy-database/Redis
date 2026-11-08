@@ -222,7 +222,8 @@ def decode_reply(data: bytes):
     if prefix == b"-":
         return {"type": "error", "value": raw.decode()}, next_offset
     if prefix == b":":
-        value = _count(raw)
+        # RESP 整数是有符号 64 位，`i64` 下限本身也是规范形态。
+        value = canonical_integer(raw)
         if value is None:
             raise ValueError("reply integer is not canonical")
         return {"type": "int", "value": value}, next_offset

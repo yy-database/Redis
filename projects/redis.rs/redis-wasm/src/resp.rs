@@ -424,6 +424,9 @@ fn line(input: &[u8], start: usize) -> Option<(&[u8], usize)> {
 }
 
 /// Parses a canonical decimal integer, used for lengths inside the protocol.
+///
+/// 负数的下界比正数上界多一格，`-9223372036854775808` 同样是规范整数，
+/// 因此按无符号量累加后再单独处理符号位。
 fn parse_count(bytes: &[u8]) -> Option<i64> {
     if bytes.is_empty() || bytes.len() > 20 {
         return None;
@@ -435,15 +438,23 @@ fn parse_count(bytes: &[u8]) -> Option<i64> {
     if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
         return None;
     }
-    let magnitude = digits.iter().try_fold(0_i64, |accumulator, byte| {
+    let magnitude = digits.iter().try_fold(0_u64, |accumulator, byte| {
         accumulator
             .checked_mul(10)
-            .and_then(|value| value.checked_add(i64::from(byte - b'0')))
+            .and_then(|value| value.checked_add(u64::from(byte - b'0')))
     })?;
     if negative {
-        magnitude.checked_neg()
+        if magnitude == 1 << 63 {
+            return Some(i64::MIN);
+        }
+        if magnitude > 1 << 63 {
+            return None;
+        }
+        Some(-(magnitude as i64))
+    } else if magnitude <= i64::MAX as u64 {
+        Some(magnitude as i64)
     } else {
-        Some(magnitude)
+        None
     }
 }
 
