@@ -1,0 +1,11 @@
+{
+  "name": "@yydb/redis-example-with-cache-layer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cache-aside layer with TTL, JSON values, single-flight, and invalidation over @yydb/redis",
+  "scripts": {
+    "demo": "node ./src/demo.mjs",
+    "test": "node ./tests/cache.mjs"
+  }
+}

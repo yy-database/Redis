@@ -1,0 +1,11 @@
+{
+  "name": "@yydb/redis-example-vs-js-libraries",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-client conformance and benchmark of @yydb/redis against ioredis and node-redis over RESP2",
+  "scripts": {
+    "test": "node ./tests/conformance.mjs",
+    "benchmark": "node ./tests/benchmark.mjs"
+  }
+}

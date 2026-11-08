@@ -1,0 +1,11 @@
+{
+  "name": "@yydb/redis-example-with-express",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Express 5 REST cache API backed by the emulated @yydb/redis server",
+  "scripts": {
+    "start": "node ./src/server.mjs",
+    "test": "node ./tests/api.mjs"
+  }
+}
