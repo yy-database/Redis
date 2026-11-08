@@ -1661,6 +1661,15 @@
         "COUNT",
         "100"
       ],
+      "oracleLimitation": "scan-cursor",
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "757365723a31",
+          "757365723a32",
+          "757365723a33"
+        ]
+      },
       "reply": {
         "type": "array",
         "value": [
@@ -1769,6 +1778,15 @@
         "COUNT",
         "100"
       ],
+      "oracleLimitation": "scan-cursor",
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "757365723a31",
+          "757365723a32",
+          "757365723a33"
+        ]
+      },
       "reply": {
         "type": "array",
         "value": [
@@ -1877,6 +1895,14 @@
         "COUNT",
         "100"
       ],
+      "oracleLimitation": "scan-cursor",
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "757365723a31",
+          "757365723a32"
+        ]
+      },
       "reply": {
         "type": "array",
         "value": [
