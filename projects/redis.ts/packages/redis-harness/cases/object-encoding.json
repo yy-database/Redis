@@ -457,6 +457,109 @@
       "sides": [
         "ts"
       ]
+    },
+    {
+      "id": "command.object.encoding.stream",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "x1"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          115,
+          116,
+          114,
+          101,
+          97,
+          109
+        ]
+      },
+      "setup": [
+        {
+          "call": "command",
+          "argsText": [
+            "XADD",
+            "x1",
+            "1-1",
+            "f",
+            "v"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.object.encoding.hll",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "hll"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          114,
+          97,
+          119
+        ]
+      },
+      "setup": [
+        {
+          "call": "command",
+          "argsText": [
+            "PFADD",
+            "hll",
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.object.encoding.empty-string",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "OBJECT",
+        "ENCODING",
+        "k"
+      ],
+      "reply": {
+        "type": "bulk",
+        "bytes": [
+          101,
+          109,
+          98,
+          115,
+          116,
+          114
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6b",
+          "valueHex": ""
+        }
+      ],
+      "effect": []
     }
   ]
 }

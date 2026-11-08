@@ -178,6 +178,11 @@ export class Store {
         return JSON.parse(this.native.stringCommand(db, protocol, args.map(bytes)));
     }
 
+    /** Runs one keyspace-family request in the binding and returns its reply specification. */
+    keyspaceCommand(db, protocol, args) {
+        return JSON.parse(this.native.keyspaceCommand(db, protocol, args.map(bytes)));
+    }
+
     /** Runs one HyperLogLog-family request in the binding and returns its reply specification. */
     hyperloglogCommand(db, args) {
         return JSON.parse(this.native.hyperloglogCommand(db, args.map(bytes)));

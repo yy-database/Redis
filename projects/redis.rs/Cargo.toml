@@ -16,16 +16,17 @@ repository = "https://github.com/yy-database/Redis"
 
 [workspace.dependencies]
 # 上游提供 `.yyds` 目录与 `.yykv` 分片的字节布局、执行器契约与 Redis 命令族入口，
-# 这里钉在 `dev` 的提交上，该提交同时携带六种 Redis 值类型、`SCAN`、`RENAME`、
+# 这里钉在 `dev` 的提交上，该提交同时携带六种 Redis 值类型、带 `SCAN TYPE`
+# 的键空间族入口（`KEYS` / `SCAN` / `TYPE` / `OBJECT`）、`RENAME`、
 # 带 `SET ... GET` 的字符串与键族入口、`OBJECT ENCODING`、`SETNX`、`PSETEX`、
 # `MSET`、`FLUSHDB`、zset 集合运算、排序与 bitfield 族、`LPOS`、HyperLogLog
 # 族、hash 与 set 的公开命令入口、带 `LMPOP` 的 list 族入口，以及 `CLIENT`、
 # `COMMAND`、`INFO`、`CONFIG`、`ACL` 的内嵌服务端会话。
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "3fc5c6d6493af572768242467f35d91d59e90aaa", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "3fc5c6d6493af572768242467f35d91d59e90aaa", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "3fc5c6d6493af572768242467f35d91d59e90aaa", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "3fc5c6d6493af572768242467f35d91d59e90aaa", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "3fc5c6d6493af572768242467f35d91d59e90aaa", package = "database-server" }
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "27512c2f783534f53d511ea9b63fbed9245076ee", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

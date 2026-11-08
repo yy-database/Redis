@@ -2400,6 +2400,1256 @@
           }
         }
       ]
+    },
+    {
+      "id": "command.scan.type-string",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "string",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "LPUSH",
+            "l1",
+            "a"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "SADD",
+            "set1",
+            "a"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "HSET",
+            "h1",
+            "f",
+            "v"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "ZADD",
+            "z1",
+            "1",
+            "m"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-hash",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "hash",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  104,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "HSET",
+            "h1",
+            "f",
+            "v"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-list",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "list",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  108,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "LPUSH",
+            "l1",
+            "a"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-set",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "set",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115,
+                  101,
+                  116,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "SADD",
+            "set1",
+            "a"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-zset",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "zset",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  122,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "ZADD",
+            "z1",
+            "1",
+            "m"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-stream",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "stream",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  120,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "XADD",
+            "x1",
+            "1-1",
+            "f",
+            "v"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-uppercase",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "STRING",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  115,
+                  49
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "LPUSH",
+            "l1",
+            "a"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-unknown",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "nope",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "HSET",
+            "h1",
+            "f",
+            "v"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-missing-value",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR syntax error"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-traversal",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "string",
+        "COUNT",
+        "2"
+      ],
+      "oracleLimitation": "scan-cursor",
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "7331",
+          "7332",
+          "7333"
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7332",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7333",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "LPUSH",
+            "l1",
+            "a"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "SADD",
+            "set1",
+            "a"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "HSET",
+            "h1",
+            "f",
+            "v"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "ZADD",
+            "z1",
+            "1",
+            "m"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.type-with-match",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "TYPE",
+        "string",
+        "MATCH",
+        "s1*",
+        "COUNT",
+        "2"
+      ],
+      "oracleLimitation": "scan-cursor",
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "7331"
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7331",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "7332",
+          "valueHex": "76"
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "LPUSH",
+            "l1",
+            "a"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "SADD",
+            "set1",
+            "a"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "HSET",
+            "h1",
+            "f",
+            "v"
+          ]
+        },
+        {
+          "call": "command",
+          "argsText": [
+            "ZADD",
+            "z1",
+            "1",
+            "m"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.count-not-integer",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "abc"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.count-overflow",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "9223372036854775808"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR value is not an integer or out of range"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.scan.max-cursor",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "18446744073709551615"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.cursor-overflow",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "18446744073709551616"
+      ],
+      "reply": {
+        "type": "error",
+        "value": "ERR invalid cursor"
+      },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.keys.binary",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*"
+      ],
+      "replyUnordered": true,
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              0
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              0,
+              1
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              112,
+              108,
+              97,
+              105,
+              110
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "00",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "0001",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "706c61696e",
+          "valueHex": "78"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.binary-pattern",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*\u0000*"
+      ],
+      "replyUnordered": true,
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              0
+            ]
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "00",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "0001",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "706c61696e",
+          "valueHex": "78"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.empty-pattern",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        ""
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": []
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.empty-key-all",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*"
+      ],
+      "replyUnordered": true,
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": []
+          },
+          {
+            "type": "bulk",
+            "bytes": [
+              97
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "61",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.empty-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        ""
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "string"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.binary-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "\u0000"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "string"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "00",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.empty-key",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": []
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "",
+          "valueHex": "76"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.binary-traversal",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "2"
+      ],
+      "oracleLimitation": "scan-cursor",
+      "scanContract": {
+        "cursorIndex": 1,
+        "universe": [
+          "00",
+          "0001",
+          "706c61696e"
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "00",
+          "valueHex": "76"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "0001",
+          "valueHex": "77"
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "706c61696e",
+          "valueHex": "78"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.keys.expired-hidden",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "KEYS",
+        "*"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              108,
+              105,
+              118,
+              101
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "676f6e65",
+          "valueHex": "76",
+          "expiresAt": 1000
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6c697665",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.scan.expired-hidden",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "SCAN",
+        "0",
+        "COUNT",
+        "100"
+      ],
+      "reply": {
+        "type": "array",
+        "value": [
+          {
+            "type": "bulk",
+            "bytes": [
+              48
+            ]
+          },
+          {
+            "type": "array",
+            "value": [
+              {
+                "type": "bulk",
+                "bytes": [
+                  108,
+                  105,
+                  118,
+                  101
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "676f6e65",
+          "valueHex": "76",
+          "expiresAt": 1000
+        },
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "6c697665",
+          "valueHex": "77"
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.expired",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "gone"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "none"
+      },
+      "setup": [
+        {
+          "call": "set",
+          "db": 0,
+          "keyHex": "676f6e65",
+          "valueHex": "76",
+          "expiresAt": 1000
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.stream",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "x1"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "stream"
+      },
+      "setup": [
+        {
+          "call": "command",
+          "argsText": [
+            "XADD",
+            "x1",
+            "1-1",
+            "f",
+            "v"
+          ]
+        }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.type.hll",
+      "face": "command",
+      "op": "command",
+      "sides": [
+        "ts"
+      ],
+      "argsText": [
+        "TYPE",
+        "hll"
+      ],
+      "reply": {
+        "type": "simple",
+        "value": "string"
+      },
+      "setup": [
+        {
+          "call": "command",
+          "argsText": [
+            "PFADD",
+            "hll",
+            "a",
+            "b"
+          ]
+        }
+      ],
+      "effect": []
     }
   ]
 }

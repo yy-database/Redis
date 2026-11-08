@@ -497,6 +497,12 @@ function plan(store, session, name, args) {
         case 'acl':
             return { run: () => store.serverCommand(session.id ?? 0, session.db, session.protocol ?? 2, args) };
 
+        case 'keys':
+        case 'scan':
+        case 'type':
+        case 'object':
+            return planKeyspace(store, session, name, args);
+
         case 'get':
         case 'set':
         case 'setnx':
@@ -509,7 +515,6 @@ function plan(store, session, name, args) {
         case 'mset':
         case 'del':
         case 'exists':
-        case 'type':
         case 'strlen':
         case 'append':
         case 'getrange':
@@ -537,13 +542,10 @@ function plan(store, session, name, args) {
         case 'rename':
         case 'renamenx':
         case 'copy':
-        case 'keys':
-        case 'scan':
         case 'randomkey':
         case 'dbsize':
         case 'flushdb':
         case 'flushall':
-        case 'object':
             return planString(store, session, name, args);
 
         case 'hset':
@@ -778,6 +780,14 @@ function classMatch(pattern, start, byte) {
     return [index, negated ? !matched : matched];
 }
 
+/** Queue-time arity of the keyspace family, as `[minimum, maximum]` arguments. */
+const KEYSPACE_ARITY = {
+    keys: [2, 2],
+    scan: [2, Infinity],
+    type: [2, 2],
+    object: [2, Infinity],
+};
+
 /** Queue-time arity of the string/key family, as `[minimum, maximum]` arguments. */
 const STRING_ARITY = {
     get: [2, 2],
@@ -820,14 +830,24 @@ const STRING_ARITY = {
     rename: [3, 3],
     renamenx: [3, 3],
     copy: [3, Infinity],
-    keys: [2, 2],
-    scan: [2, Infinity],
     randomkey: [1, 1],
     dbsize: [1, 1],
     flushdb: [1, 2],
     flushall: [1, 2],
-    object: [2, Infinity],
 };
+
+/**
+ * Plans one keyspace-family command.
+ *
+ * Only arity is checked here so a transaction rejects a malformed command while it
+ * is queued. Pattern matching, cursor paging, type probing and object encoding all
+ * run upstream behind one binding primitive.
+ */
+function planKeyspace(store, session, name, args) {
+    const [minimum, maximum] = KEYSPACE_ARITY[name];
+    if (args.length < minimum || args.length > maximum) return { error: wrongArity(name) };
+    return { run: () => store.keyspaceCommand(session.db, session.protocol ?? 2, args) };
+}
 
 /**
  * Plans one string/key-family command.

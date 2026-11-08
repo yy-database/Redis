@@ -35,7 +35,7 @@ function commandStore(store) {
         get(target, property) {
             if (property === 'hashCommand' || property === 'setCommand' || property === 'listCommand'
                 || property === 'zsetCommand' || property === 'stringCommand' || property === 'hyperloglogCommand'
-                || property === 'serverCommand') {
+                || property === 'keyspaceCommand' || property === 'serverCommand') {
                 return (...call) => JSON.parse(target[property](...call));
             }
             const value = Reflect.get(target, property);
