@@ -747,7 +747,12 @@ impl Store {
     /// `protocol` is `2` or `3`, matching the connection that issued the request.
     /// Key enumeration, cursor paging, type probing and object encoding stay upstream.
     #[napi]
-    pub fn keyspace_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
+    pub fn keyspace_command(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<String, napi::Error> {
         let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(redis_wasm::store::namespace(db));
         let executor = StoreExecutor { node: &self.node };
