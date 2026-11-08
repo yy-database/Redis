@@ -1,5 +1,5 @@
 import { connect } from 'node:net';
-import { encodeCommand } from '../../../packages/redis/dist/index.js';
+import { encodeCommand } from '../../shared/product.mjs';
 
 const CRLF = '\r\n';
 

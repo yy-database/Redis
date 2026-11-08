@@ -36,10 +36,16 @@ arrays round-trip unchanged.
 
 ## Run
 
+Prerequisites:
+
+```shell
+pnpm install
+pnpm build
+```
+
 Start the product server in one terminal:
 
 ```shell
-pnpm build
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --data-dir ./.redis-data --port 6379
 ```
 
@@ -66,4 +72,5 @@ pnpm --dir projects/redis.ts/examples/with-express test
 
 The test starts the product server on port 0 with a temporary data directory, connects
 `ioredis`, listens on port 0, and exercises health, 404, object round-trip, TTL expiry,
-invalid bodies, and delete semantics.
+invalid bodies, and delete semantics. It loads the checkout platform binding through
+`../../shared/product.mjs`, so no environment variable needs to be set.

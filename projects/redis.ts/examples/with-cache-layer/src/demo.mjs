@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Redis from 'ioredis';
-import { startServer } from '../../../packages/redis/dist/index.js';
+import { startServer } from '../../shared/product.mjs';
 import { createCache } from './cache.mjs';
 import { createRepository } from './repository.mjs';
 

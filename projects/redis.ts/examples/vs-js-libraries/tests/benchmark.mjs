@@ -1,8 +1,8 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { startServer } from '../../../packages/redis/dist/index.js';
-import { createClients, closeClients } from '../src/clients.mjs';
+import { startServer } from '../../shared/product.mjs';
+import { createClient } from '../src/clients.mjs';
 import { elapsedMs, median, throughput } from '../src/timing.mjs';
 
 const HOST = '127.0.0.1';
@@ -77,31 +77,39 @@ const workloads = [
 ];
 
 const names = workloads.map(workload => workload.name);
+const clientNames = ['ioredis', '@yydb/redis', 'node-redis'];
 
-async function runRound() {
+async function measure(clientName, workload) {
   const dataDir = await mkdtemp(join(tmpdir(), 'yydb-redis-bench-'));
   const server = await startServer({ dataDir, host: HOST, port: 0 });
-  const clients = await createClients({ host: server.host, port: server.port });
-  const result = Object.fromEntries(names.map(name => [name, {}]));
+  const client = await createClient(clientName, { host: server.host, port: server.port });
   try {
-    for (const workload of workloads) {
-      for (const client of clients) {
-        await workload.prepare?.(client);
-        const start = process.hrtime.bigint();
-        await workload.run(client);
-        result[workload.name][client.name] = elapsedMs(start);
-      }
-    }
+    await workload.prepare?.(client);
+    const start = process.hrtime.bigint();
+    await workload.run(client);
+    return elapsedMs(start);
   } finally {
-    await closeClients(clients);
-    await server.close();
+    try {
+      await client.close();
+    } finally {
+      await server.close();
+    }
+  }
+}
+
+async function runRound() {
+  const result = Object.fromEntries(names.map(name => [name, {}]));
+  for (const workload of workloads) {
+    for (const clientName of clientNames) {
+      result[workload.name][clientName] = await measure(clientName, workload);
+    }
   }
   return result;
 }
 
 console.log(`Redis RESP2 benchmark (1 warmup + ${ROUNDS} measured rounds)`);
 console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_ROUNDS=${ROUNDS}`);
-console.log('Server: fresh emulated server and dataDir per round, shared by every client');
+console.log('Server: fresh emulated server and dataDir for every (round, workload, client) measurement');
 console.log('');
 
 await runRound();
@@ -124,7 +132,6 @@ function clientsTotal(result) {
   };
 }
 
-const clientNames = ['ioredis', '@yydb/redis', 'node-redis'];
 const medians = Object.fromEntries(
   names.map(name => [
     name,

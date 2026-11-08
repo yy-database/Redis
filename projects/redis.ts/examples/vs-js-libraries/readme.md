@@ -8,9 +8,10 @@ against two JavaScript Redis clients over RESP2:
 - `@yydb/redis` — this product's `startServer` plus a minimal RESP2 client built on
   `encodeCommand` and a local framing reader (`src/resp-client.mjs`)
 
-Every client talks to the same emulated server process. The product package does not
-ship a high-level client, so this example keeps its own request/response framing and
-does not use `decodeReply`.
+Conformance runs every client against one emulated server process. Each benchmark
+measurement instead gets its own fresh server and data directory. The product package
+does not ship a high-level client, so this example keeps its own request/response
+framing and does not use `decodeReply`.
 
 ## Layout
 
@@ -20,6 +21,7 @@ does not use `decodeReply`.
 - `tests/conformance.mjs` — writes with one client and reads with the other two
 - `tests/benchmark.mjs` — sequential, pipelined, GET, and PING workloads
 - `reports/` — captured conformance and benchmark output
+- `../shared/product.mjs` — loads the checkout platform binding before importing the product
 
 ## Requirements
 
@@ -31,11 +33,10 @@ pnpm build
 ```
 
 The examples resolve `ioredis` and `redis` from the repository root `node_modules`,
-just like the SQLite examples (`express` is used by the `with-express` example).
-
-If pnpm still loads an older injected copy of the native platform package after
-`pnpm build`, point `REDIS_NATIVE_PATH` at
-`projects/redis.ts/platforms/redis-<platform>/redis.<platform>.node` for the run.
+just like the SQLite examples (`express` is used by the `with-express` example). Every
+example loads `../../shared/product.mjs` first, which points the product at the
+checkout's platform binding produced by `pnpm build`, so no environment variable is
+needed.
 
 Command names delegated to the native command families are matched case-sensitively by
 the current backend. The ioredis and node-redis adapters therefore use their explicit
@@ -65,9 +66,9 @@ One file measures all three clients on four workloads:
 Defaults are `BENCH_SET=100`, `BENCH_PIPE=500`, `BENCH_GET=500`, `BENCH_PING=1000`,
 `BENCH_ROUNDS=3`. The `SET` counts are lower than the other workloads because each
 `SET` rewrites the whole `.yykv` snapshot, so larger key spaces grow super-linearly.
-Each round starts a fresh temporary data directory and a fresh server,
-then runs every client against that same server. Reports use the median of the measured
-rounds, milliseconds per operation, and operations per second.
+Every measurement starts a fresh temporary data directory and a fresh server, runs that
+client's untimed preload on the empty server, and only then starts the clock. Reports use
+the median of the measured rounds, milliseconds per operation, and operations per second.
 
 ```shell
 pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark
@@ -80,8 +81,9 @@ pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark
 
 ## Intentional deltas
 
-- All clients share one server process per round; earlier clients leave keys and snapshot
-  growth behind, so later clients write into a larger `.yykv` snapshot.
+- Every measurement is isolated: a fresh data directory and a fresh server, then that
+  client's preload and timed workload on an empty server. All clients start from the
+  same state.
 - The product client has no reconnect, offline queue, or retry behavior; a socket error
   fails the in-flight command.
 - No pooling or auto-pipelining anywhere. Pipelined workloads use explicit batches of 500

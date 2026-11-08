@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { startServer } from '../../../packages/redis/dist/index.js';
+import { startServer } from '../../shared/product.mjs';
 import { createClients, closeClients } from '../src/clients.mjs';
 
 const VALUE = 'v'.repeat(64);

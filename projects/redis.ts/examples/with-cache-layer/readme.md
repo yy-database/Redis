@@ -29,10 +29,16 @@ backend, so the layer uses `client.call('GET' | 'SET' | 'DEL', ...)`.
 ## Run
 
 The demo and test start their own in-process product server on a temporary data
-directory, so they run standalone after the product is built:
+directory, so they run standalone. Prerequisites:
 
 ```shell
+pnpm install
 pnpm build
+```
+
+Then:
+
+```shell
 pnpm --dir projects/redis.ts/examples/with-cache-layer demo
 pnpm --dir projects/redis.ts/examples/with-cache-layer test
 ```

@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { createClient } from 'redis';
+import { createClient as createNodeRedisClient } from 'redis';
 import { createRespClient } from './resp-client.mjs';
 
 function waitForReady(client) {
@@ -44,7 +44,7 @@ async function makeIoredis({ host, port }) {
 }
 
 async function makeNodeRedis({ host, port }) {
-  const client = createClient({ socket: { host, port }, RESP: 2 });
+  const client = createNodeRedisClient({ socket: { host, port }, RESP: 2 });
   client.on('error', () => {});
   await client.connect();
   return {
@@ -77,9 +77,26 @@ async function makeProduct({ host, port }) {
   };
 }
 
+const clientFactories = {
+  ioredis: makeIoredis,
+  '@yydb/redis': makeProduct,
+  'node-redis': makeNodeRedis,
+};
+
+/** Creates one adapter by report name so benchmarks can isolate every measurement. */
+export async function createClient(name, options) {
+  const factory = clientFactories[name];
+  if (!factory) throw new Error(`unknown client ${name}`);
+  return factory(options);
+}
+
 /** One connection per client, ordered as in the reports. */
-export async function createClients({ host, port }) {
-  return [await makeIoredis({ host, port }), await makeProduct({ host, port }), await makeNodeRedis({ host, port })];
+export async function createClients(options) {
+  return [
+    await createClient('ioredis', options),
+    await createClient('@yydb/redis', options),
+    await createClient('node-redis', options),
+  ];
 }
 
 export async function closeClients(clients) {
