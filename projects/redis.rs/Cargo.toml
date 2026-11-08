@@ -23,11 +23,11 @@ repository = "https://github.com/yy-database/Redis"
 # HyperLogLog family, the public hash and set command entries, the list family
 # entry with `LMPOP`, and the embedded server-face session for `CLIENT`,
 # `COMMAND`, `INFO`, `CONFIG` and `ACL`.
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "faa5144fcdc7faa9ca6d52ce042014376c3feebb", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "faa5144fcdc7faa9ca6d52ce042014376c3feebb", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "faa5144fcdc7faa9ca6d52ce042014376c3feebb", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "faa5144fcdc7faa9ca6d52ce042014376c3feebb", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "faa5144fcdc7faa9ca6d52ce042014376c3feebb", package = "database-server" }
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "2d7d2aac9f608235815583b5bd1206be075ebf58", package = "database-server" }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"
