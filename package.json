@@ -15,6 +15,7 @@
         "gate:conformance:compare": "node scripts/compare-conformance.mjs",
         "gate:oracle": "node projects/redis.ts/packages/redis-harness/bin/oracle.mjs",
         "gate:oracle:live": "node scripts/oracle-live.mjs --all",
+        "gate:oracle:live:resp3": "node scripts/oracle-live.mjs command key-space keyspace-ops string-set-get object-encoding scan-contract --protocol=3",
         "oracle:live": "node scripts/oracle-live.mjs"
     },
     "packageManager": "pnpm@10.18.3",

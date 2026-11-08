@@ -39,6 +39,15 @@ function parseFrame(bytes, offset) {
             const body = bytes.subarray(next, next + length);
             return [{ kind: 'bulk', value: body.toString('utf8'), bytes: body }, next + length + 2];
         }
+        case '=': {
+            // RESP3 verbatim string: `=<length>\r\n<fmt>:<content>\r\n`, where the
+            // three-char format prefix is framing rather than payload.
+            const length = Number(line);
+            if (next + length + 2 > bytes.length) throw new Error('truncated RESP frame');
+            const body = bytes.subarray(next, next + length);
+            const value = body.subarray(4);
+            return [{ kind: 'bulk', value: value.toString('utf8'), bytes: value }, next + length + 2];
+        }
         case '*': {
             const count = Number(line);
             if (count === -1) return [{ kind: 'null-array', value: null }, next];
@@ -50,6 +59,30 @@ function parseFrame(bytes, offset) {
                 cursor = after;
             }
             return [{ kind: 'array', value: items }, cursor];
+        }
+        case '~': {
+            // RESP3 set frame, compared as an array of the same elements.
+            const count = Number(line);
+            const items = [];
+            let cursor = next;
+            for (let index = 0; index < count; index += 1) {
+                const [item, after] = parseFrame(bytes, cursor);
+                items.push(item);
+                cursor = after;
+            }
+            return [{ kind: 'array', value: items }, cursor];
+        }
+        case '|': {
+            // RESP3 attributes carry metadata before the actual frame, so parse
+            // them only to reach the reply they annotate.
+            const count = Number(line);
+            let cursor = next;
+            for (let index = 0; index < count; index += 1) {
+                const [, afterKey] = parseFrame(bytes, cursor);
+                const [, afterValue] = parseFrame(bytes, afterKey);
+                cursor = afterValue;
+            }
+            return parseFrame(bytes, cursor);
         }
         case '_': return [{ kind: 'null', value: null }, next];
         case '#': return [{ kind: 'bool', value: line === 't' }, next];
@@ -1025,9 +1058,14 @@ async function checkEffect(link, step) {
         const expected = expectedEmpty ? [] : decodeZSet(Buffer.from(step.expect.bytes, 'hex'));
         const reply = await link.send(['ZRANGE', key, '0', '-1', 'WITHSCORES']);
         if (reply.kind !== 'array') return `ZRANGE expected an array, read ${describe(reply)}`;
+        // RESP3 pairs every member with its score as a nested array, RESP2 keeps
+        // them flat, so normalise before comparing.
+        const flat = reply.value.length > 0 && reply.value[0].kind === 'array'
+            ? reply.value.flatMap(pair => pair.value)
+            : reply.value;
         const read = [];
-        for (let index = 0; index + 1 < reply.value.length; index += 2) {
-            read.push([reply.value[index].value, Number(reply.value[index + 1].value)]);
+        for (let index = 0; index + 1 < flat.length; index += 2) {
+            read.push([flat[index].value, Number(flat[index + 1].value)]);
         }
         const ordered = list => list.sort((left, right) => (left[1] - right[1])
             || (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0));

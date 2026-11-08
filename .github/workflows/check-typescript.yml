@@ -58,5 +58,10 @@ jobs:
         env:
           REDIS_ORACLE_HOST: 127.0.0.1
           REDIS_ORACLE_PORT: "6379"
+      - name: Live Redis oracle (RESP3)
+        run: pnpm gate:oracle:live:resp3
+        env:
+          REDIS_ORACLE_HOST: 127.0.0.1
+          REDIS_ORACLE_PORT: "6379"
       - name: Real driver conformance
         run: pnpm gate:drivers
