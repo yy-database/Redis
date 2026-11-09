@@ -1,16 +1,48 @@
 //! Socket loop composed from the native framing primitives.
 
 import { createServer } from 'node:net';
+import type { AddressInfo, Socket } from 'node:net';
 import { BlockingHub } from './blocking.js';
+import type { BlockEntry } from './blocking.js';
 import { execute, PubSubHub } from './commands.js';
+import type { ExecuteResult } from './commands/execute.js';
+import type { Session } from './commands/session.js';
 import { decodeCommand, encodeReply, Store } from './native.js';
+import type { DecodedCommand } from './native.js';
 import { error as replyError } from './reply.js';
+import type { ReplySpec } from './reply.js';
 
 const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
 
 /** Run identifier reported by `INFO server`, one per process. */
 const RUN_ID = Array.from({ length: 40 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
 const SERVER_STARTED_AT = Date.now();
+
+/** Per-connection counters and traffic totals reported through the server face. */
+interface ServerStats {
+    [counter: string]: number;
+    connections: number;
+    commands: number;
+    netInput: number;
+    netOutput: number;
+    reads: number;
+    writes: number;
+    expired: number;
+    evicted: number;
+    hits: number;
+    misses: number;
+    pubsubChannels: number;
+    pubsubPatterns: number;
+}
+
+/** The handle `startServer` answers with. */
+export interface ServerHandle {
+    host: string;
+    port: number;
+    dataDir: string;
+    store: Store;
+    close: () => Promise<void>;
+}
 
 /**
  * Starts an emulated server bound to `host`, persisting through `.yyds` and `.yykv`.
@@ -19,12 +51,14 @@ const SERVER_STARTED_AT = Date.now();
  * stops the listener and the open connections, and leaves the storage directory
  * in place.
  */
-export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}) {
-    const store = new Store(dataDir);
-    const connections = new Set();
+export async function startServer(
+    { dataDir, host = '127.0.0.1', port = 0 }: { dataDir?: string; host?: string; port?: number } = {},
+): Promise<ServerHandle> {
+    const store = new Store(dataDir as string);
+    const connections = new Set<Socket>();
     // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
-    const clients = new Map();
-    const stats = {
+    const clients = new Map<number, Session>();
+    const stats: ServerStats = {
         connections: 0,
         commands: 0,
         netInput: 0,
@@ -43,8 +77,10 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
     const pubsub = new PubSubHub();
     const listener = createServer(socket => {
         connections.add(socket);
-        const session = {
-            id: nextClientId,
+        const id = nextClientId;
+        const handle = (socket as unknown as { _handle?: { fd?: number } })._handle;
+        const session: Session = {
+            id,
             createdAt: Date.now(),
             lastActivity: Date.now(),
             commandCount: 0,
@@ -58,33 +94,33 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
             stats,
             runId: RUN_ID,
             serverStartedAt: SERVER_STARTED_AT,
-            port: listener.address().port,
+            port: (listener.address() as AddressInfo).port,
             bind: host,
             remoteAddress: { address: socket.remoteAddress, port: socket.remotePort },
             localAddress: { address: socket.localAddress, port: socket.localPort },
-            fd: socket._handle?.fd >= 0 ? socket._handle.fd : nextClientId,
+            fd: handle?.fd !== undefined && handle.fd >= 0 ? handle.fd : id,
             libName: '',
             libVer: '',
             kill: () => socket.destroy(),
         };
         nextClientId += 1;
-        clients.set(session.id, session);
+        clients.set(id, session);
         stats.connections += 1;
         // Publishing runs synchronously on this loop, so a subscriber's push
         // frame is written straight to its socket, after any ack frames of the
         // command that produced it.
         session.deliver = frame => {
-            if (!socket.destroyed) socket.write(encodeReply(frame, session.protocol));
+            if (!socket.destroyed) socket.write(encodeReply(frame, session.protocol as number));
         };
         pubsub.attach(session);
         let pending = Buffer.alloc(0);
-        let blocked = null;
-        function send(frame) {
-            const encoded = encodeReply(frame, session.protocol);
+        let blocked: BlockEntry | null = null;
+        function send(frame: ReplySpec): void {
+            const encoded = encodeReply(frame, session.protocol as number);
             stats.netOutput += encoded.length;
             socket.write(encoded);
         }
-        function write(result) {
+        function write(result: ExecuteResult): void {
             if (result.frames !== undefined) {
                 for (const frame of result.frames) send(frame);
                 return;
@@ -92,11 +128,11 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
             if (result.reply === undefined) {
                 return;
             }
-            send(result.reply);
+            send(result.reply as ReplySpec);
         }
-        function pump() {
+        function pump(): void {
             while (pending.length > 0 && blocked === null) {
-                let decoded;
+                let decoded: DecodedCommand | null;
                 try {
                     decoded = decodeCommand(pending);
                 }
@@ -133,8 +169,8 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
                 write(result);
                 // A peer `CLIENT KILL` is reported by the binding, because the
                 // killed connection lives on another socket owned by this loop.
-                for (const id of result.killed ?? []) {
-                    clients.get(id)?.kill();
+                for (const killed of result.killed ?? []) {
+                    clients.get(killed)?.kill();
                 }
                 if (result.close) {
                     socket.end();
@@ -152,26 +188,26 @@ export async function startServer({ dataDir, host = '127.0.0.1', port = 0 } = {}
             if (blocked !== null) hub.cancel(blocked);
             pubsub.detach(session);
             connections.delete(socket);
-            clients.delete(session.id);
-            store.serverRelease(session.id);
+            clients.delete(id);
+            store.serverRelease(id);
         });
         socket.on('error', () => {
             connections.delete(socket);
-            clients.delete(session.id);
-            store.serverRelease(session.id);
+            clients.delete(id);
+            store.serverRelease(id);
         });
     });
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
         listener.once('error', reject);
         listener.listen(port, host, resolve);
     });
-    const address = listener.address();
+    const address = listener.address() as AddressInfo;
     return {
         host,
         port: address.port,
         dataDir: store.dataDir(),
         store,
-        close: () => new Promise(resolve => {
+        close: () => new Promise<void>(resolve => {
             store.flush();
             for (const socket of connections) {
                 socket.destroy();
