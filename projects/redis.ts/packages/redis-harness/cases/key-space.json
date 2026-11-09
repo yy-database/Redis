@@ -3094,6 +3094,7 @@
       "sides": [
         "ts"
       ],
+      "oracleLimitation": "scan-cursor",
       "argsText": [
         "SCAN",
         "18446744073709551615"
