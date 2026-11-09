@@ -171,7 +171,7 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 [[package]]
 name = "database"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=1c950f333c09b7d27de284f30a4957480117935e#1c950f333c09b7d27de284f30a4957480117935e"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "database-harness",
 ]
@@ -179,10 +179,10 @@ dependencies = [
 [[package]]
 name = "database-cluster"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "database-formats",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "serde",
  "serde_json",
  "vos",
@@ -191,13 +191,13 @@ dependencies = [
 [[package]]
 name = "database-execution"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "database-cluster",
  "database-formats",
  "database-query",
  "database-storage",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "database-udf",
  "js-sys",
  "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185)",
@@ -213,19 +213,19 @@ dependencies = [
 [[package]]
 name = "database-formats"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "blake3",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "vos",
 ]
 
 [[package]]
 name = "database-harness"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=1c950f333c09b7d27de284f30a4957480117935e#1c950f333c09b7d27de284f30a4957480117935e"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=1c950f333c09b7d27de284f30a4957480117935e)",
+ "database-types",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -235,7 +235,7 @@ dependencies = [
 [[package]]
 name = "database-protocol"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "database-protocol-mongo",
  "database-protocol-mysql",
@@ -247,9 +247,9 @@ dependencies = [
 [[package]]
 name = "database-protocol-mongo"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "serde",
  "serde_json",
 ]
@@ -257,9 +257,9 @@ dependencies = [
 [[package]]
 name = "database-protocol-mysql"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "serde",
  "serde_json",
  "sha1",
@@ -268,9 +268,9 @@ dependencies = [
 [[package]]
 name = "database-protocol-pgsql"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "serde",
  "serde_json",
 ]
@@ -278,9 +278,9 @@ dependencies = [
 [[package]]
 name = "database-protocol-redis"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "serde",
  "serde_json",
 ]
@@ -288,10 +288,10 @@ dependencies = [
 [[package]]
 name = "database-protocol-yy"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "base64",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "database-udf",
  "serde",
  "serde_json",
@@ -300,10 +300,10 @@ dependencies = [
 [[package]]
 name = "database-query"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "database-cluster",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "js-sys",
  "oak-core 0.0.12 (git+https://github.com/yggdrasil-language/oaks.git?rev=d33f38e6f6118446a4deeb6a0682999e594d8185)",
  "oak-sql",
@@ -318,7 +318,7 @@ dependencies = [
 [[package]]
 name = "database-server"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "base64",
  "database-cluster",
@@ -331,7 +331,7 @@ dependencies = [
  "database-protocol-yy",
  "database-query",
  "database-storage",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "database-udf",
  "mongo",
  "serde",
@@ -343,11 +343,11 @@ dependencies = [
 [[package]]
 name = "database-storage"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "blake3",
  "database-formats",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "libc",
  "serde_json",
  "sha2 0.11.1",
@@ -358,18 +358,7 @@ dependencies = [
 [[package]]
 name = "database-types"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=1c950f333c09b7d27de284f30a4957480117935e#1c950f333c09b7d27de284f30a4957480117935e"
-dependencies = [
- "serde",
- "serde_json",
- "uuid",
- "vos",
-]
-
-[[package]]
-name = "database-types"
-version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "serde",
  "serde_json",
@@ -380,7 +369,7 @@ dependencies = [
 [[package]]
 name = "database-udf"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "serde",
  "serde_json",
@@ -788,12 +777,12 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "mongo"
 version = "0.0.1"
-source = "git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0#6e4943c14d561d128da02c3a68f3e0c11de398c0"
+source = "git+https://github.com/oovm/database.rs.git?rev=382a408623166924dbd0fcfbb7f438170ad3a0e9#382a408623166924dbd0fcfbb7f438170ad3a0e9"
 dependencies = [
  "database-cluster",
  "database-protocol-mongo",
  "database-storage",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "regex",
  "serde_json",
 ]
@@ -1024,7 +1013,7 @@ dependencies = [
  "database-execution",
  "database-query",
  "database-server",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "napi",
  "napi-build",
  "napi-derive",
@@ -1046,7 +1035,7 @@ name = "redis-wasm"
 version = "0.1.0"
 dependencies = [
  "database-formats",
- "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",
+ "database-types",
  "getrandom 0.4.3",
  "serde_json",
 ]

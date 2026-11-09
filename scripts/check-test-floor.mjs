@@ -1,7 +1,22 @@
 #!/usr/bin/env node
 //! Runs a test command and verifies that it executed enough cases and skipped none.
+//!
+//! Parsing of TAP and unittest output stays here (product-side observation);
+//! the verdict itself runs in `database.harness` through the napi primitive
+//! `harnessSuiteVerdict`: skipped is red, failed is a problem, every floor is
+//! compared against its declared metric.
 
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+function loadBinding() {
+    const packageDir = join(root, 'projects', 'redis.ts', 'platforms', `redis-${process.platform}-${process.arch}`);
+    return createRequire(import.meta.url)(process.env.REDIS_NATIVE || packageDir);
+}
 
 // Minimum executed cases per side, held a few cases below the current count so
 // a small refactor does not trip the gate while a real regression still does.
@@ -136,10 +151,17 @@ catch (error) {
 if (result.status !== 0) {
     fail(`the command exited with status ${result.status}`, summary);
 }
-if (summary.skipped > 0) {
-    fail(`${summary.skipped} cases were skipped`, summary);
-}
-if (summary.executed < options.floor) {
-    fail(`only ${summary.executed} cases executed, the floor is ${options.floor}`, summary);
+const gate = JSON.parse(loadBinding().harnessSuiteVerdict(
+    JSON.stringify({ cases: summary.executed, assertions: 0, passed: summary.passed, failed: summary.failed, skipped: summary.skipped }),
+    JSON.stringify([{ metric: 'cases', min: options.floor }]),
+));
+for (const problem of gate.problems) {
+    if (problem.kind === 'skipped') {
+        fail(`${problem.count} cases were skipped`, summary);
+    }
+    if (problem.kind === 'floor-unmet') {
+        fail(`only ${problem.actual} cases executed, the floor is ${problem.min}`, summary);
+    }
+    fail(`gate problem ${problem.kind}`, summary);
 }
 console.log(`${options.kind}: ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} skipped, ${summary.executed} executed, floor ${options.floor}`);

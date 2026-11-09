@@ -7,7 +7,6 @@
   "scripts": {
     "pretest": "node ../../../../scripts/build-platforms.mjs",
     "test": "node --test --test-reporter=tap",
-    "manifest:shadow": "node bin/manifest-shadow.mjs",
     "oracle": "node bin/oracle.mjs"
   }
 }
