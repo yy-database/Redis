@@ -1018,7 +1018,7 @@ checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
 name = "redis-napi"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "database",
  "database-execution",
@@ -1034,7 +1034,7 @@ dependencies = [
 
 [[package]]
 name = "redis-pyo3"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "pyo3",
  "redis-wasm",
@@ -1043,7 +1043,7 @@ dependencies = [
 
 [[package]]
 name = "redis-wasm"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "database-formats",
  "database-types 0.0.1 (git+https://github.com/oovm/database.rs.git?rev=6e4943c14d561d128da02c3a68f3e0c11de398c0)",

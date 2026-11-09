@@ -1,6 +1,7 @@
 {
   "name": "@yydb/redis-unknown-wasm32",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "private": true,
   "license": "MPL-2.0",
   "description": "WASM binding for @yydb/redis",
   "main": "redis.unknown-wasm32.node",

@@ -1,6 +1,6 @@
 {
   "name": "@yydb/redis",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Redis-compatible server and client composed over the `.yyds` and `.yykv` backends",
   "license": "MPL-2.0",
@@ -31,11 +31,11 @@
     "node": ">=24.0.0"
   },
   "optionalDependencies": {
-    "@yydb/redis-darwin-arm64": "0.0.0",
-    "@yydb/redis-darwin-x64": "0.0.0",
-    "@yydb/redis-linux-x64": "0.0.0",
-    "@yydb/redis-unknown-wasm32": "0.0.0",
-    "@yydb/redis-win32-x64": "0.0.0"
+    "@yydb/redis-darwin-arm64": "0.1.0",
+    "@yydb/redis-darwin-x64": "0.1.0",
+    "@yydb/redis-linux-x64": "0.1.0",
+    "@yydb/redis-unknown-wasm32": "0.1.0",
+    "@yydb/redis-win32-x64": "0.1.0"
   },
   "repository": {
     "type": "git",

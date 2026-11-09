@@ -1,6 +1,6 @@
 {
   "name": "@yydb/redis-win32-x64",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MPL-2.0",
   "description": "Native binding for @yydb/redis on win32-x64",
   "os": ["win32"],

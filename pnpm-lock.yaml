@@ -26,22 +26,6 @@ importers:
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
-    optionalDependencies:
-      '@yydb/redis-darwin-arm64':
-        specifier: 0.0.0
-        version: 0.0.0
-      '@yydb/redis-darwin-x64':
-        specifier: 0.0.0
-        version: 0.0.0
-      '@yydb/redis-linux-x64':
-        specifier: 0.0.0
-        version: 0.0.0
-      '@yydb/redis-unknown-wasm32':
-        specifier: 0.0.0
-        version: 0.0.0
-      '@yydb/redis-win32-x64':
-        specifier: 0.0.0
-        version: 0.0.0
 
   projects/redis.ts/packages/redis-harness: {}
 
@@ -129,34 +113,6 @@ packages:
   '@vmz/commander@0.2.8':
     resolution: {integrity: sha512-hDTOJGKHam1+GYnOJY8M0yqctrBt8RfdkvUVmkeu1LQVRyfWRZ8kqWnTdYcW8PoCWKP4DdDpcWJrbmI7rn68Bg==}
     engines: {node: '>=20'}
-
-  '@yydb/redis-darwin-arm64@0.0.0':
-    resolution: {integrity: sha512-CNFwEErPF+VtVN3ruCvqJ59gW9spPp/zu6R70CnI6B7nB2bF3kPmNGaDj4yejx4ZE/46l8mzD59fH5cKq5C0hA==}
-    engines: {node: '>=24.0.0'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@yydb/redis-darwin-x64@0.0.0':
-    resolution: {integrity: sha512-+McXmyLU2tfb1C2AUk0XMiYN6kH+nTVijMX9LFB7PTrFG27gwrbOpS+2ptWzxICJm2ZGC2zqDD/HBW31ni1I0Q==}
-    engines: {node: '>=24.0.0'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@yydb/redis-linux-x64@0.0.0':
-    resolution: {integrity: sha512-BQBc/ag7s/7tzkqKlqnEoeJvkKklae6ui/4QPDxjjgJBeAEc1FlikMw+kJo4A9yRortoMm4OYx+tJ7p2GklIdA==}
-    engines: {node: '>=24.0.0'}
-    cpu: [x64]
-    os: [linux]
-
-  '@yydb/redis-unknown-wasm32@0.0.0':
-    resolution: {integrity: sha512-+WoKooIeCfrezdn6p1yYfk95Sdd9XQeRETwq27BQ+5TZfIP7SNmW489OZudo/7JSC2ygBegxj63bEG7Q8aQzjg==}
-    engines: {node: '>=24.0.0'}
-
-  '@yydb/redis-win32-x64@0.0.0':
-    resolution: {integrity: sha512-dNml5Bw0+1qdWxT7tGUOMZiJ/4uBO0Dj7/7zFw42rTVhC9S0y6wynby+ye2kHm9Gtzr7cvGFNBgUXI+L5tlAgw==}
-    engines: {node: '>=24.0.0'}
-    cpu: [x64]
-    os: [win32]
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -488,21 +444,6 @@ snapshots:
       '@redis/client': 6.3.1
 
   '@vmz/commander@0.2.8': {}
-
-  '@yydb/redis-darwin-arm64@0.0.0':
-    optional: true
-
-  '@yydb/redis-darwin-x64@0.0.0':
-    optional: true
-
-  '@yydb/redis-linux-x64@0.0.0':
-    optional: true
-
-  '@yydb/redis-unknown-wasm32@0.0.0':
-    optional: true
-
-  '@yydb/redis-win32-x64@0.0.0':
-    optional: true
 
   accepts@2.0.0:
     dependencies:

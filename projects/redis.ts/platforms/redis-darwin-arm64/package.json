@@ -1,6 +1,6 @@
 {
   "name": "@yydb/redis-darwin-arm64",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MPL-2.0",
   "description": "Native binding for @yydb/redis on macOS arm64",
   "os": ["darwin"],
