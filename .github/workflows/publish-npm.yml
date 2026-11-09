@@ -7,6 +7,8 @@ name: publish-npm
 #
 # Real `@yydb/redis*` versions publish only through npm Trusted Publisher
 # (OIDC) on tag push. Local `nifty publish --placeholder` is only for 0.0.0 stubs.
+# `--refresh` re-reads the registry first, so versions already published under
+# this name (for example `@yydb/redis@0.1.0`) are skipped instead of republished.
 #
 # Runs only after Check Rust, Check TypeScript and Check Python all succeed
 # on this tag (re-run via workflow_call).
@@ -121,4 +123,4 @@ jobs:
           done
       - run: pnpm --filter @yydb/redis build
       - name: Publish packages to npm
-        run: pnpm exec nifty publish --access public --version="${RELEASE_TAG#v}"
+        run: pnpm exec nifty publish --access public --refresh --version="${RELEASE_TAG#v}"
