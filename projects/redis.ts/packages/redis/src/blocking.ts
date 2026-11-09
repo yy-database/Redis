@@ -6,8 +6,24 @@
 //! keeps wake-ups in registration order and lets the mover wake consumers of
 //! its destination.
 
+import type { ReplySpec } from './reply.js';
+
+/** One parked blocking command, served by {@link BlockingHub}. */
+export interface BlockEntry {
+    db: number;
+    keys: (Buffer | string)[];
+    timeoutMs: number;
+    /** Returns a reply when it could claim a value, `null` when the key is still empty. */
+    attempt: () => ReplySpec | null;
+    timeoutReply: ReplySpec;
+    /** Writes the reply to the blocked connection. */
+    deliver: (reply: ReplySpec) => void;
+    registered?: boolean;
+    timer?: ReturnType<typeof setTimeout>;
+}
+
 /** Key identity inside the wait table: database index plus raw key bytes. */
-function slotOf(db, key) {
+function slotOf(db: number, key: Buffer | string): string {
     return `${db}\u0000${Buffer.isBuffer(key) ? key.toString('hex') : String(key)}`;
 }
 
@@ -26,12 +42,10 @@ const MAX_TIMER_MS = 2147483647;
  * blocked connection.
  */
 export class BlockingHub {
-    constructor() {
-        this.queues = new Map();
-    }
+    readonly queues = new Map<string, BlockEntry[]>();
 
     /** Parks one command until a push to any of its keys or the timeout. */
-    wait(entry) {
+    wait(entry: BlockEntry): void {
         entry.registered = true;
         for (const key of entry.keys) {
             const slot = slotOf(entry.db, key);
@@ -49,7 +63,7 @@ export class BlockingHub {
     }
 
     /** Serves the waiters of one key after a push, first registered first served. */
-    wake(db, key) {
+    wake(db: number, key: Buffer | string): void {
         const slot = slotOf(db, key);
         const queue = this.queues.get(slot);
         if (queue === undefined) return;
@@ -63,18 +77,18 @@ export class BlockingHub {
     }
 
     /** Drops one parked command, used when its connection closes. */
-    cancel(entry) {
+    cancel(entry: BlockEntry): void {
         if (entry.registered) this.settle(entry);
     }
 
-    expire(entry) {
+    expire(entry: BlockEntry): void {
         if (!entry.registered) return;
         const reply = entry.attempt();
         this.settle(entry);
         entry.deliver(reply ?? entry.timeoutReply);
     }
 
-    settle(entry) {
+    settle(entry: BlockEntry): void {
         entry.registered = false;
         if (entry.timer !== undefined) {
             clearTimeout(entry.timer);
