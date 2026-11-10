@@ -2,17 +2,8 @@ export function elapsedMs(start) {
   return Number(process.hrtime.bigint() - start) / 1_000_000;
 }
 
-export function median(samples) {
-  const sorted = [...samples].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-}
-
-export function p95(samples) {
-  const sorted = [...samples].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1);
-  return sorted[Math.max(0, index)];
-}
+// median/p95 不在这里实现：统计口径唯一入口是 `harness-bench.mjs` 的
+// `benchSummary`，由上游 `database.harness` 判定。
 
 export function throughput(ops, ms) {
   if (ms <= 0) return 'n/a';

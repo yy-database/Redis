@@ -29,6 +29,7 @@ async function makeIoredis({ host, port }) {
     get: key => client.call('GET', key),
     ttl: key => client.call('TTL', key),
     ping: () => client.ping(),
+    call: args => client.call(...args),
     async pipeline(commands) {
       const tx = client.pipeline();
       for (const args of commands) tx.call(...args);
@@ -54,6 +55,7 @@ async function makeNodeRedis({ host, port }) {
     get: key => client.sendCommand(['GET', key]),
     ttl: key => client.sendCommand(['TTL', key]),
     ping: () => client.ping(),
+    call: args => client.sendCommand(args),
     async pipeline(commands) {
       const multi = client.multi();
       for (const args of commands) multi.sendCommand(args);
@@ -72,6 +74,7 @@ async function makeProduct({ host, port }) {
     get: key => client.command(['GET', key]),
     ttl: key => client.command(['TTL', key]),
     ping: () => client.command(['PING']),
+    call: args => client.command(args),
     pipeline: commands => client.pipeline(commands),
     close: () => client.close(),
   };

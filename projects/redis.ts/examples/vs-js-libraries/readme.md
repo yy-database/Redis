@@ -9,7 +9,8 @@ against two JavaScript Redis clients over RESP2:
   `encodeCommand` and a local framing reader (`src/resp-client.mjs`)
 
 Conformance runs every client against one emulated server process. Each benchmark
-measurement instead gets its own fresh server and data directory. The product package
+(workload, client) cell instead gets its own fresh server and data directory, with the
+warmup and measured rounds of that cell sharing it. The product package
 does not ship a high-level client, so this example keeps its own request/response
 framing and does not use `decodeReply`.
 
@@ -17,9 +18,13 @@ framing and does not use `decodeReply`.
 
 - `src/resp-client.mjs` — RESP2 framing reader plus `command` / `pipeline` / `close`
 - `src/clients.mjs` — the same adapter surface over ioredis, node-redis, and the product
-- `src/timing.mjs` — `hrtime` elapsed time, median, p95, and throughput helpers
+- `src/timing.mjs` — `hrtime` elapsed time and throughput helpers (no median or p95 here)
+- `src/harness-bench.mjs` — the single stats entry: median/p95/min/max via the upstream
+  `database.harness::summarize` (`harnessBenchSummary` when the platform binding exposes
+  it, otherwise the crate's golden vectors, asserted on every load)
 - `tests/conformance.mjs` — writes with one client and reads with the other two
-- `tests/benchmark.mjs` — sequential, pipelined, GET, and PING workloads
+- `tests/benchmark.mjs` — the scenario matrix below, with provenance and optional
+  real-server oracle comparison
 - `reports/` — captured conformance and benchmark output
 - `../shared/product.mjs` — loads the checkout platform binding before importing the product
 
@@ -54,21 +59,45 @@ pnpm --dir projects/redis.ts/examples/vs-js-libraries test
 
 ## Benchmark
 
-One file measures all three clients on four workloads:
+One file measures all three clients across the scenario matrix. Each row carries a
+stable scenario id, so runs can be compared across revisions:
 
-| Workload | Shape |
-|----------|-------|
-| `set-seq` | 100 sequential awaited `SET` |
-| `set-pipeline` | 500 `SET` in explicit pipelines of 500 |
-| `get-seq` | 500 keys preloaded untimed, then 500 awaited `GET` |
-| `ping` | 1,000 awaited `PING` |
+| Workload | Scenario | Shape |
+|----------|----------|-------|
+| `get-seq` | `redis-string-get` | awaited `GET` point reads |
+| `set-seq` | `redis-string-set` | awaited `SET` point writes |
+| `set-pipeline` | `redis-pipeline-set` | `SET` throughput in explicit pipelines |
+| `get-pipeline` | `redis-pipeline-get` | `GET` throughput in explicit pipelines |
+| `hash-hset-hget` | `redis-hash-hset-hget` | `HSET` + `HGET` on one hash |
+| `list-rpush-lrange` | `redis-list-rpush-lrange` | `RPUSH` + `LRANGE` on one list |
+| `set-sadd-smembers` | `redis-set-sadd-smembers` | `SADD` + `SMEMBERS` on one set |
+| `zset-zadd-zrange` | `redis-zset-zadd-zrange` | `ZADD` + `ZRANGE WITHSCORES` on one zset |
+| `set-big` | `redis-big-value-set` | large-value `SET` |
+| `get-big` | `redis-big-value-get` | large-value `GET` |
+| `ping` | `redis-ping-rtt` | awaited `PING` round-trips |
+| `connect` | `redis-connect-open-close` | establish + readiness `PING` + close |
 
-Defaults are `BENCH_SET=100`, `BENCH_PIPE=500`, `BENCH_GET=500`, `BENCH_PING=1000`,
-`BENCH_ROUNDS=3`. The `SET` counts are lower than the other workloads because each
-`SET` rewrites the whole `.yykv` snapshot, so larger key spaces grow super-linearly.
-Every measurement starts a fresh temporary data directory and a fresh server, runs that
-client's untimed preload on the empty server, and only then starts the clock. Reports use
-the median of the measured rounds, milliseconds per operation, and operations per second.
+Defaults are `BENCH_SET=100`, `BENCH_GET=500`, `BENCH_PIPE=500`, `BENCH_PING=1000`,
+`BENCH_BATCH=500`, `BENCH_COLL=200`, `BENCH_BIG=20`, `BENCH_BIG_GET=50`,
+`BENCH_BIG_BYTES=65536`, `BENCH_CONNECT=50`, `BENCH_ROUNDS=3`, `BENCH_WARMUP=1`. The
+`SET` counts are lower than the other workloads because each `SET` rewrites the whole
+`.yykv` snapshot, so larger key spaces grow super-linearly.
+
+Every cell starts a fresh temporary data directory and a fresh server, runs its untimed
+preload on that empty server, warms up, and only then collects `BENCH_ROUNDS` timed
+samples on one connection. Statistics never come from a local formula: median, p95,
+min, max, and rounds come from `database.harness::summarize` through
+`src/harness-bench.mjs` (`harnessBenchSummary` on the platform binding when present,
+otherwise the crate's golden vectors, re-asserted on every load). Reports carry
+provenance in the harness `BenchReport` wire shape — `node_version`, `rustc_version`,
+`target_triple`, `rev`, data scale, scenario params, and the rounds plan.
+
+Real-server comparison: set `BENCH_ORACLE_HOST` (and optionally `BENCH_ORACLE_PORT`) to
+a reachable `redis-server` and the same matrix reruns with `ioredis` as the fixed
+client against it, reported as a `redis-server (oracle)` column. The script refuses an
+oracle that answers `redis_mode:disguise`, so the emulated server can never masquerade
+as the expected value. Without a reachable real server the report states the
+oracle-limitation instead of silently comparing against this repository.
 
 ```shell
 pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark
@@ -81,9 +110,13 @@ pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark
 
 ## Intentional deltas
 
-- Every measurement is isolated: a fresh data directory and a fresh server, then that
-  client's preload and timed workload on an empty server. All clients start from the
-  same state.
+- Each (workload, client) cell is isolated: a fresh data directory and a fresh server,
+  then that cell's untimed preload, warmup, and timed rounds on one connection. All
+  clients start from the same state.
+- Collection workloads begin each round with `DEL` so rounds stay idempotent; the `DEL`
+  is timed and counted in ops on every client.
+- The `connect` workload measures establish + one readiness `PING` + close per op so
+  every client pays a full handshake regardless of lazy-connect behavior.
 - The product client has no reconnect, offline queue, or retry behavior; a socket error
   fails the in-flight command.
 - No pooling or auto-pipelining anywhere. Pipelined workloads use explicit batches of 500
@@ -91,3 +124,5 @@ pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark
 - All clients use RESP2 with a single TCP connection.
 - `SET` rewrites the whole `.yykv` snapshot, so absolute `SET` numbers are snapshot-bound;
   `GET` and `PING` isolate round-trip overhead.
+- The emulated server answers `ZRANGE ... WITHSCORES` with nested pairs even under
+  RESP2; the workload normalizes both shapes outside the timed command count.
