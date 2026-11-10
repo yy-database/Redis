@@ -931,17 +931,18 @@ impl From<Stats> for BenchStats {
 ///
 /// 判定与统计语义全走上游 `database.harness::summarize`，绑定层只做类型转换。
 #[napi]
-pub fn harness_bench_summary(samples_ms: Vec<f64>) -> BenchStats {
-    summarize(&samples_ms).into()
+pub fn harness_bench_summary(samples_ms: Vec<f64>) -> napi::Result<BenchStats> {
+    summarize(&samples_ms).map(Into::into).map_err(harness_error)
 }
 
-/// 单次操作的归一毫秒（median / ops）。`ops` 为 0 时返回 NaN。
+/// 单次操作的归一毫秒（median / ops）。`ops` 为 0 时抛错，不返回 NaN。
 ///
 /// 走上游 `database.harness::per_op_ms`，绑定层只搬运字段。
 #[napi]
-pub fn harness_bench_per_op(stats: BenchStats, ops: u32) -> f64 {
+pub fn harness_bench_per_op(stats: BenchStats, ops: u32) -> napi::Result<f64> {
     per_op_ms(
         &Stats { median_ms: stats.median_ms, p95_ms: stats.p95_ms, min_ms: stats.min_ms, max_ms: stats.max_ms, rounds: stats.rounds },
         u64::from(ops),
     )
+    .map_err(harness_error)
 }
