@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use database::harness::{
-    Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, Stats, SuiteReport, check_baseline, evaluate,
-    per_op_ms, render_json, summarize,
+    Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, Stats, SuiteReport,
+    check_baseline, evaluate, per_op_ms, render_json, summarize,
 };
 use database_execution::cluster::KeyValueExecutor;
 use database_query::cluster_kv::{KeyValueAction, KeyValueCommand, KeyValueResult};
@@ -901,8 +901,8 @@ pub fn harness_render_report(report_json: String) -> napi::Result<String> {
 #[napi]
 pub fn harness_evaluate_gate(input_json: String) -> napi::Result<String> {
     let envelope: serde_json::Value = serde_json::from_str(&input_json).map_err(harness_error)?;
-    let suites: Vec<SuiteReport> = serde_json::from_value(envelope.get("suites").cloned().unwrap_or_default())
-        .map_err(harness_error)?;
+    let suites: Vec<SuiteReport> =
+        serde_json::from_value(envelope.get("suites").cloned().unwrap_or_default()).map_err(harness_error)?;
     let policy: GatePolicy = match envelope.get("policy") {
         Some(value) => serde_json::from_value(value.clone()).map_err(harness_error)?,
         None => GatePolicy::default(),
@@ -923,7 +923,13 @@ pub struct BenchStats {
 
 impl From<Stats> for BenchStats {
     fn from(stats: Stats) -> Self {
-        Self { median_ms: stats.median_ms, p95_ms: stats.p95_ms, min_ms: stats.min_ms, max_ms: stats.max_ms, rounds: stats.rounds }
+        Self {
+            median_ms: stats.median_ms,
+            p95_ms: stats.p95_ms,
+            min_ms: stats.min_ms,
+            max_ms: stats.max_ms,
+            rounds: stats.rounds,
+        }
     }
 }
 
@@ -941,7 +947,13 @@ pub fn harness_bench_summary(samples_ms: Vec<f64>) -> napi::Result<BenchStats> {
 #[napi]
 pub fn harness_bench_per_op(stats: BenchStats, ops: u32) -> napi::Result<f64> {
     per_op_ms(
-        &Stats { median_ms: stats.median_ms, p95_ms: stats.p95_ms, min_ms: stats.min_ms, max_ms: stats.max_ms, rounds: stats.rounds },
+        &Stats {
+            median_ms: stats.median_ms,
+            p95_ms: stats.p95_ms,
+            min_ms: stats.min_ms,
+            max_ms: stats.max_ms,
+            rounds: stats.rounds,
+        },
         u64::from(ops),
     )
     .map_err(harness_error)
