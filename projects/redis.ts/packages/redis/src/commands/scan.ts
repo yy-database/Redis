@@ -1,4 +1,4 @@
-//! Scan cursors, scan options and random-member sampling.
+//! Scan cursors and the `MATCH`/`COUNT` options shared by the collection scans.
 
 import { parseInteger } from '../native.js';
 import { error as replyError } from '../reply.js';
@@ -36,27 +36,4 @@ export function parseScanOptions(args: Buffer[], from: number): { error?: ReplyS
     return { pattern, count };
 }
 
-/** Picks one random member, `null` when the collection is empty. */
-export function randomMember<T>(members: T[]): T | null {
-    if (members.length === 0) return null;
-    return members[Math.floor(Math.random() * members.length)];
-}
 
-/** Samples `count` members: positive counts are unique, negative counts allow repeats. */
-export function sampleMembers<T>(members: T[], count: number): T[] {
-    if (count === 0 || members.length === 0) return [];
-    if (count < 0) {
-        const picks: T[] = [];
-        for (let index = 0; index < -count; index += 1) picks.push(randomMember(members));
-        return picks;
-    }
-    const pool = members.slice();
-    const take = Math.min(count, pool.length);
-    for (let index = 0; index < take; index += 1) {
-        const swap = index + Math.floor(Math.random() * (pool.length - index));
-        const held = pool[index];
-        pool[index] = pool[swap];
-        pool[swap] = held;
-    }
-    return pool.slice(0, take);
-}

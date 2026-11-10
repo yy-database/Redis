@@ -2,14 +2,14 @@
 
 import { parseInteger } from '../native.js';
 import type { Store } from '../native.js';
-import { array, bulk, error as replyError, integer, nullArray, nullReply } from '../reply.js';
+import { bulk, error as replyError, nullArray } from '../reply.js';
 import { blockingPlan, deferredFailure, parseBlockingTimeout } from './blocking-plan.js';
 import { encodeHash, readHash, rewriteKind } from './chunks.js';
 import { SUFFIX, integerError, kindOf, text, unknownCommand, wrongArity, wrongType } from './kinds.js';
 import { addLongDoubles, longDoubleText, parseLongDouble } from './long-double.js';
 import type { LongDouble } from './long-double.js';
 import { forwardBlockingList, forwardList } from './lists.js';
-import { parseScanCursor, parseScanOptions, randomMember, sampleMembers } from './scan.js';
+import { parseScanCursor, parseScanOptions } from './scan.js';
 import type { CommandPlan, Session } from './session.js';
 import { forwardSet } from './sets.js';
 
@@ -24,26 +24,6 @@ export function planCollection(store: Store, session: Session, name: string, arg
     const db = session.db;
     const key: Buffer | null = args.length > 1 ? args[1] : null;
     switch (name) {
-        case 'hsetnx': {
-            if (args.length !== 4) return { error: wrongArity('hsetnx') };
-            const field = args[2];
-            const value = args[3];
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields: [Buffer, Buffer][] | null = kind === null ? [] : readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    if (fields.some(([name]) => name.equals(field))) return integer(0);
-                    fields.push([field, value]);
-                    const body = encodeHash(fields);
-                    if (body === null) return replyError('ERR hash value exceeds the storage limit');
-                    rewriteKind(store, db, 'hash', key, body);
-                    return integer(1);
-                },
-            };
-        }
-
         case 'hincrbyfloat': {
             if (args.length !== 4) return { error: wrongArity('hincrbyfloat') };
             const increment = parseLongDouble(args[3]);
@@ -78,38 +58,8 @@ export function planCollection(store: Store, session: Session, name: string, arg
             };
         }
 
-        case 'hrandfield': {
-            if (args.length < 2 || args.length > 4) return { error: wrongArity('hrandfield') };
-            let count: number | null = null;
-            let withValues = false;
-            if (args.length >= 3) {
-                count = parseInteger(args[2]);
-                if (count === null) return { error: integerError() };
-                if (args.length === 4) {
-                    if (text(args[3]).toLowerCase() !== 'withvalues') return { error: replyError('ERR syntax error') };
-                    withValues = true;
-                }
-            }
-            return {
-                run: () => {
-                    const kind = kindOf(store, db, key);
-                    if (kind !== null && kind !== 'hash') return wrongType();
-                    const fields: [Buffer, Buffer][] | null = kind === null ? [] : readHash(store, db, key);
-                    if (fields === null) return replyError('ERR stored hash value is corrupt');
-                    if (count === null) {
-                        if (fields.length === 0) return nullReply();
-                        return bulk(randomMember(fields)[0]);
-                    }
-                    const items = [];
-                    for (const [field, value] of sampleMembers(fields, count)) {
-                        items.push(bulk(field));
-                        if (withValues) items.push(bulk(value));
-                    }
-                    return array(items);
-                },
-            };
-        }
-
+        case 'hsetnx':
+        case 'hrandfield':
         case 'hscan':
         case 'hset':
         case 'hget':
@@ -130,12 +80,19 @@ export function planCollection(store: Store, session: Session, name: string, arg
             if (name === 'hdel' && args.length < 3) {
                 return { error: wrongArity('hdel') };
             }
-            const fixed = { hget: 3, hgetall: 2, hlen: 2, hincrby: 4, hkeys: 2, hvals: 2, hexists: 3 }[name];
+            const fixed = { hsetnx: 4, hget: 3, hgetall: 2, hlen: 2, hincrby: 4, hkeys: 2, hvals: 2, hexists: 3 }[name];
             if (fixed !== undefined && args.length !== fixed) {
                 return { error: wrongArity(name) };
             }
             if (name === 'hincrby' && parseInteger(args[3]) === null) {
                 return { error: integerError() };
+            }
+            if (name === 'hrandfield') {
+                if (args.length < 2 || args.length > 4) return { error: wrongArity('hrandfield') };
+                if (args.length >= 3 && parseInteger(args[2]) === null) return { error: integerError() };
+                if (args.length === 4 && text(args[3]).toLowerCase() !== 'withvalues') {
+                    return { error: replyError('ERR syntax error') };
+                }
             }
             if (name === 'hscan') {
                 if (args.length < 3) {
