@@ -49,12 +49,13 @@ export interface ServerHandle {
  *
  * The caller owns the process lifetime. `close` flushes buffered counter updates,
  * stops the listener and the open connections, and leaves the storage directory
- * in place.
+ * in place. Passing an existing `store` binds the listener to that engine instead
+ * of opening a second one on `dataDir`.
  */
 export async function startServer(
-    { dataDir, host = '127.0.0.1', port = 0 }: { dataDir?: string; host?: string; port?: number } = {},
+    { dataDir, host = '127.0.0.1', port = 0, store: providedStore }: { dataDir?: string; host?: string; port?: number; store?: Store } = {},
 ): Promise<ServerHandle> {
-    const store = new Store(dataDir as string);
+    const store = providedStore ?? new Store(dataDir as string);
     const connections = new Set<Socket>();
     // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
     const clients = new Map<number, Session>();
