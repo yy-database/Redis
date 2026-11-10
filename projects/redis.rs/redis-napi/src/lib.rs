@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use database::harness::{
-    Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, SuiteReport, check_baseline, evaluate, render_json,
+    Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, Stats, SuiteReport, check_baseline, evaluate,
+    per_op_ms, render_json, summarize,
 };
 use database_execution::cluster::KeyValueExecutor;
 use database_query::cluster_kv::{KeyValueAction, KeyValueCommand, KeyValueResult};
@@ -908,4 +909,39 @@ pub fn harness_evaluate_gate(input_json: String) -> napi::Result<String> {
     };
     let verdict = evaluate(&suites, &policy);
     serde_json::to_string(&verdict).map_err(harness_error)
+}
+
+/// 基准统计的 JS 形态。字段名由本 DTO 负责 camelCase，核心 `Stats` 说 Rust。
+#[napi(object)]
+pub struct BenchStats {
+    pub median_ms: f64,
+    pub p95_ms: f64,
+    pub min_ms: f64,
+    pub max_ms: f64,
+    pub rounds: u32,
+}
+
+impl From<Stats> for BenchStats {
+    fn from(stats: Stats) -> Self {
+        Self { median_ms: stats.median_ms, p95_ms: stats.p95_ms, min_ms: stats.min_ms, max_ms: stats.max_ms, rounds: stats.rounds }
+    }
+}
+
+/// 对一组毫秒样本求 median/p95/极值（nearest-rank，与上游 golden 向量口径一致）。
+///
+/// 判定与统计语义全走上游 `database.harness::summarize`，绑定层只做类型转换。
+#[napi]
+pub fn harness_bench_summary(samples_ms: Vec<f64>) -> BenchStats {
+    summarize(&samples_ms).into()
+}
+
+/// 单次操作的归一毫秒（median / ops）。`ops` 为 0 时返回 NaN。
+///
+/// 走上游 `database.harness::per_op_ms`，绑定层只搬运字段。
+#[napi]
+pub fn harness_bench_per_op(stats: BenchStats, ops: u32) -> f64 {
+    per_op_ms(
+        &Stats { median_ms: stats.median_ms, p95_ms: stats.p95_ms, min_ms: stats.min_ms, max_ms: stats.max_ms, rounds: stats.rounds },
+        u64::from(ops),
+    )
 }

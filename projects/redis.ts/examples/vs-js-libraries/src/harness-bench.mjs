@@ -44,9 +44,19 @@ export function benchSummary(samplesMs) {
   return native ? native.harnessBenchSummary([...samplesMs]) : pinnedSummary(samplesMs);
 }
 
+/** `database.harness::per_op_ms` 的钉死口径：median / ops，`ops` 为 0 时 NaN。 */
+function pinnedPerOpMs(stats, ops) {
+  return ops === 0 ? Number.NaN : stats.medianMs / ops;
+}
+
+/** 单次操作的归一毫秒（median / ops），口径与 `benchSummary` 同源。 */
+export function benchPerOpMs(stats, ops) {
+  return native ? native.harnessBenchPerOp(stats, ops) : pinnedPerOpMs(stats, ops);
+}
+
 /** 统计口径的实际来源，报告 provenance 必须原样标注。 */
 export const benchSummarySource = native
-  ? 'addon:harnessBenchSummary (database.harness::summarize)'
+  ? 'addon:harnessBenchSummary + harnessBenchPerOp (database.harness::summarize / per_op_ms)'
   : 'pinned:database.harness::summarize golden vectors (addon binding missing)';
 
 // `database.harness` bench.rs 的 golden 向量，逐条钉死口径；漂移即终止。

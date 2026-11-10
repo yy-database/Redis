@@ -13,6 +13,23 @@ function waitForReady(client) {
   });
 }
 
+/** FIFO of delivered pub/sub payloads so a round can await each receipt. */
+function createMessageQueue() {
+  const queue = [];
+  const waiters = [];
+  return {
+    push(message) {
+      const waiter = waiters.shift();
+      if (waiter !== undefined) waiter(message);
+      else queue.push(message);
+    },
+    next() {
+      if (queue.length > 0) return Promise.resolve(queue.shift());
+      return new Promise(resolve => waiters.push(resolve));
+    },
+  };
+}
+
 async function makeIoredis({ host, port }) {
   const client = new Redis({
     host,
@@ -22,6 +39,8 @@ async function makeIoredis({ host, port }) {
     lazyConnect: false,
   });
   await waitForReady(client);
+  const messages = createMessageQueue();
+  client.on('message', (_channel, message) => messages.push(message));
   return {
     name: 'ioredis',
     set: (key, value) => client.call('SET', key, value),
@@ -30,6 +49,8 @@ async function makeIoredis({ host, port }) {
     ttl: key => client.call('TTL', key),
     ping: () => client.ping(),
     call: args => client.call(...args),
+    subscribe: channel => client.subscribe(channel),
+    nextMessage: () => messages.next(),
     async pipeline(commands) {
       const tx = client.pipeline();
       for (const args of commands) tx.call(...args);
@@ -48,6 +69,7 @@ async function makeNodeRedis({ host, port }) {
   const client = createNodeRedisClient({ socket: { host, port }, RESP: 2 });
   client.on('error', () => {});
   await client.connect();
+  const messages = createMessageQueue();
   return {
     name: 'node-redis',
     set: (key, value) => client.sendCommand(['SET', key, value]),
@@ -56,6 +78,8 @@ async function makeNodeRedis({ host, port }) {
     ttl: key => client.sendCommand(['TTL', key]),
     ping: () => client.ping(),
     call: args => client.sendCommand(args),
+    subscribe: channel => client.subscribe(channel, message => messages.push(message)),
+    nextMessage: () => messages.next(),
     async pipeline(commands) {
       const multi = client.multi();
       for (const args of commands) multi.sendCommand(args);
@@ -66,7 +90,14 @@ async function makeNodeRedis({ host, port }) {
 }
 
 async function makeProduct({ host, port }) {
-  const client = createRespClient({ host, port });
+  const messages = createMessageQueue();
+  const client = createRespClient({
+    host,
+    port,
+    onPush: frame => {
+      if (Array.isArray(frame) && frame[0] === 'message') messages.push(frame[2]);
+    },
+  });
   return {
     name: '@yydb/redis',
     set: (key, value) => client.command(['SET', key, value]),
@@ -75,6 +106,8 @@ async function makeProduct({ host, port }) {
     ttl: key => client.command(['TTL', key]),
     ping: () => client.command(['PING']),
     call: args => client.command(args),
+    subscribe: channel => client.command(['SUBSCRIBE', channel]),
+    nextMessage: () => messages.next(),
     pipeline: commands => client.pipeline(commands),
     close: () => client.close(),
   };

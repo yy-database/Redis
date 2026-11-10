@@ -6,7 +6,8 @@
 // 运行：`pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark`
 // 环境变量：BENCH_ROUNDS (3), BENCH_WARMUP (1), BENCH_SET (100), BENCH_GET (500),
 //   BENCH_PIPE (500), BENCH_PING (1000), BENCH_BATCH (500), BENCH_COLL (200),
-//   BENCH_BIG (20), BENCH_BIG_GET (50), BENCH_BIG_BYTES (65536), BENCH_CONNECT (50)
+//   BENCH_BIG (20), BENCH_BIG_GET (50), BENCH_BIG_BYTES (65536), BENCH_CONNECT (50),
+//   BENCH_STREAM (200), BENCH_PUBSUB (100), BENCH_TTL (30), BENCH_TXN (100)
 // 真机对照：设 BENCH_ORACLE_HOST / BENCH_ORACLE_PORT 指向真实 redis-server 后，
 //   同一矩阵以 `ioredis` 为固定客户端再跑一轮，作为 oracle 列写进报告。
 
@@ -19,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import { startServer } from '../../shared/product.mjs';
 import { createClient } from '../src/clients.mjs';
-import { benchSummary, benchSummarySource } from '../src/harness-bench.mjs';
+import { benchPerOpMs, benchSummary, benchSummarySource } from '../src/harness-bench.mjs';
 import { elapsedMs, throughput } from '../src/timing.mjs';
 
 const exampleRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -47,6 +48,10 @@ const BIG_COUNT = count('BENCH_BIG', 20);
 const BIG_GET = count('BENCH_BIG_GET', 50);
 const BIG_BYTES = count('BENCH_BIG_BYTES', 65_536);
 const CONNECT_COUNT = count('BENCH_CONNECT', 50);
+const STREAM_COUNT = count('BENCH_STREAM', 200);
+const PUBSUB_COUNT = count('BENCH_PUBSUB', 100);
+const TTL_COUNT = count('BENCH_TTL', 30);
+const TXN_COUNT = count('BENCH_TXN', 100);
 const ROUNDS = count('BENCH_ROUNDS', 3);
 const WARMUP = count('BENCH_WARMUP', 1);
 const BIG_VALUE = 'b'.repeat(BIG_BYTES);
@@ -199,6 +204,85 @@ const workloads = [
     },
   },
   {
+    name: 'streams-xadd-xrange',
+    scenario: 'redis-stream-xadd-xrange',
+    ops: STREAM_COUNT + 2,
+    params: { entries: String(STREAM_COUNT), fields: '1' },
+    dataScale: `key=1,entries=${STREAM_COUNT}`,
+    async run({ client }) {
+      await client.call(['DEL', 'bench:stream']);
+      for (let index = 0; index < STREAM_COUNT; index += 1) {
+        await client.call(['XADD', 'bench:stream', '*', 'entry', `v${index}`]);
+      }
+      const rows = await client.call(['XRANGE', 'bench:stream', '-', '+']);
+      if (!Array.isArray(rows) || rows.length !== STREAM_COUNT) {
+        throw new Error(`stream length ${Array.isArray(rows) ? rows.length : rows}, expected ${STREAM_COUNT}`);
+      }
+    },
+  },
+  {
+    name: 'pubsub-roundtrip',
+    scenario: 'redis-pubsub-publish-deliver',
+    ops: PUBSUB_COUNT,
+    params: { messages: String(PUBSUB_COUNT), channels: '1' },
+    dataScale: 'keys=0,channel=bench:news',
+    async prepare(ctx) {
+      ctx.subscriber = await createClient(ctx.clientName, { host: ctx.host, port: ctx.port });
+      await ctx.subscriber.subscribe('bench:news');
+    },
+    async cleanup(ctx) {
+      await ctx.subscriber?.close();
+    },
+    async run({ client, subscriber }) {
+      for (let index = 0; index < PUBSUB_COUNT; index += 1) {
+        const payload = `m${index}`;
+        const receivers = await client.call(['PUBLISH', 'bench:news', payload]);
+        if (receivers !== 1) throw new Error(`publish reported ${receivers} receivers, expected 1`);
+        const received = await subscriber.nextMessage();
+        if (received !== payload) throw new Error(`pubsub mismatch at ${index}: ${received}`);
+      }
+    },
+  },
+  {
+    name: 'ttl-setex-expire',
+    scenario: 'redis-ttl-setex-expire',
+    ops: TTL_COUNT * 3,
+    params: { keys: String(TTL_COUNT), ttl_seconds: '1', wait_ms: '1100' },
+    dataScale: `keys=${TTL_COUNT},value_bytes=64`,
+    async run({ client }) {
+      for (let index = 0; index < TTL_COUNT; index += 1) {
+        await client.call(['SETEX', `bench:ttl:${index}`, '1', VALUE]);
+      }
+      for (let index = 0; index < TTL_COUNT; index += 1) {
+        const remaining = await client.ttl(`bench:ttl:${index}`);
+        if (!(remaining > 0)) throw new Error(`ttl ${remaining} at ${index}, expected a live deadline`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 1_100));
+      for (let index = 0; index < TTL_COUNT; index += 1) {
+        const value = await client.get(`bench:ttl:${index}`);
+        if (value !== null) throw new Error(`ttl-expire miss at ${index}: key still live`);
+      }
+    },
+  },
+  {
+    name: 'multi-exec',
+    scenario: 'redis-txn-multi-exec',
+    ops: TXN_COUNT + 2,
+    params: { commands: String(TXN_COUNT), probe: 'SET' },
+    dataScale: `keys=${TXN_COUNT},value_bytes=64`,
+    async run({ client }) {
+      await client.call(['MULTI']);
+      for (let index = 0; index < TXN_COUNT; index += 1) {
+        const queued = await client.call(['SET', `bench:txn:${index}`, VALUE]);
+        if (queued !== 'QUEUED') throw new Error(`multi queue failed at ${index}: ${queued}`);
+      }
+      const replies = await client.call(['EXEC']);
+      if (!Array.isArray(replies) || replies.length !== TXN_COUNT) {
+        throw new Error(`exec replies ${Array.isArray(replies) ? replies.length : replies}, expected ${TXN_COUNT}`);
+      }
+    },
+  },
+  {
     name: 'set-big',
     scenario: 'redis-big-value-set',
     ops: BIG_COUNT,
@@ -291,10 +375,15 @@ async function measure(clientName, workload, target) {
   }
   finally {
     try {
-      await client?.close();
+      await workload.cleanup?.(context);
     }
     finally {
-      await server?.close();
+      try {
+        await client?.close();
+      }
+      finally {
+        await server?.close();
+      }
     }
   }
 }
@@ -325,7 +414,7 @@ const results = {};
 const oracle = await oracleTarget();
 
 console.log(`Redis RESP2 scenario matrix (${WARMUP} warmup + ${ROUNDS} measured rounds per cell)`);
-console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
+console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
 console.log(`Stats: benchSummary via ${benchSummarySource}`);
 console.log('Server: fresh emulated server and dataDir per (workload, client); rounds share one server and one connection');
 console.log('');
@@ -383,7 +472,7 @@ function perOpTable() {
   for (const workload of workloads) {
     const cells = reportClients.map(client => {
       const stats = results[workload.name][client];
-      return `${(stats.medianMs / workload.ops).toFixed(3)} ms/op, ${throughput(workload.ops, stats.medianMs)}`;
+      return `${benchPerOpMs(stats, workload.ops).toFixed(3)} ms/op, ${throughput(workload.ops, stats.medianMs)}`;
     });
     lines.push(`| ${workload.name} | ${cells.join(' | ')} |`);
   }
@@ -399,6 +488,7 @@ const runProvenance = {
     set: String(SET_COUNT), get: String(GET_COUNT), pipe: String(PIPE_COUNT),
     ping: String(PING_COUNT), coll: String(COLL), big: String(BIG_COUNT),
     big_get: String(BIG_GET), big_bytes: String(BIG_BYTES), connect: String(CONNECT_COUNT),
+    stream: String(STREAM_COUNT), pubsub: String(PUBSUB_COUNT), ttl: String(TTL_COUNT), txn: String(TXN_COUNT),
   },
   data_scale: `matrix=${workloads.length}x${reportClients.length}`,
   rustc_version: rustcVersion,
@@ -452,10 +542,10 @@ emulated server refuses to be mistaken for the oracle (\`INFO\` shows
 const report = `# Benchmark report
 
 Command: \`pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark\`
-Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
+Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
 Baseline: \`ioredis\` against the emulated server = \`1.00x\`
 Ratio: subject_time / baseline_time (smaller is faster). Fastest cell in each row is bold.
-Stats: median/p95/min/max/rounds come from \`database.harness::summarize\` via \`benchSummary\` (${benchSummarySource}); nearest-rank p95, even-length median averages the middle pair. No median or p95 formula lives in this example.
+Stats: median/p95/min/max/rounds come from \`database.harness::summarize\` via \`benchSummary\` (${benchSummarySource}); nearest-rank p95, even-length median averages the middle pair. Per-op milliseconds come from \`database.harness::per_op_ms\` via \`benchPerOpMs\`, the same DTO the summary returns. No median, p95 or per-op formula lives in this example.
 
 ## Provenance
 
@@ -510,6 +600,20 @@ ${oracleSection}
 - \`ZRANGE ... WITHSCORES\` comes back as nested \`[member, score]\` pairs from the
   emulated server even under RESP2, while a real \`redis-server\` replies flat; the
   workload normalizes both shapes, so reply parsing never changes the timed region.
+- \`pubsub-roundtrip\` opens one dedicated subscriber connection per cell during the
+  untimed \`prepare\` and closes it after the measured rounds; each op is one
+  \`PUBLISH\` on the main connection plus the awaited delivery on the subscriber, so
+  the timing covers the server-wide fan-out path, not the handshake.
+- \`ttl-setex-expire\` writes \`BENCH_TTL\` keys with \`SETEX … 1\`, reads \`TTL\` on each,
+  waits \`1100ms\` inside the timed region, then asserts every \`GET\` answers nil. The
+  wait is a fixed constant shared by all three clients, so the absolute ms/op is
+  dominated by the wait while the relative column still compares command overhead.
+- \`multi-exec\` queues \`BENCH_TXN\` \`SET\`s after \`MULTI\` (each answering \`QUEUED\`) and
+  commits them with one \`EXEC\`; \`MULTI\` and \`EXEC\` are counted in ops on every
+  client, and the snapshot rewrite happens once at commit, not per queued command.
+- \`streams-xadd-xrange\` starts each round with \`DEL\` like the other collection
+  cells; \`XADD\` auto-ids are server-generated, so every client pays the same id
+  allocation cost inside the timed region.
 
 ## Machine-readable summary
 

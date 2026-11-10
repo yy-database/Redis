@@ -52,8 +52,11 @@ function parseFrame(buffer, offset = 0) {
 /**
  * Minimal RESP2 client: one socket, explicit command writes, reply frames read
  * in order. Pipelining writes one batch and waits for one reply per command.
+ *
+ * `onPush` receives complete frames that arrive while no command is pending —
+ * exactly the pub/sub deliveries a subscriber gets after its ack frame.
  */
-export function createRespClient({ host = '127.0.0.1', port } = {}) {
+export function createRespClient({ host = '127.0.0.1', port, onPush = null } = {}) {
   const socket = connect({ host, port });
   let buffer = Buffer.alloc(0);
   let failure = null;
@@ -86,6 +89,20 @@ export function createRespClient({ host = '127.0.0.1', port } = {}) {
       const entry = pending.shift();
       if (frame.error) entry.reject(frame.error);
       else entry.resolve(frame.value);
+    }
+    if (onPush === null) return;
+    while (true) {
+      let frame;
+      try {
+        frame = parseFrame(buffer);
+      } catch (error) {
+        fail(error);
+        return;
+      }
+      if (frame === null) return;
+      buffer = buffer.subarray(frame.consumed);
+      if (frame.error) fail(frame.error);
+      else onPush(frame.value);
     }
   }
 
