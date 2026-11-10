@@ -157,6 +157,27 @@ const workloads = [
     },
   },
   {
+    name: 'hash-setnx-hrandfield',
+    scenario: 'redis-hash-setnx-hrandfield',
+    ops: COLL * 2 + 2,
+    params: { fields: String(COLL) },
+    dataScale: `key=1,fields=${COLL}`,
+    async run({ client }) {
+      await client.call(['DEL', 'bench:hashnx']);
+      for (let index = 0; index < COLL; index += 1) {
+        await client.call(['HSETNX', 'bench:hashnx', `f${index}`, `v${index}`]);
+      }
+      const overwritten = await client.call(['HSETNX', 'bench:hashnx', 'f0', 'x']);
+      if (Number(overwritten) !== 0) throw new Error(`HSETNX overwrote f0: ${overwritten}`);
+      const single = await client.call(['HRANDFIELD', 'bench:hashnx']);
+      if (typeof single !== 'string' || !single.startsWith('f')) throw new Error(`HRANDFIELD returned ${single}`);
+      const picks = await client.call(['HRANDFIELD', 'bench:hashnx', '4']);
+      if (!Array.isArray(picks) || picks.length !== Math.min(4, COLL)) {
+        throw new Error(`HRANDFIELD count returned ${Array.isArray(picks) ? picks.length : picks}`);
+      }
+    },
+  },
+  {
     name: 'list-rpush-lrange',
     scenario: 'redis-list-rpush-lrange',
     ops: COLL + 2,
