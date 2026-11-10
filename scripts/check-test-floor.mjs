@@ -3,7 +3,7 @@
 //!
 //! Parsing of TAP and unittest output stays here (product-side observation);
 //! the verdict itself runs in `database.harness` through the napi primitive
-//! `harnessSuiteVerdict`: skipped is red, failed is a problem, every floor is
+//! `harnessEvaluateGate`: skipped is red, failed is a problem, every floor is
 //! compared against its declared metric.
 
 import { spawnSync } from 'node:child_process';
@@ -151,10 +151,31 @@ catch (error) {
 if (result.status !== 0) {
     fail(`the command exited with status ${result.status}`, summary);
 }
-const gate = JSON.parse(loadBinding().harnessSuiteVerdict(
-    JSON.stringify({ cases: summary.executed, assertions: 0, passed: summary.passed, failed: summary.failed, skipped: summary.skipped }),
-    JSON.stringify([{ metric: 'cases', min: options.floor }]),
-));
+const gate = JSON.parse(loadBinding().harnessEvaluateGate(JSON.stringify({
+    suites: [
+        {
+            name: `redis.${options.kind}`,
+            tally: {
+                cases: summary.executed,
+                assertions: 0,
+                attempts: summary.executed,
+                passed: summary.passed,
+                failed: summary.failed,
+                skipped: summary.skipped,
+                unverified: 0,
+                unavailable: 0,
+                timed_out: 0,
+                cancelled: 0,
+                crashed: 0,
+                not_run: 0,
+            },
+            floors: [{ metric: 'cases', min: options.floor }],
+            oracle: { required: false, available: false, provenance: null },
+            baseline: 'none',
+        },
+    ],
+    policy: { allow_partial: false, allow_skipped: false, required_suites: [] },
+})));
 for (const problem of gate.problems) {
     if (problem.kind === 'skipped') {
         fail(`${problem.count} cases were skipped`, summary);

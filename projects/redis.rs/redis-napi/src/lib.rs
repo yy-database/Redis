@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use database::harness::{
-    Baseline, BaselineIdentity, DifferenceObservation, Digest, Floor, ReportEnvelope, SuiteSummary, check_baseline, render_json, verdict,
+    Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, SuiteReport, check_baseline, evaluate, render_json,
 };
 use database_execution::cluster::KeyValueExecutor;
 use database_query::cluster_kv::{KeyValueAction, KeyValueCommand, KeyValueResult};
@@ -891,16 +891,21 @@ pub fn harness_render_report(report_json: String) -> napi::Result<String> {
     render_json(&report).map_err(harness_error)
 }
 
-/// 按 floor 门禁判定套件计数。
+/// 按上游失败关闭规则判定一组套件证据。
 ///
-/// `summary_json` 是 `SuiteSummary` 的 serde 形态（`cases` / `assertions` /
-/// `passed` / `failed` / `skipped`）；`floors_json` 是 `Vec<Floor>` 形态
-/// （如 `[{"metric":"cases","min":1660}]`）。测试输出解析与 floor 数值由
-/// 调用方持有，本函数只做判定：skipped 即红、failed 记问题、逐条 floor 比较。
+/// `input_json` 是 `{ "suites": [SuiteReport..], "policy": GatePolicy }` 的 serde
+/// 形态（核心类型 snake_case 字段）。测试输出解析与 floor 数值由调用方持有，
+/// 本函数只做判定：failed、skipped、unverified、unavailable 等各执行状态分别记
+/// 问题，逐条 floor 比较，任一问题即 `ok` 为假。
 #[napi]
-pub fn harness_suite_verdict(summary_json: String, floors_json: String) -> napi::Result<String> {
-    let summary: SuiteSummary = serde_json::from_str(&summary_json).map_err(harness_error)?;
-    let floors: Vec<Floor> = serde_json::from_str(&floors_json).map_err(harness_error)?;
-    let gate = verdict(&summary, &floors);
-    serde_json::to_string(&gate).map_err(harness_error)
+pub fn harness_evaluate_gate(input_json: String) -> napi::Result<String> {
+    let envelope: serde_json::Value = serde_json::from_str(&input_json).map_err(harness_error)?;
+    let suites: Vec<SuiteReport> = serde_json::from_value(envelope.get("suites").cloned().unwrap_or_default())
+        .map_err(harness_error)?;
+    let policy: GatePolicy = match envelope.get("policy") {
+        Some(value) => serde_json::from_value(value.clone()).map_err(harness_error)?,
+        None => GatePolicy::default(),
+    };
+    let verdict = evaluate(&suites, &policy);
+    serde_json::to_string(&verdict).map_err(harness_error)
 }

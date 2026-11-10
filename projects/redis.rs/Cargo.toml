@@ -23,12 +23,12 @@ repository = "https://github.com/yy-database/Redis"
 # 族、hash 与 set 的公开命令入口、带 `LMPOP` 的 list 族入口、阻塞 list 与 zset
 # 命令的非阻塞复放入口，以及 `CLIENT`、`COMMAND`、`INFO`、`CONFIG`、`ACL` 的内嵌
 # 服务端会话。
-database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "382a408623166924dbd0fcfbb7f438170ad3a0e9", package = "database-formats" }
-database-types = { git = "https://github.com/oovm/database.rs.git", rev = "382a408623166924dbd0fcfbb7f438170ad3a0e9", package = "database-types" }
-database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "382a408623166924dbd0fcfbb7f438170ad3a0e9", package = "database-execution" }
-database-query = { git = "https://github.com/oovm/database.rs.git", rev = "382a408623166924dbd0fcfbb7f438170ad3a0e9", package = "database-query" }
-database-server = { git = "https://github.com/oovm/database.rs.git", rev = "382a408623166924dbd0fcfbb7f438170ad3a0e9", package = "database-server" }
-database = { git = "https://github.com/oovm/database.rs.git", rev = "382a408623166924dbd0fcfbb7f438170ad3a0e9", package = "database", default-features = false }
+database-formats = { git = "https://github.com/oovm/database.rs.git", rev = "0d688fe8526171b4a7a5398489cfb73f74fae5b2", package = "database-formats" }
+database-types = { git = "https://github.com/oovm/database.rs.git", rev = "0d688fe8526171b4a7a5398489cfb73f74fae5b2", package = "database-types" }
+database-execution = { git = "https://github.com/oovm/database.rs.git", rev = "0d688fe8526171b4a7a5398489cfb73f74fae5b2", package = "database-execution" }
+database-query = { git = "https://github.com/oovm/database.rs.git", rev = "0d688fe8526171b4a7a5398489cfb73f74fae5b2", package = "database-query" }
+database-server = { git = "https://github.com/oovm/database.rs.git", rev = "0d688fe8526171b4a7a5398489cfb73f74fae5b2", package = "database-server" }
+database = { git = "https://github.com/oovm/database.rs.git", rev = "0d688fe8526171b4a7a5398489cfb73f74fae5b2", package = "database", default-features = false }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"
