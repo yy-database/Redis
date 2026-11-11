@@ -26,9 +26,25 @@ importers:
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
+      '@yydb/redis-harness':
+        specifier: workspace:*
+        version: link:../redis-harness
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
+    optionalDependencies:
+      '@yydb/redis-darwin-arm64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-darwin-arm64
+      '@yydb/redis-darwin-x64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-darwin-x64
+      '@yydb/redis-linux-x64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-linux-x64
+      '@yydb/redis-win32-x64':
+        specifier: workspace:*
+        version: link:../../platforms/redis-win32-x64
 
   projects/redis.ts/packages/redis-harness: {}
 

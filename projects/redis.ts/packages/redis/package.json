@@ -1,49 +1,51 @@
 {
-  "name": "@yydb/redis",
-  "version": "0.1.0",
-  "type": "module",
-  "description": "Redis-compatible server and client composed over the `.yyds` and `.yykv` backends",
-  "license": "MPL-2.0",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+    "name": "@yydb/redis",
+    "version": "0.1.0",
+    "type": "module",
+    "description": "Redis-compatible server and client composed over the `.yyds` and `.yykv` backends",
+    "license": "MPL-2.0",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
+        }
+    },
+    "bin": {
+        "redis-cli": "./bin/redis-cli.mjs",
+        "redis-server": "./bin/redis-server.mjs"
+    },
+    "files": [
+        "dist",
+        "bin",
+        "readme.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "prepack": "tsc -p tsconfig.json",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "engines": {
+        "node": ">=24.0.0"
+    },
+    "dependencies": {
+    },
+    "optionalDependencies": {
+        "@yydb/redis-darwin-arm64": "workspace:*",
+        "@yydb/redis-darwin-x64": "workspace:*",
+        "@yydb/redis-linux-x64": "workspace:*",
+        "@yydb/redis-win32-x64": "workspace:*"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/yy-database/Redis.git",
+        "directory": "projects/redis.ts/packages/redis"
+    },
+    "devDependencies": {
+        "@types/node": "^24.19.2",
+        "typescript": "^5.9.2",
+        "@yydb/redis-harness": "workspace:*"
     }
-  },
-  "bin": {
-    "redis-cli": "./bin/redis-cli.mjs",
-    "redis-server": "./bin/redis-server.mjs"
-  },
-  "files": [
-    "dist",
-    "bin",
-    "readme.md"
-  ],
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "prepack": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
-  },
-  "engines": {
-    "node": ">=24.0.0"
-  },
-  "optionalDependencies": {
-    "@yydb/redis-darwin-arm64": "0.1.0",
-    "@yydb/redis-darwin-x64": "0.1.0",
-    "@yydb/redis-linux-x64": "0.1.0",
-    "@yydb/redis-unknown-wasm32": "0.1.0",
-    "@yydb/redis-win32-x64": "0.1.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yy-database/Redis.git",
-    "directory": "projects/redis.ts/packages/redis"
-  },
-  "devDependencies": {
-    "@types/node": "^24.19.2",
-    "typescript": "^5.9.2"
-  }
 }
