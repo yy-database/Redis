@@ -38,6 +38,9 @@ try {
     const options = parseArguments(process.argv.slice(2));
     const server = await startServer(options);
     console.log(`ready to accept connections on ${server.host}:${server.port} using ${server.dataDir}`);
+    // `SHUTDOWN` tears the server down from inside the socket loop; the process
+    // follows once the shard is flushed and the listener is closed.
+    server.onShutdown(() => process.exit(0));
     const shutdown = () => server.close().then(() => process.exit(0));
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);

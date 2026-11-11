@@ -4,8 +4,11 @@ import { parseInteger } from '../native.js';
 import type { Store } from '../native.js';
 import { array, bulk, error as replyError, integer, map, simple } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
+import { sweepExpired } from './expiry.js';
 import { planCollection, planHyperLogLog, planKeyspace, planSetAggregate, planSMisMember, planSort, planSPop, planString, planZSet } from './forward.js';
 import { DATABASES, commandName, unknownCommand, wrongArity } from './kinds.js';
+import { planIntrospection } from './introspection.js';
+import { planPersistence } from './persistence.js';
 import { planPubsub, pubsubSubcommand, pubsubSubcommandError, publish, SUBSCRIBER_COMMANDS, subscribed, subscriptionFrames } from './pubsub.js';
 import { planStream, planXRead, planXGroup, planXAck, planXPending, planXClaim, planXAutoClaim, planXInfo } from './streams.js';
 import type { BlockDescriptor, CommandPlan, RunOutcome, ServerOutcome, Session } from './session.js';
@@ -17,7 +20,12 @@ export interface ExecuteResult {
     killed?: number[];
     frames?: ReplySpec[];
     block?: BlockDescriptor;
+    /** Set by `SHUTDOWN`: the whole server, not just this connection, goes down. */
+    shutdown?: boolean;
 }
+
+/** Commands the upstream refuses to queue; they never enter a transaction. */
+const NO_MULTI_COMMANDS = new Set(['save', 'shutdown']);
 
 function hello(protocol: number, id?: number): ReplySpec {
     return map([
@@ -110,6 +118,13 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         return { reply: simple('OK') };
     }
 
+    // Upstream rejects the `NO_MULTI` commands while they are being queued, so
+    // the transaction is poisoned before the command could ever run.
+    if (session.queued && NO_MULTI_COMMANDS.has(name)) {
+        session.multiError = true;
+        return { reply: replyError(`ERR Command ${name.toUpperCase()} can not be used in MULTI`) };
+    }
+
     const planned = plan(store, session, name, args);
     if (planned.error) {
         // A command rejected while queued poisons the transaction: EXEC answers
@@ -137,9 +152,9 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         }
         return { block: planned.block };
     }
-    const outcome = planned.run() as RunOutcome & Partial<ServerOutcome>;
+    const outcome = planned.run() as RunOutcome & Partial<ServerOutcome> & { shutdown?: boolean };
     if (outcome !== null && typeof outcome === 'object' && outcome.close !== undefined) {
-        return { reply: outcome.reply, close: outcome.close, killed: outcome.killed };
+        return { reply: outcome.reply, close: outcome.close, killed: outcome.killed, shutdown: outcome.shutdown };
     }
     return { reply: outcome };
 }
@@ -211,6 +226,26 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'acl':
             return { run: () => store.serverCommand(session.id ?? 0, session.db, session.protocol ?? 2, args) };
 
+        case 'save':
+        case 'bgsave':
+        case 'lastsave':
+        case 'bgrewriteaof':
+        case 'shutdown':
+            return planPersistence(store, session, name, args);
+
+        case 'flushdb':
+        case 'flushall': {
+            if (args.length > 2) return { error: wrongArity(name) };
+            return {
+                run: () => {
+                    // Account for keys whose deadline elapsed since the previous
+                    // sweep before the facade empties the databases.
+                    sweepExpired(store, session.stats);
+                    return store.stringCommand(session.db, session.protocol ?? 2, args);
+                },
+            };
+        }
+
         case 'keys':
         case 'scan':
         case 'type':
@@ -258,8 +293,6 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'copy':
         case 'randomkey':
         case 'dbsize':
-        case 'flushdb':
-        case 'flushall':
             return planString(store, session, name, args);
 
         case 'hset':
@@ -394,6 +427,12 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
 
         case 'smismember':
             return planSMisMember(store, session, args);
+
+        case 'wait':
+        case 'latency':
+        case 'slowlog':
+        case 'memory':
+            return planIntrospection(store, session, name, args);
 
         default:
             return { error: unknownCommand(args) };
