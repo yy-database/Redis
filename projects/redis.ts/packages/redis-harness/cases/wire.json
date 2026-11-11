@@ -5111,6 +5111,70 @@
       "expect": {
         "value": 1234567890123
       }
+    },
+    {
+      "id": "wire.encode_command.extra.echo-empty-argument",
+      "face": "resp",
+      "op": "encode_command",
+      "argsHex": [
+        "4543484f",
+        ""
+      ],
+      "expect": {
+        "hex": "2a320d0a24340d0a4543484f0d0a24300d0a0d0a"
+      }
+    },
+    {
+      "id": "wire.decode_command.extra.echo-empty-argument",
+      "face": "resp",
+      "op": "decode_command",
+      "inputHex": "2a320d0a24340d0a4543484f0d0a24300d0a0d0a",
+      "expect": {
+        "consumed": 20,
+        "argsHex": [
+          "4543484f",
+          ""
+        ]
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.double.resp2",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 2,
+      "spec": {
+        "type": "double",
+        "value": "3.5"
+      },
+      "expect": {
+        "hex": "24330d0a332e350d0a"
+      }
+    },
+    {
+      "id": "wire.encode_reply.extra.double.resp3",
+      "face": "resp",
+      "op": "encode_reply",
+      "protocol": 3,
+      "spec": {
+        "type": "double",
+        "value": "3.5"
+      },
+      "expect": {
+        "hex": "2c332e350d0a"
+      }
+    },
+    {
+      "id": "wire.decode_reply.extra.double",
+      "face": "resp",
+      "op": "decode_reply",
+      "inputHex": "2c332e350d0a",
+      "expect": {
+        "consumed": 6,
+        "spec": {
+          "type": "double",
+          "value": "3.5"
+        }
+      }
     }
   ]
 }
