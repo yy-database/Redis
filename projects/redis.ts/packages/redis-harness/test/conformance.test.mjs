@@ -419,7 +419,7 @@ function runCase(entry) {
                     assertScanContract(entry, store);
                 }
             }
-            const steps = runSteps(store, entry.effect, directory);
+            const steps = runSteps(store, entry.effect ?? [], directory);
             return { steps };
         }
         case 'dispatch': {

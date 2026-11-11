@@ -1,0 +1,321 @@
+{
+  "format": "redis.case/v1",
+  "table": "persistence-ops",
+  "cases": [
+    {
+      "id": "command.persistence.save.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SAVE", "x"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'save' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.save.ok",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SAVE"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "61", "valueHex": "62" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 1 } }
+      ]
+    },
+    {
+      "id": "command.persistence.save.durable",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "oracleLimitation": "save-durability-check-is-storage-side",
+      "argsText": ["SAVE"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "incr_by", "db": 0, "keyHex": "63", "delta": 5 }
+      ],
+      "effect": [
+        { "call": "reopen" },
+        { "call": "get", "db": 0, "keyHex": "63", "expect": { "bytes": "35" } }
+      ]
+    },
+    {
+      "id": "dispatch.persistence.save.in-multi",
+      "face": "command",
+      "op": "dispatch",
+      "sides": ["ts"],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": ["MULTI"],
+          "reply": { "type": "simple", "value": "OK" }
+        },
+        {
+          "argsText": ["SAVE"],
+          "reply": { "type": "error", "value": "ERR Command SAVE can not be used in MULTI" }
+        },
+        {
+          "argsText": ["EXEC"],
+          "reply": { "type": "error", "value": "EXECABORT Transaction discarded because of previous errors." }
+        }
+      ]
+    },
+    {
+      "id": "dispatch.persistence.bgsave.schedule-idle",
+      "face": "command",
+      "op": "dispatch",
+      "sides": ["ts"],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": ["BGSAVE", "SCHEDULE"],
+          "reply": { "type": "simple", "value": "Background saving started" }
+        }
+      ]
+    },
+    {
+      "id": "command.persistence.bgsave.started",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BGSAVE"],
+      "reply": { "type": "simple", "value": "Background saving started" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.bgsave.in-progress",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "oracleLimitation": "bgsave-child-timing",
+      "argsText": ["BGSAVE"],
+      "reply": { "type": "error", "value": "ERR Background save already in progress" },
+      "setup": [
+        { "call": "command", "argsText": ["BGSAVE"] }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.bgsave.schedule-during-rdb",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "oracleLimitation": "bgsave-child-timing",
+      "argsText": ["BGSAVE", "SCHEDULE"],
+      "reply": { "type": "error", "value": "ERR Background save already in progress" },
+      "setup": [
+        { "call": "command", "argsText": ["BGSAVE"] }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.save.during-bgsave",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "oracleLimitation": "bgsave-child-timing",
+      "argsText": ["SAVE"],
+      "reply": { "type": "error", "value": "ERR Background save already in progress" },
+      "setup": [
+        { "call": "command", "argsText": ["BGSAVE"] }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.bgsave.bogus-option",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BGSAVE", "BOGUS"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.bgsave.too-many-args",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BGSAVE", "SCHEDULE", "SCHEDULE"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.lastsave.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["LASTSAVE", "x"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'lastsave' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.bgrewriteaof.arity",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BGREWRITEAOF", "x"],
+      "reply": { "type": "error", "value": "ERR wrong number of arguments for 'bgrewriteaof' command" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.bgrewriteaof.started",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["BGREWRITEAOF"],
+      "reply": { "type": "simple", "value": "Background append only file rewriting started" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "dispatch.persistence.bgrewriteaof.in-multi",
+      "face": "command",
+      "op": "dispatch",
+      "sides": ["ts"],
+      "setup": [],
+      "steps": [
+        {
+          "argsText": ["MULTI"],
+          "reply": { "type": "simple", "value": "OK" }
+        },
+        {
+          "argsText": ["BGREWRITEAOF"],
+          "reply": { "type": "simple", "value": "QUEUED" }
+        },
+        {
+          "argsText": ["EXEC"],
+          "reply": {
+            "type": "array",
+            "value": [
+              { "type": "simple", "value": "Background append only file rewriting started" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "command.persistence.shutdown.nosave",
+      "face": "command",
+      "op": "dispatch",
+      "sides": ["ts"],
+      "oracleLimitation": "shutdown-terminates-the-server",
+      "setup": [],
+      "steps": [
+        {
+          "argsText": ["SHUTDOWN", "NOSAVE"],
+          "close": true
+        }
+      ]
+    },
+    {
+      "id": "command.persistence.shutdown.bare",
+      "face": "command",
+      "op": "dispatch",
+      "sides": ["ts"],
+      "oracleLimitation": "shutdown-terminates-the-server",
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "61", "valueHex": "62" }
+      ],
+      "steps": [
+        {
+          "argsText": ["SHUTDOWN"],
+          "close": true,
+          "effect": [
+            { "call": "reopen" },
+            { "call": "get", "db": 0, "keyHex": "61", "expect": { "bytes": "62" } }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "command.persistence.shutdown.abort-idle",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "oracleLimitation": "shutdown-abort-wording",
+      "argsText": ["SHUTDOWN", "ABORT"],
+      "reply": { "type": "error", "value": "ERR No shutdown in progress." },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.shutdown.bogus-modifier",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SHUTDOWN", "BOGUS"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.shutdown.too-many-args",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SHUTDOWN", "NOSAVE", "NOW", "FORCE", "ABORT", "EXTRA"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.shutdown.conflicting-save-flags",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SHUTDOWN", "SAVE", "NOSAVE"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.shutdown.abort-with-other-flags",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["SHUTDOWN", "ABORT", "NOW"],
+      "reply": { "type": "error", "value": "ERR syntax error" },
+      "setup": [],
+      "effect": []
+    },
+    {
+      "id": "command.persistence.flushdb.clears-expired",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHDB"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "61", "valueHex": "62", "expiresAt": 1600000000000 },
+        { "call": "set", "db": 0, "keyHex": "63", "valueHex": "64" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 0 } }
+      ]
+    },
+    {
+      "id": "command.persistence.flushall.clears-expired",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["FLUSHALL"],
+      "reply": { "type": "simple", "value": "OK" },
+      "setup": [
+        { "call": "set", "db": 0, "keyHex": "61", "valueHex": "62", "expiresAt": 1600000000000 },
+        { "call": "set", "db": 1, "keyHex": "63", "valueHex": "64" }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 0 } },
+        { "call": "size", "db": 1, "expect": { "int": 0 } }
+      ]
+    }
+  ]
+}

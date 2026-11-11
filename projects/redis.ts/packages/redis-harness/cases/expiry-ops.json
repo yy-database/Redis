@@ -1,0 +1,95 @@
+{
+  "format": "redis.case/v1",
+  "table": "expiry-ops",
+  "cases": [
+    {
+      "id": "command.expiry.ttl-after-past-pexpireat",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["TTL", "e1"],
+      "reply": { "type": "int", "value": -2 },
+      "setup": [
+        { "call": "command", "argsText": ["SET", "e1", "v"] },
+        { "call": "command", "argsText": ["PEXPIREAT", "e1", "1600000000000"] }
+      ],
+      "effect": [
+        { "call": "exists", "db": 0, "keyHex": "6531", "expect": { "bool": false } }
+      ]
+    },
+    {
+      "id": "command.expiry.pttl-after-past-pexpireat",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["PTTL", "e1"],
+      "reply": { "type": "int", "value": -2 },
+      "setup": [
+        { "call": "command", "argsText": ["SET", "e1", "v"] },
+        { "call": "command", "argsText": ["PEXPIREAT", "e1", "1600000000000"] }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.expiry.del-missing-expired",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["DEL", "e1"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "command", "argsText": ["SET", "e1", "v"] },
+        { "call": "command", "argsText": ["PEXPIREAT", "e1", "1600000000000"] }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.expiry.exists-hides-expired",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["EXISTS", "e1"],
+      "reply": { "type": "int", "value": 0 },
+      "setup": [
+        { "call": "command", "argsText": ["SET", "e1", "v"] },
+        { "call": "command", "argsText": ["PEXPIREAT", "e1", "1600000000000"] }
+      ],
+      "effect": []
+    },
+    {
+      "id": "command.expiry.dbsize-hides-expired",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["DBSIZE"],
+      "reply": { "type": "int", "value": 1 },
+      "setup": [
+        { "call": "command", "argsText": ["SET", "live1", "v"] },
+        { "call": "command", "argsText": ["SET", "e1", "v"] },
+        { "call": "command", "argsText": ["PEXPIREAT", "e1", "1600000000000"] }
+      ],
+      "effect": [
+        { "call": "size", "db": 0, "expect": { "int": 1 } }
+      ]
+    },
+    {
+      "id": "command.expiry.keys-hides-expired",
+      "face": "command",
+      "op": "command",
+      "sides": ["ts"],
+      "argsText": ["KEYS", "*"],
+      "reply": {
+        "type": "array",
+        "value": [
+          { "type": "bulk", "bytes": [108, 105, 118, 101, 49] }
+        ]
+      },
+      "setup": [
+        { "call": "command", "argsText": ["SET", "live1", "v"] },
+        { "call": "command", "argsText": ["SET", "e1", "v"] },
+        { "call": "command", "argsText": ["PEXPIREAT", "e1", "1600000000000"] }
+      ],
+      "effect": []
+    }
+  ]
+}
