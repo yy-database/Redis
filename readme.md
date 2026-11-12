@@ -81,9 +81,12 @@ Supported options are narrower than the real server:
   RESP2 the map is flattened into a fourteen-element array. The `7.4.0` string is
   a compatibility label, not a claim that the command surface above matches
   Redis 7.4.0.
-- `HELLO` accepts only the optional protocol argument. It does not accept the
-  `AUTH` or `SETNAME` clauses. `CLIENT ID` answers the connection's own id, which
-  increases per connection; `HELLO` reports the same id.
+- `HELLO` accepts an optional protocol version followed by optional `AUTH
+  <username> <password>` and `SETNAME <name>` clauses. The `AUTH` clause
+  authenticates the connection, and `SETNAME` is also reported by `CLIENT
+  GETNAME`.
+- `CLIENT ID` answers the connection's own id, which increases per connection;
+  `HELLO` reports the same id.
 - Null replies use `$-1` under RESP2 and `_` under RESP3. Maps use `%` under
   RESP3 and a flattened array under RESP2.
 - Requests must be RESP multibulk frames. A request is limited to 64 MiB and
@@ -227,8 +230,7 @@ Tests and gates:
 - **No scripting or cluster surface.** There is no `EVAL` / `SCRIPT` / `FUNCTION`,
   no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS, keyspace notification
   or `DEBUG`. `AUTH` covers the single default user, not additional ACL users.
-- **Option gaps.** `HELLO` accepts only the protocol argument, so it cannot take
-  `AUTH` or `SETNAME`; `CLIENT` supports only the listed subcommands.
+- **Client options.** `CLIENT` supports only the subcommands listed above.
 - **Narrow glob.** `KEYS` matches only `*`, `?` and literal bytes. Character
   classes and escapes are not supported.
 - **Cursor semantics.** `SCAN` treats the cursor as a position in the current

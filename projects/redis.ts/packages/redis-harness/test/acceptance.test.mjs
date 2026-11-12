@@ -667,6 +667,22 @@ test('requirepass gates commands until AUTH succeeds', async () => {
         finally {
             fresh.close();
         }
+
+        // HELLO can carry the credentials and a client name.
+        const helloClient = await connectClient(server.port);
+        try {
+            const badHello = await helloClient.send('HELLO', '3', 'AUTH', 'default', 'nope');
+            assert.match(badHello.value, /WRONGPASS/);
+            assert.match((await helloClient.send('GET', 'k')).value, /NOAUTH/);
+
+            const hello = await helloClient.send('HELLO', '3', 'AUTH', 'default', 'secret', 'SETNAME', 'agent');
+            assert.equal(hello.type, 'map');
+            assert.equal(textOf(await helloClient.send('CLIENT', 'GETNAME')), 'agent');
+            assert.equal(textOf(await helloClient.send('GET', 'k')), 'v');
+        }
+        finally {
+            helloClient.close();
+        }
     }
     finally {
         guest.close();

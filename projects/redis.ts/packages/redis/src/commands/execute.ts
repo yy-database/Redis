@@ -62,22 +62,29 @@ function passwordMatches(given: Buffer, configured: string): boolean {
 function authenticate(session: Session, args: Buffer[]): ReplySpec {
     const username = args.length === 3 ? args[1].toString('utf8') : 'default';
     const password = args.length === 3 ? args[2] : args[1];
+    const error = credentialError(session, username, password, args.length === 2);
+    if (error !== null) return error;
+    session.authenticated = true;
+    return simple('OK');
+}
+
+/**
+ * Checks one username/password pair, returning the error reply or `null`.
+ *
+ * `legacy` marks the single-argument `AUTH <password>` form, which upstream
+ * answers with a dedicated message when no password is configured at all.
+ */
+function credentialError(session: Session, username: string, password: Buffer, legacy: boolean): ReplySpec | null {
     const configured = session.requirepass;
     if (configured === undefined) {
-        // The legacy single-argument form has no password to check, while the
-        // ACL form targets a default user whose `nopass` accepts any password.
-        if (args.length === 2) {
+        if (legacy) {
             return replyError(
                 'ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?',
             );
         }
-        if (username !== 'default') return wrongPass();
-        session.authenticated = true;
-        return simple('OK');
+        return username === 'default' ? null : wrongPass();
     }
-    if (username !== 'default' || !passwordMatches(password, configured)) return wrongPass();
-    session.authenticated = true;
-    return simple('OK');
+    return username === 'default' && passwordMatches(password, configured) ? null : wrongPass();
 }
 
 /** Executes one command and returns the reply specification. */
@@ -123,7 +130,7 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         return { reply: authenticate(session, args) };
     }
     if (name === 'hello') {
-        return helloCommand(session, args);
+        return helloCommand(store, session, args);
     }
     if (name === 'reset') {
         if (args.length !== 1) {
@@ -242,15 +249,56 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
     return { reply: outcome };
 }
 
-function helloCommand(session: Session, args: Buffer[]): ExecuteResult {
-    if (args.length > 2) {
-        return { reply: replyError('ERR syntax error') };
+function helloCommand(store: Store, session: Session, args: Buffer[]): ExecuteResult {
+    if (args.length === 1) {
+        return { reply: hello(session.protocol ?? 2, session.id) };
     }
-    const protocol = args.length === 2 ? parseInteger(args[1]) : session.protocol;
-    if (protocol !== 2 && protocol !== 3) {
+    const protocol = parseInteger(args[1]);
+    if (protocol === null || (protocol !== 2 && protocol !== 3)) {
         return { reply: replyError('NOPROTO unsupported protocol version') };
     }
+    let username: string | undefined;
+    let password: Buffer | undefined;
+    let name: string | undefined;
+    for (let index = 2; index < args.length;) {
+        const option = args[index].toString('utf8').toUpperCase();
+        if (option === 'AUTH') {
+            if (username !== undefined || index + 2 >= args.length) {
+                return { reply: replyError('ERR syntax error') };
+            }
+            username = args[index + 1].toString('utf8');
+            password = args[index + 2];
+            index += 3;
+        }
+        else if (option === 'SETNAME') {
+            if (name !== undefined || index + 1 >= args.length) {
+                return { reply: replyError('ERR syntax error') };
+            }
+            name = args[index + 1].toString('utf8');
+            index += 2;
+        }
+        else {
+            return { reply: replyError('ERR syntax error') };
+        }
+    }
+    if (username !== undefined && password !== undefined) {
+        const error = credentialError(session, username, password, false);
+        if (error !== null) {
+            return { reply: error };
+        }
+        session.authenticated = true;
+    }
     session.protocol = protocol;
+    if (name !== undefined) {
+        session.name = name;
+        // `CLIENT GETNAME` and `CLIENT LIST` read the upstream face, so mirror
+        // the name into the embedded session as well.
+        store.serverCommand(session.id ?? 0, session.db ?? 0, protocol, [
+            Buffer.from('CLIENT'),
+            Buffer.from('SETNAME'),
+            Buffer.from(name),
+        ]);
+    }
     return { reply: hello(protocol, session.id) };
 }
 
