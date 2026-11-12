@@ -511,7 +511,9 @@ function runStress(entry) {
             assert.equal(frame.length, entry.expect.frameLen);
             const decoded = decodeReply(frame);
             assert.equal(decoded.consumed, entry.expect.consumed);
-            assert.equal(JSON.parse(decoded.spec).bytes.length, entry.size);
+            const spec = JSON.parse(decoded.spec);
+            const size = spec.b64 !== undefined ? Buffer.from(spec.b64, 'base64').length : spec.bytes.length;
+            assert.equal(size, entry.size);
             return { encodeMs, frameLen: frame.length };
         }
         case 'nesting': {

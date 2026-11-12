@@ -5,8 +5,13 @@ alone. Acceptance checks compare the extension output against these values,
 so a defect in the extension cannot validate itself.
 """
 
+import base64
+
 YYKV_MAGIC = b"YYKV\x03"
 YYDS_MAGIC = b"YYDS\x01"
+
+#: Bulk payloads at least this large cross the binding as one base64 string.
+BULK_SPEC_BASE64_THRESHOLD = 4096
 
 
 def fnv1a(data: bytes) -> int:
@@ -191,7 +196,7 @@ def encode_reply(spec: dict, protocol: int) -> bytes:
     if kind == "int":
         return b":%d\r\n" % spec["value"]
     if kind == "bulk":
-        raw = bytes(spec["bytes"])
+        raw = base64.b64decode(spec["b64"]) if "b64" in spec else bytes(spec["bytes"])
         return b"$%d\r\n" % len(raw) + raw + b"\r\n"
     if kind == "null":
         return b"_\r\n" if protocol >= 3 else b"$-1\r\n"
@@ -238,7 +243,10 @@ def decode_reply(data: bytes):
         end = next_offset + length
         if len(data) < end + 2:
             return None
-        return {"type": "bulk", "bytes": list(data[next_offset:end])}, end + 2
+        raw = data[next_offset:end]
+        if length >= BULK_SPEC_BASE64_THRESHOLD:
+            return {"type": "bulk", "b64": base64.b64encode(raw).decode()}, end + 2
+        return {"type": "bulk", "bytes": list(raw)}, end + 2
     if prefix in (b"*", b"%"):
         count = _count(raw)
         if count is None or count < 0:

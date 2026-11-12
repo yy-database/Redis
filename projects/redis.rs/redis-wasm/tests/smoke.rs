@@ -5,7 +5,7 @@
 
 use std::io;
 
-use redis_wasm::format::Record;
+use redis_wasm::format::{Record, record_bytes};
 use redis_wasm::resp::{Reply, decode_command, encode_command, encode_reply};
 use redis_wasm::store::Node;
 
@@ -27,12 +27,39 @@ fn primitives_compose_without_a_listener() -> io::Result<()> {
     let mut node = Node::open(&data_dir)?;
     node.set(0, b"greeting", b"hello", None)?;
     let stored: Option<&Record> = node.get(0, b"greeting");
-    assert_eq!(stored.map(|record| record.value.as_slice()), Some(b"hello".as_slice()));
+    assert_eq!(stored.map(record_bytes), Some(b"hello".as_slice()));
     assert!(node.get(1, b"greeting").is_none());
     assert!(node.delete(0, b"greeting")?);
 
     let reply = encode_reply(&Reply::Bulk(b"hello".to_vec()), 2);
     assert_eq!(reply, b"$5\r\nhello\r\n");
+    let _ = std::fs::remove_dir_all(&data_dir);
+    Ok(())
+}
+
+#[test]
+fn batch_defers_the_snapshot_until_it_closes() -> io::Result<()> {
+    let data_dir = temporary_dir("batch");
+    let mut node = Node::open(&data_dir)?;
+    let before = std::fs::read(node.shard_path())?;
+    node.begin_batch();
+    node.set(0, b"first", b"1", None)?;
+    node.set(0, b"second", b"2", None)?;
+    assert_eq!(
+        std::fs::read(node.shard_path())?,
+        before,
+        "a batched mutation must not rewrite the shard on its own"
+    );
+    node.end_batch()?;
+    assert_ne!(std::fs::read(node.shard_path())?, before);
+    assert_eq!(node.get(0, b"first").map(record_bytes), Some(b"1".as_slice()));
+
+    let reopened = Node::open(&data_dir)?;
+    assert_eq!(
+        reopened.get(0, b"second").map(record_bytes),
+        Some(b"2".as_slice()),
+        "closing the batch must persist every mutation in it"
+    );
     let _ = std::fs::remove_dir_all(&data_dir);
     Ok(())
 }

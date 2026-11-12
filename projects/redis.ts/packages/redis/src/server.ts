@@ -140,7 +140,20 @@ export interface ServerHandle {
  * keys whose deadline elapsed while the server ran.
  */
 export async function startServer(
-    { dataDir, host = '127.0.0.1', port = 0, store: providedStore }: { dataDir?: string; host?: string; port?: number; store?: Store } = {},
+    {
+        dataDir,
+        host = '127.0.0.1',
+        port = 0,
+        store: providedStore,
+        appendfsync = 'everysec',
+    }: {
+        dataDir?: string;
+        host?: string;
+        port?: number;
+        store?: Store;
+        /** `everysec` syncs once per second, `always` syncs on every snapshot write. */
+        appendfsync?: 'always' | 'everysec';
+    } = {},
 ): Promise<ServerHandle> {
     const directory = providedStore !== undefined ? providedStore.dataDir() : dataDir as string;
     const releaseLock = acquireDataDirLock(directory);
@@ -152,6 +165,7 @@ export async function startServer(
         releaseLock();
         throw error;
     }
+    store.setSyncAlways(appendfsync === 'always');
     const connections = new Set<Socket>();
     // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
     const clients = new Map<number, Session>();
@@ -228,61 +242,75 @@ export async function startServer(
             send(result.reply as ReplySpec);
         }
         function pump(): void {
-            while (pending.length > 0 && blocked === null) {
-                let decoded: DecodedCommand | null;
-                try {
-                    decoded = decodeCommand(pending);
+            if (pending.length === 0 || blocked !== null) {
+                return;
+            }
+            // One socket read can carry a whole pipelined burst or a `MULTI`
+            // queue. Mutations land in memory as each command runs, and the
+            // shard is rewritten once when the burst ends instead of once per
+            // command. Replies are already buffered on the socket before the
+            // batch closes, so no client observes the deferred write.
+            store.beginBatch();
+            try {
+                while (pending.length > 0 && blocked === null) {
+                    let decoded: DecodedCommand | null;
+                    try {
+                        decoded = decodeCommand(pending);
+                    }
+                    catch {
+                        send(replyError(PROTOCOL_ERROR));
+                        socket.destroy();
+                        return;
+                    }
+                    if (decoded === null) {
+                        return;
+                    }
+                    pending = pending.subarray(decoded.consumed);
+                    // Redis consumes `*0` and a negative multibulk length as an
+                    // empty request and never answers it, so the loop just moves on.
+                    if (decoded.args.length === 0) {
+                        continue;
+                    }
+                    const startedAt = process.hrtime.bigint();
+                    const result = execute(store, session, decoded.args);
+                    if (result.block === undefined) {
+                        slowlogObserve(Number((process.hrtime.bigint() - startedAt) / 1000n), decoded.args, session);
+                    }
+                    if (result.block !== undefined) {
+                        // Park the command until another connection pushes to one of
+                        // its keys or its timeout fires. The reply is written by the
+                        // hub callback instead of this loop.
+                        blocked = {
+                            ...result.block,
+                            deliver: reply => {
+                                blocked = null;
+                                send(reply);
+                                if (!socket.destroyed) pump();
+                            },
+                        };
+                        hub.wait(blocked);
+                        return;
+                    }
+                    write(result);
+                    // A peer `CLIENT KILL` is reported by the binding, because the
+                    // killed connection lives on another socket owned by this loop.
+                    for (const killed of result.killed ?? []) {
+                        clients.get(killed)?.kill();
+                    }
+                    if (result.shutdown) {
+                        // `SHUTDOWN` has already persisted when it asked to leave;
+                        // the whole server goes down, so this loop stops pumping.
+                        performShutdown();
+                        return;
+                    }
+                    if (result.close) {
+                        socket.end();
+                        return;
+                    }
                 }
-                catch {
-                    send(replyError(PROTOCOL_ERROR));
-                    socket.destroy();
-                    return;
-                }
-                if (decoded === null) {
-                    return;
-                }
-                pending = pending.subarray(decoded.consumed);
-                // Redis consumes `*0` and a negative multibulk length as an
-                // empty request and never answers it, so the loop just moves on.
-                if (decoded.args.length === 0) {
-                    continue;
-                }
-                const startedAt = process.hrtime.bigint();
-                const result = execute(store, session, decoded.args);
-                if (result.block === undefined) {
-                    slowlogObserve(Number((process.hrtime.bigint() - startedAt) / 1000n), decoded.args, session);
-                }
-                if (result.block !== undefined) {
-                    // Park the command until another connection pushes to one of
-                    // its keys or its timeout fires. The reply is written by the
-                    // hub callback instead of this loop.
-                    blocked = {
-                        ...result.block,
-                        deliver: reply => {
-                            blocked = null;
-                            send(reply);
-                            if (!socket.destroyed) pump();
-                        },
-                    };
-                    hub.wait(blocked);
-                    return;
-                }
-                write(result);
-                // A peer `CLIENT KILL` is reported by the binding, because the
-                // killed connection lives on another socket owned by this loop.
-                for (const killed of result.killed ?? []) {
-                    clients.get(killed)?.kill();
-                }
-                if (result.shutdown) {
-                    // `SHUTDOWN` has already persisted when it asked to leave;
-                    // the whole server goes down, so this loop stops pumping.
-                    performShutdown();
-                    return;
-                }
-                if (result.close) {
-                    socket.end();
-                    return;
-                }
+            }
+            finally {
+                store.endBatch();
             }
         }
         socket.on('data', chunk => {
@@ -318,9 +346,14 @@ export async function startServer(
     // hundred-millisecond sweep keeps `expired` close to the real counter.
     const expiryTimer = setInterval(() => sweepExpired(store, stats), 100);
     expiryTimer.unref();
-    // The buffered counters reach the shard on a one-second cadence, so a crash
-    // loses at most one second of accounting rather than the whole session.
-    const flushTimer = setInterval(() => store.flush(), 1000);
+    // The buffered counters reach the shard on a one-second cadence, and the
+    // `everysec` fsync policy makes the shard stable on the same cadence, so a
+    // power loss loses at most one second of accounting rather than the whole
+    // session. Under `always` both calls are no-ops.
+    const flushTimer = setInterval(() => {
+        store.flush();
+        store.sync();
+    }, 1000);
     flushTimer.unref();
     const shutdownCallbacks: Array<() => void> = [];
     let torn = false;
@@ -333,6 +366,7 @@ export async function startServer(
         clearInterval(expiryTimer);
         clearInterval(flushTimer);
         store.flush();
+        store.sync();
         releaseLock();
         for (const socket of connections) {
             socket.destroy();

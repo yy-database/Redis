@@ -7,6 +7,7 @@ use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
 };
+use redis_wasm::format::record_bytes;
 use redis_wasm::resp::Reply;
 use redis_wasm::store::{Node, RenameOutcome};
 
@@ -94,7 +95,7 @@ impl Store {
 
     /// Returns the live value for one key.
     fn get(&self, db: u8, key: &[u8]) -> Option<Vec<u8>> {
-        self.node.get(db, key).map(|record| record.value.clone())
+        self.node.get(db, key).map(|record| record_bytes(record).to_vec())
     }
 
     /// Inserts or replaces a value with an optional absolute deadline in epoch milliseconds.
@@ -127,7 +128,10 @@ impl Store {
     /// Returns the live value of one kind (`""`, `hash`, `list`, `set`, `zset` or `stream`).
     fn get_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<Vec<u8>>> {
         check_kind(kind)?;
-        Ok(self.node.get_kind(db, kind, key).map(|record| record.value.clone()))
+        Ok(self
+            .node
+            .get_kind(db, kind, key)
+            .map(|record| record_bytes(record).to_vec()))
     }
 
     /// Inserts or replaces one kind with an optional absolute deadline in epoch milliseconds.

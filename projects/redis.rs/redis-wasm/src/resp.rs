@@ -16,6 +16,13 @@ use serde_json::Value as Json;
 pub const MAX_REQUEST_BYTES: usize = 64 * 1024 * 1024;
 /// Largest accepted argument count in one request.
 pub const MAX_REQUEST_ARGS: usize = 1024 * 1024;
+/// Payload size from which a bulk reply crosses the binding as base64.
+///
+/// Smaller payloads stay a JSON number array so the reply specification keeps
+/// its established shape. A numeric array costs one JSON node per byte, which
+/// dominates every large reply (a 64 KiB value becomes a 196 KiB spec), so the
+/// larger ones travel as one base64 string instead.
+pub const BULK_SPEC_BASE64_THRESHOLD: usize = 4096;
 
 /// One protocol reply.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,7 +131,13 @@ impl Reply {
             Self::Simple(value) => serde_json::json!({ "type": "simple", "value": value }),
             Self::Error(value) => serde_json::json!({ "type": "error", "value": value }),
             Self::Integer(value) => serde_json::json!({ "type": "int", "value": value }),
-            Self::Bulk(value) => serde_json::json!({ "type": "bulk", "bytes": value }),
+            Self::Bulk(value) => {
+                if value.len() >= BULK_SPEC_BASE64_THRESHOLD {
+                    serde_json::json!({ "type": "bulk", "b64": base64_encode(value) })
+                } else {
+                    serde_json::json!({ "type": "bulk", "bytes": value })
+                }
+            }
             Self::Null => serde_json::json!({ "type": "null" }),
             Self::NullArray => serde_json::json!({ "type": "null-array" }),
             Self::Double(value) => serde_json::json!({ "type": "double", "value": value }),
@@ -162,6 +175,9 @@ impl Reply {
                     .ok_or("reply specification `int` needs an integer `value`")?,
             )),
             "bulk" => {
+                if let Some(encoded) = spec.get("b64").and_then(Json::as_str) {
+                    return Ok(Self::Bulk(base64_decode(encoded)?));
+                }
                 let bytes = match spec.get("bytes") {
                     Some(Json::Array(values)) => values
                         .iter()
@@ -461,4 +477,109 @@ fn parse_count(bytes: &[u8]) -> Option<i64> {
 /// Writes an encoded reply to a writer.
 pub fn write_reply(writer: &mut impl Write, reply: &Reply, protocol: u8) -> std::io::Result<()> {
     writer.write_all(&encode_reply(reply, protocol))
+}
+
+const BASE64_ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/// Encodes bytes with the standard padded base64 alphabet.
+fn base64_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    for chunk in bytes.chunks(3) {
+        let first = u32::from(chunk[0]);
+        let second = u32::from(*chunk.get(1).unwrap_or(&0));
+        let third = u32::from(*chunk.get(2).unwrap_or(&0));
+        let triple = (first << 16) | (second << 8) | third;
+        out.push(BASE64_ALPHABET[(triple >> 18) as usize & 0x3f] as char);
+        out.push(BASE64_ALPHABET[(triple >> 12) as usize & 0x3f] as char);
+        out.push(if chunk.len() > 1 {
+            BASE64_ALPHABET[(triple >> 6) as usize & 0x3f] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            BASE64_ALPHABET[triple as usize & 0x3f] as char
+        } else {
+            '='
+        });
+    }
+    out
+}
+
+/// Decodes the standard padded base64 alphabet.
+fn base64_decode(text: &str) -> Result<Vec<u8>, String> {
+    let malformed = || "reply specification `bulk` has a malformed `b64` payload".to_owned();
+    let raw = text.as_bytes();
+    if raw.len() % 4 != 0 {
+        return Err(malformed());
+    }
+    let mut out = Vec::with_capacity(raw.len() / 4 * 3);
+    for (index, chunk) in raw.chunks(4).enumerate() {
+        let last = index + 1 == raw.len() / 4;
+        let padding = chunk.iter().rev().take_while(|byte| **byte == b'=').count();
+        if padding > 2 || (padding > 0 && !last) || chunk[..4 - padding].contains(&b'=') {
+            return Err(malformed());
+        }
+        let digit = |byte: u8| -> Option<u32> {
+            Some(match byte {
+                b'A'..=b'Z' => u32::from(byte - b'A'),
+                b'a'..=b'z' => u32::from(byte - b'a') + 26,
+                b'0'..=b'9' => u32::from(byte - b'0') + 52,
+                b'+' => 62,
+                b'/' => 63,
+                _ => return None,
+            })
+        };
+        let first = digit(chunk[0]).ok_or_else(malformed)?;
+        let second = digit(chunk[1]).ok_or_else(malformed)?;
+        let third = if padding >= 2 {
+            0
+        } else {
+            digit(chunk[2]).ok_or_else(malformed)?
+        };
+        let fourth = if padding >= 1 {
+            0
+        } else {
+            digit(chunk[3]).ok_or_else(malformed)?
+        };
+        out.push(((first << 2) | (second >> 4)) as u8);
+        if padding < 2 {
+            out.push(((second << 4) | (third >> 2)) as u8);
+        }
+        if padding < 1 {
+            out.push(((third << 6) | fourth) as u8);
+        }
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BULK_SPEC_BASE64_THRESHOLD, Reply, base64_decode, base64_encode};
+
+    #[test]
+    fn base64_round_trips_every_tail_length() {
+        for length in 0..32 {
+            let bytes = (0..length).map(|index| (index * 37 + 11) as u8).collect::<Vec<_>>();
+            let encoded = base64_encode(&bytes);
+            assert_eq!(base64_decode(&encoded).expect("decode"), bytes, "length {length}");
+        }
+    }
+
+    #[test]
+    fn base64_rejects_malformed_payloads() {
+        for text in ["A", "AA=A", "A===", "AA==AA==", "AA*="] {
+            assert!(base64_decode(text).is_err(), "{text} must be rejected");
+        }
+    }
+
+    #[test]
+    fn large_bulks_cross_the_specification_as_base64() {
+        let large = vec![0xab; BULK_SPEC_BASE64_THRESHOLD];
+        let spec = Reply::Bulk(large.clone()).to_spec();
+        assert!(spec.get("b64").is_some());
+        assert_eq!(Reply::from_spec(&spec).expect("round trip"), Reply::Bulk(large));
+
+        let small = Reply::Bulk(b"hello".to_vec()).to_spec();
+        assert!(small.get("bytes").is_some());
+    }
 }

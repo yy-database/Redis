@@ -27,12 +27,12 @@ fn fixtures() -> Vec<Fixture> {
 fn local_records() -> Records {
     let mut records = Records::new();
     for (namespace, key, value, revision, expires_at) in fixtures() {
+        let key = Key::new(namespace, key.to_vec());
         records.insert(
-            (namespace.to_owned(), key.to_vec()),
+            key.clone(),
             Record {
-                namespace: namespace.to_owned(),
-                key: key.to_vec(),
-                value: value.to_vec(),
+                key,
+                value: StoredValue::Inline(InlineValue(value.to_vec())),
                 revision,
                 expires_at,
             },

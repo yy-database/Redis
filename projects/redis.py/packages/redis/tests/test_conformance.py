@@ -7,6 +7,7 @@ documented shard/catalog layout, and documented Redis command semantics. No
 check compares one implementation against another at run time.
 """
 
+import base64
 import json
 import os
 import tempfile
@@ -465,7 +466,9 @@ def run_stress(entry):
         assert len(frame) == entry["expect"]["frameLen"]
         spec_text, consumed = decode_reply(frame)
         assert consumed == entry["expect"]["consumed"]
-        assert len(json.loads(spec_text)["bytes"]) == entry["size"]
+        spec = json.loads(spec_text)
+        size = len(base64.b64decode(spec["b64"])) if "b64" in spec else len(spec["bytes"])
+        assert size == entry["size"]
         return {"encodeMs": encode_ms, "frameLen": len(frame)}
     if kind == "nesting":
         spec = {"type": "bulk", "bytes": [120]}

@@ -86,9 +86,11 @@ function printReply(spec, prefix = '') {
         case 'int':
             console.log(`${padding}(integer) ${spec.value}`);
             break;
-        case 'bulk':
-            console.log(`${padding}${Buffer.from(spec.bytes ?? []).toString('utf8')}`);
+        case 'bulk': {
+            const bytes = spec.b64 !== undefined ? Buffer.from(spec.b64, 'base64') : Buffer.from(spec.bytes ?? []);
+            console.log(`${padding}${bytes.toString('utf8')}`);
             break;
+        }
         case 'null':
             console.log(`${padding}(nil)`);
             break;

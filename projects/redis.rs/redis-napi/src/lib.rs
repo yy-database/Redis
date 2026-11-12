@@ -16,6 +16,7 @@ use database_server::yyds::redis::{ClientRegistry, EmbeddedServerFace};
 use database_types::cluster::{Error as ClusterError, FenceToken, Namespace};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+use redis_wasm::format::record_bytes;
 use redis_wasm::resp::Reply;
 use redis_wasm::store::{Node, RenameOutcome};
 
@@ -251,13 +252,13 @@ impl KeyValueExecutor for StoreExecutor<'_> {
         match command.action {
             KeyValueAction::Get => Ok(KeyValueResult::Get(
                 node.get_kind(db, kind, key)
-                    .map(|record| upstream_value(kind, &record.value)),
+                    .map(|record| upstream_value(kind, record_bytes(record))),
             )),
             KeyValueAction::Exists => Ok(KeyValueResult::Exists(node.contains_kind(db, kind, key))),
             KeyValueAction::GetDelete => {
                 let value = node
                     .get_kind(db, kind, key)
-                    .map(|record| upstream_value(kind, &record.value));
+                    .map(|record| upstream_value(kind, record_bytes(record)));
                 if value.is_some() {
                     node.delete_kind(db, kind, key).map_err(ClusterError::Io)?;
                 }
@@ -266,7 +267,7 @@ impl KeyValueExecutor for StoreExecutor<'_> {
             KeyValueAction::GetSet(value) => {
                 let previous = node
                     .get_kind(db, kind, key)
-                    .map(|record| upstream_value(kind, &record.value));
+                    .map(|record| upstream_value(kind, record_bytes(record)));
                 let value = downstream_value(kind, value);
                 let revision = node
                     .set_kind_revision(db, kind, key, &value, None)
@@ -446,7 +447,7 @@ impl KeyValueExecutor for StoreExecutor<'_> {
             // `keys` merges every kind of the database, so a key that only lives
             // in another kind namespace is not part of this scan.
             if let Some(record) = node.get_kind(db, kind, &key) {
-                records.push((key, upstream_value(kind, &record.value)));
+                records.push((key, upstream_value(kind, record_bytes(record))));
             }
         }
         Ok(records)
@@ -481,7 +482,7 @@ impl Store {
     pub fn get(&self, db: u8, key: Buffer) -> Option<Buffer> {
         self.shard()
             .get(db, &key)
-            .map(|record| Buffer::from(record.value.clone()))
+            .map(|record| Buffer::from(record_bytes(record).to_vec()))
     }
 
     /// Inserts or replaces a value with an optional absolute deadline in epoch milliseconds.
@@ -527,7 +528,7 @@ impl Store {
         Ok(self
             .shard()
             .get_kind(db, &kind, &key)
-            .map(|record| Buffer::from(record.value.clone())))
+            .map(|record| Buffer::from(record_bytes(record).to_vec())))
     }
 
     /// Inserts or replaces one kind with an optional absolute deadline in epoch milliseconds.
@@ -658,6 +659,44 @@ impl Store {
     #[napi]
     pub fn flush_db(&mut self, db: u8) -> std::result::Result<(), napi::Error> {
         self.shard().flush_db(db).map_err(reason)
+    }
+
+    /// Drops every record whose deadline elapsed at `now_unix_ms`.
+    ///
+    /// Returns the number of distinct logical keys that expired. One pass walks
+    /// the shard in Rust, so a large keyspace costs one native call instead of
+    /// one call per key and kind from the host loop.
+    #[napi]
+    pub fn sweep_expired(&mut self, now_unix_ms: i64) -> std::result::Result<u32, napi::Error> {
+        Ok(self.shard().sweep_expired(now_unix_ms).map_err(reason)? as u32)
+    }
+
+    /// Opens a batch whose mutations share one snapshot write.
+    ///
+    /// The host brackets one socket read with `beginBatch` / `endBatch`, so a
+    /// pipelined burst rewrites the `.yykv` shard once instead of once per
+    /// command. Reads inside the batch already see every earlier mutation.
+    #[napi]
+    pub fn begin_batch(&mut self) {
+        self.shard().begin_batch();
+    }
+
+    /// Closes a batch and writes the shard at the outermost depth.
+    #[napi]
+    pub fn end_batch(&mut self) -> std::result::Result<(), napi::Error> {
+        self.shard().end_batch().map_err(reason)
+    }
+
+    /// Selects `fsync` on every snapshot write (`always`) or once per sync call.
+    #[napi]
+    pub fn set_sync_always(&mut self, always: bool) {
+        self.shard().set_sync_always(always);
+    }
+
+    /// Flushes an unsynced snapshot to stable storage.
+    #[napi]
+    pub fn sync(&mut self) -> std::result::Result<(), napi::Error> {
+        self.shard().sync().map_err(reason)
     }
 
     /// Number of live keys in one database.

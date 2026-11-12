@@ -10,33 +10,36 @@
 use std::collections::BTreeMap;
 
 use database_formats::yy::yyds;
-use database_formats::yy::yykv::{self, InlineValue, Key, Record as SnapshotRecord, StoredValue};
+use database_formats::yy::yykv::{self, InlineValue, StoredValue};
+pub use database_formats::yy::yykv::{Key, Record};
 use database_types::cluster::{Error as SourceError, ShardId};
 
-/// One stored record inside the shard.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Record {
-    /// Namespace partitioning this key, one per Redis database index.
-    pub namespace: String,
-    /// Opaque key bytes.
-    pub key: Vec<u8>,
-    /// Inline value payload.
-    pub value: Vec<u8>,
-    /// Monotonic revision inside the shard.
-    pub revision: u64,
-    /// Wall-clock expiry as Unix epoch milliseconds.
-    pub expires_at: Option<i64>,
-}
+/// Records keyed by [`Key`] for ordered lookup.
+///
+/// This is the upstream record model itself, so a snapshot encode borrows the
+/// live map instead of rebuilding a second one on every write.
+pub type Records = BTreeMap<Key, Record>;
 
-impl Record {
-    /// Whether the record is absent at `now_unix_ms`.
-    pub fn is_expired_at(&self, now_unix_ms: i64) -> bool {
-        self.expires_at.is_some_and(|deadline| deadline <= now_unix_ms)
+/// Inline payload bytes of one record.
+///
+/// The node stores inline payloads only; an object-backed record yields no
+/// bytes and is rejected by [`encode_shard`] and [`decode_shard`] instead.
+pub fn record_bytes(record: &Record) -> &[u8] {
+    match &record.value {
+        StoredValue::Inline(value) => &value.0,
+        StoredValue::Object(_) => &[],
     }
 }
 
-/// Records keyed by `(namespace, key bytes)` for ordered lookup.
-pub type Records = BTreeMap<(String, Vec<u8>), Record>;
+/// Builds one inline record at a shard-assigned revision.
+pub fn inline_record(key: Key, value: Vec<u8>, revision: u64, expires_at: Option<i64>) -> Record {
+    Record {
+        key,
+        value: StoredValue::Inline(InlineValue(value)),
+        revision,
+        expires_at,
+    }
+}
 
 /// Format-level failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,28 +90,15 @@ pub fn encode_shard(records: &Records, next_revision: u64) -> Result<Vec<u8>> {
     // Product policy: every record is inline and a negative deadline is a caller
     // bug. Upstream wraps a negative expiry with `as u64`, so the rejection stays
     // here instead of being delegated.
-    if records
-        .values()
-        .any(|record| record.expires_at.is_some_and(|deadline| deadline < 0))
-    {
-        return Err(FormatError("expiry deadline must not be negative".to_owned()));
+    for record in records.values() {
+        if record.expires_at.is_some_and(|deadline| deadline < 0) {
+            return Err(FormatError("expiry deadline must not be negative".to_owned()));
+        }
+        if matches!(record.value, StoredValue::Object(_)) {
+            return Err(FormatError("shared object payloads are not supported here".to_owned()));
+        }
     }
-    let snapshot: BTreeMap<Key, SnapshotRecord> = records
-        .values()
-        .map(|record| {
-            let key = Key::new(record.namespace.clone(), record.key.clone());
-            (
-                key.clone(),
-                SnapshotRecord {
-                    key,
-                    value: StoredValue::Inline(InlineValue(record.value.clone())),
-                    revision: record.revision,
-                    expires_at: record.expires_at,
-                },
-            )
-        })
-        .collect();
-    yykv::encode_snapshot(&snapshot, next_revision).map_err(|source| encode_error(&source))
+    yykv::encode_snapshot(records, next_revision).map_err(|source| encode_error(&source))
 }
 
 /// Parses `.yykv` bytes written by [`encode_shard`].
@@ -119,29 +109,15 @@ pub fn encode_shard(records: &Records, next_revision: u64) -> Result<Vec<u8>> {
 /// the store's own refusal wording.
 pub fn decode_shard(bytes: &[u8]) -> Result<(Records, u64)> {
     let snapshot = yykv::decode_snapshot_strict(bytes).map_err(|source| shard_error(bytes, &source))?;
-    let mut records = Records::new();
-    for (key, record) in snapshot.records {
-        let value = match record.value {
-            StoredValue::Inline(value) => value.0,
-            // A shared payload reference must not be surfaced as row bytes.
-            StoredValue::Object(_) => {
-                return Err(FormatError("shared object payloads are not supported here".to_owned()));
-            }
-        };
-        let namespace = key.namespace.0;
-        let key_bytes = key.bytes;
-        records.insert(
-            (namespace.clone(), key_bytes.clone()),
-            Record {
-                namespace,
-                key: key_bytes,
-                value,
-                revision: record.revision,
-                expires_at: record.expires_at,
-            },
-        );
+    // A shared payload reference must not be surfaced as row bytes.
+    if snapshot
+        .records
+        .values()
+        .any(|record| matches!(record.value, StoredValue::Object(_)))
+    {
+        return Err(FormatError("shared object payloads are not supported here".to_owned()));
     }
-    Ok((records, snapshot.next_revision))
+    Ok((snapshot.records, snapshot.next_revision))
 }
 
 /// Serializes `.yyds` catalog bytes registering one shard.

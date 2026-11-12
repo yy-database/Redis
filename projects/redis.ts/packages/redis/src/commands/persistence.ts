@@ -36,6 +36,7 @@ function markSaved(store: Store): void {
 /** Flushes synchronously, the blocking `SAVE` path. */
 function performSave(store: Store): void {
     store.flush();
+    store.sync();
     markSaved(store);
 }
 
@@ -52,6 +53,7 @@ function startBackgroundSave(store: Store): void {
         const state = stateOf(store);
         try {
             store.flush();
+            store.sync();
             markSaved(store);
         }
         finally {

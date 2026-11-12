@@ -62,6 +62,11 @@ interface NativeStore {
     flush(): void;
     incrBy(db: number, key: Buffer, delta: number): Increment;
     flushDb(db: number): void;
+    sweepExpired(nowUnixMs: number): number;
+    beginBatch(): void;
+    endBatch(): void;
+    setSyncAlways(always: boolean): void;
+    sync(): void;
     size(db: number): number;
     dataDir(): string;
     hashCommand(db: number, protocol: number, args: Buffer[]): string;
@@ -214,6 +219,31 @@ export class Store {
 
     flushDb(db: number): void {
         this.native.flushDb(db);
+    }
+
+    /** Drops every record already past its deadline; returns the expired key count. */
+    sweepExpired(nowUnixMs: number): number {
+        return this.native.sweepExpired(nowUnixMs);
+    }
+
+    /** Opens a batch whose mutations share one snapshot write. */
+    beginBatch(): void {
+        this.native.beginBatch();
+    }
+
+    /** Closes a batch and writes the shard at the outermost depth. */
+    endBatch(): void {
+        this.native.endBatch();
+    }
+
+    /** Selects `fsync` on every write (`always`) or only on `sync` (`everysec`). */
+    setSyncAlways(always: boolean): void {
+        this.native.setSyncAlways(always);
+    }
+
+    /** Flushes an unsynced snapshot to stable storage. */
+    sync(): void {
+        this.native.sync();
     }
 
     size(db: number): number {

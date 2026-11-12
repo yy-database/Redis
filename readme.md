@@ -101,15 +101,30 @@ bytes, a unique revision inside the shard, a millisecond deadline (`0` means no
 deadline) and an inline value. The YYDS object-plane payload (tag `1`) is never
 written and is rejected on read.
 
-The shard is a whole snapshot. Every write that reaches it clones the record
-map, re-serializes the entire shard, writes a synced temporary file and renames
-it over `local-0.yykv`. The catalog is written once, before the directory is
-usable, and is never rewritten afterwards. The shard is written before the
-catalog on a fresh directory, so a crash between the two renames reopens by
-recreating the catalog around the shard that already exists.
+The shard is a whole snapshot. Every write that reaches it re-serializes the
+entire shard, writes a temporary file and renames it over `local-0.yykv`. The
+live record map is mutated in place, so a commit pays one serialization pass
+rather than a full deep copy plus a second map build. The catalog is written
+once, before the directory is usable, and is never rewritten afterwards. The
+shard is written before the catalog on a fresh directory, so a crash between
+the two renames reopens by recreating the catalog around the shard that already
+exists.
 
-Write amplification follows from that layout. Measured on one Windows/NTFS host
-with the debug binding, one isolated `SET` at median of three:
+`fsync` follows the `appendfsync` policy:
+
+| Policy | Behavior |
+| ------ | -------- |
+| `everysec` (default) | The renamed snapshot is fsynced once per second, on `SAVE` / `BGSAVE`, and when the server closes. A process crash loses nothing because the bytes are already in the page cache, while a power loss can drop at most the writes since the previous second. |
+| `always` | Every snapshot write is fsynced before the command returns. |
+
+A server started with `--appendfsync always` therefore matches the strict
+durability boundary, while the default trades at most one second of power-loss
+durability for sequential write throughput.
+
+Write amplification follows from that layout. One isolated `SET` at median of
+three, recorded on one Windows/NTFS host with the debug binding before the
+in-place commit change (the byte counts still describe the layout, the times are
+I/O bound and host specific):
 
 | records in shard | single `SET` | bytes rewritten | write amplification |
 | ---------------- | ------------ | --------------- | ------------------- |
@@ -151,6 +166,7 @@ directly from the workspace:
 
 ```sh
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data
+node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data --appendfsync always
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 SET greeting hello
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 GET greeting
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 -3 HELLO 3
@@ -202,10 +218,11 @@ Tests and gates:
 - **Cursor semantics.** `SCAN` treats the cursor as a position in the current
   ascending key list and pages from there. It is not an opaque Redis cursor, and
   a keyspace change between calls can skip or repeat keys.
-- **No active expiry.** Expiry is evaluated on read. The snapshot never sweeps
-  expired records: `DEL` reports `0` for an already-expired key, and
-  `FLUSHDB` / `FLUSHALL` skip expired records, so those records stay in the
-  `.yykv` file until the same key is overwritten.
+- **Active expiry runs only with the server.** Reads always hide an expired
+  record, and the server additionally sweeps expired records out of the shard on
+  its 100 ms pass and before `FLUSHDB` / `FLUSHALL`. A bare `Store` handle that
+  never starts a server leaves those records in the `.yykv` file until the same
+  key is overwritten.
 - **No eviction.** There is no `maxmemory` policy and no background reclamation.
 - **One shard, one process.** The catalog accepts exactly one shard
   registration. There is no partitioning, multi-shard routing, replication,

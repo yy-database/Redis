@@ -4,18 +4,18 @@
 import { startServer } from '../dist/server.js';
 
 function usage() {
-    return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>]';
+    return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>] [--appendfsync <always|everysec>]';
 }
 
 function parseArguments(argv) {
-    const options = { host: '127.0.0.1', port: 6379, dataDir: 'data' };
+    const options = { host: '127.0.0.1', port: 6379, dataDir: 'data', appendfsync: 'everysec' };
     for (let index = 0; index < argv.length; index += 1) {
         const argument = argv[index];
         if (argument === '--help' || argument === '-h') {
             console.log(usage());
             process.exit(0);
         }
-        if (argument === '--host' || argument === '--port' || argument === '--data-dir') {
+        if (argument === '--host' || argument === '--port' || argument === '--data-dir' || argument === '--appendfsync') {
             const value = argv[index + 1];
             if (value === undefined) {
                 throw new Error(`${argument} needs a value`);
@@ -23,6 +23,12 @@ function parseArguments(argv) {
             index += 1;
             if (argument === '--host') options.host = value;
             else if (argument === '--port') options.port = Number.parseInt(value, 10);
+            else if (argument === '--appendfsync') {
+                if (value !== 'always' && value !== 'everysec') {
+                    throw new Error('appendfsync must be `always` or `everysec`');
+                }
+                options.appendfsync = value;
+            }
             else options.dataDir = value;
             continue;
         }
