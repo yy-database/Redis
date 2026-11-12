@@ -4,7 +4,7 @@
 import { startServer } from '../dist/server.js';
 
 function usage() {
-    return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>] [--appendfsync <always|everysec>]';
+    return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>] [--appendfsync <always|everysec>] [--requirepass <password>]';
 }
 
 function parseArguments(argv) {
@@ -15,7 +15,7 @@ function parseArguments(argv) {
             console.log(usage());
             process.exit(0);
         }
-        if (argument === '--host' || argument === '--port' || argument === '--data-dir' || argument === '--appendfsync') {
+        if (argument === '--host' || argument === '--port' || argument === '--data-dir' || argument === '--appendfsync' || argument === '--requirepass') {
             const value = argv[index + 1];
             if (value === undefined) {
                 throw new Error(`${argument} needs a value`);
@@ -29,6 +29,7 @@ function parseArguments(argv) {
                 }
                 options.appendfsync = value;
             }
+            else if (argument === '--requirepass') options.requirepass = value;
             else options.dataDir = value;
             continue;
         }

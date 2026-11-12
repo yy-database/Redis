@@ -23,7 +23,8 @@ read into a single rewrite, so a pipelined burst or a `MULTI` queue pays one
 rewrite rather than one per command. `startServer({ appendfsync })` selects
 `everysec` (default, fsync once per second and on `SAVE`, `BGSAVE` and close) or
 `always` (fsync every rewrite); `Redis`'s `redis-server` accepts the same choice
-as `--appendfsync`.
+as `--appendfsync`. `startServer({ requirepass })` and `--requirepass` require
+`AUTH` on every new connection before other commands run.
 
 Historical reference costs, recorded on one Windows/NTFS host with the debug
 binding before the in-place commit change (median of three, one isolated `SET`):

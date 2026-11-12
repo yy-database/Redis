@@ -39,7 +39,7 @@ arguments were sent.
 
 | Group | Commands |
 | ----- | -------- |
-| Connection and session | `PING` `ECHO` `QUIT` `HELLO` `SELECT` `RESET` |
+| Connection and session | `PING` `ECHO` `QUIT` `HELLO` `SELECT` `RESET` `AUTH` |
 | Client metadata | `CLIENT SETINFO` `CLIENT SETNAME` `CLIENT GETNAME` `CLIENT ID` `CLIENT LIST` `CLIENT INFO` `CLIENT NO-EVICT` `CLIENT NO-TOUCH` `CLIENT UNPAUSE` `CLIENT KILL` |
 | Server introspection | `COMMAND` `COMMAND COUNT` `COMMAND INFO` `COMMAND DOCS` `INFO` `CONFIG GET` `CONFIG SET` `ACL WHOAMI` `ACL LIST` `ACL CAT` `ACL GETUSER` |
 | Transactions | `MULTI` `EXEC` `DISCARD` `WATCH` `UNWATCH` |
@@ -98,6 +98,12 @@ Supported options are narrower than the real server:
   with a null array and the queue is dropped. `UNWATCH`, `DISCARD` and every
   `EXEC` release the pins. `WATCH` inside `MULTI` is rejected without touching
   the existing pins.
+- `AUTH` checks the single default user. Until it succeeds, every command except
+  `AUTH`, `HELLO`, `QUIT` and `RESET` answers `NOAUTH Authentication required.`.
+  A bad password answers
+  `WRONGPASS invalid username-password pair or user is disabled.`. When no
+  password is configured the legacy single-argument form reports that, while
+  `AUTH default <anything>` succeeds because the default user is `nopass`.
 - An empty multibulk request (`*0`) is ignored: it produces no reply and leaves
   the connection open.
 
@@ -181,6 +187,7 @@ directly from the workspace:
 ```sh
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data --appendfsync always
+node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data --requirepass secret
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 SET greeting hello
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 GET greeting
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 -3 HELLO 3
@@ -218,8 +225,8 @@ Tests and gates:
 ## Known limits
 
 - **No scripting or cluster surface.** There is no `EVAL` / `SCRIPT` / `FUNCTION`,
-  no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS, keyspace notification,
-  `AUTH` or `DEBUG`.
+  no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS, keyspace notification
+  or `DEBUG`. `AUTH` covers the single default user, not additional ACL users.
 - **Option gaps.** `HELLO` accepts only the protocol argument, so it cannot take
   `AUTH` or `SETNAME`; `CLIENT` supports only the listed subcommands.
 - **Narrow glob.** `KEYS` matches only `*`, `?` and literal bytes. Character

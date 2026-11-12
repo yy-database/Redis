@@ -1,5 +1,6 @@
 //! The `execute` dispatcher, the plan switch and `HELLO` framing.
 
+import { timingSafeEqual } from 'node:crypto';
 import { parseInteger } from '../native.js';
 import type { Store } from '../native.js';
 import { array, bulk, error as replyError, integer, map, nullArray, simple } from '../reply.js';
@@ -39,6 +40,46 @@ function hello(protocol: number, id?: number): ReplySpec {
     ]);
 }
 
+/** Commands an unauthenticated connection may still run, as on the real server. */
+const UNAUTHENTICATED_COMMANDS = new Set(['auth', 'hello', 'quit', 'reset']);
+
+/** Error Redis answers when a command needs an authenticated connection. */
+function noAuth(): ReplySpec {
+    return replyError('NOAUTH Authentication required.');
+}
+
+/** Error Redis answers for a bad user name or password. */
+function wrongPass(): ReplySpec {
+    return replyError('WRONGPASS invalid username-password pair or user is disabled.');
+}
+
+function passwordMatches(given: Buffer, configured: string): boolean {
+    const expected = Buffer.from(configured);
+    return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
+/** Runs `AUTH [username] password` against the single configured default user. */
+function authenticate(session: Session, args: Buffer[]): ReplySpec {
+    const username = args.length === 3 ? args[1].toString('utf8') : 'default';
+    const password = args.length === 3 ? args[2] : args[1];
+    const configured = session.requirepass;
+    if (configured === undefined) {
+        // The legacy single-argument form has no password to check, while the
+        // ACL form targets a default user whose `nopass` accepts any password.
+        if (args.length === 2) {
+            return replyError(
+                'ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?',
+            );
+        }
+        if (username !== 'default') return wrongPass();
+        session.authenticated = true;
+        return simple('OK');
+    }
+    if (username !== 'default' || !passwordMatches(password, configured)) return wrongPass();
+    session.authenticated = true;
+    return simple('OK');
+}
+
 /** Executes one command and returns the reply specification. */
 export function execute(store: Store, session: Session, args: Buffer[]): ExecuteResult {
     if (args.length === 0) {
@@ -47,6 +88,10 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         return { reply: undefined };
     }
     const name = commandName(args);
+
+    if (session.authenticated === false && !UNAUTHENTICATED_COMMANDS.has(name)) {
+        return { reply: noAuth() };
+    }
 
     // RESP2 subscriber mode: only the pub/sub verbs, PING, QUIT and RESET may run.
     // RESP3 dropped the restriction and runs any command while subscribed.
@@ -70,6 +115,12 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         // The connection layer accepts QUIT with any extra arguments and always
         // answers OK before closing, so there is no arity check here.
         return { reply: simple('OK'), close: true };
+    }
+    if (name === 'auth') {
+        if (args.length !== 2 && args.length !== 3) {
+            return { reply: wrongArity('auth') };
+        }
+        return { reply: authenticate(session, args) };
     }
     if (name === 'hello') {
         return helloCommand(session, args);

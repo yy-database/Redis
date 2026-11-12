@@ -67,6 +67,10 @@ export interface Session {
     queued?: CommandRun[] | null;
     multiError?: boolean;
     watched?: WatchedKey[];
+    /** `false` while the connection still owes an `AUTH`; absent means authorized. */
+    authenticated?: boolean;
+    /** Password configured on the server, absent when the default user has none. */
+    requirepass?: string;
     hub?: BlockingHub;
     pubsub?: PubSubTable;
     clients?: Map<number, Session>;

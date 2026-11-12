@@ -632,3 +632,57 @@ test('WATCH aborts EXEC when another connection writes the key', async () => {
         await server.close();
     }
 });
+
+test('requirepass gates commands until AUTH succeeds', async () => {
+    const server = await startServer({ dataDir: temporaryDir(), requirepass: 'secret' });
+    const guest = await connectClient(server.port);
+    const peer = await connectClient(server.port);
+    try {
+        const denied = await guest.send('GET', 'k');
+        assert.equal(denied.type, 'error');
+        assert.match(denied.value, /NOAUTH Authentication required/);
+
+        const bad = await guest.send('AUTH', 'wrong');
+        assert.equal(bad.type, 'error');
+        assert.match(bad.value, /WRONGPASS/);
+        assert.match((await guest.send('GET', 'k')).value, /NOAUTH/);
+
+        assert.match((await guest.send('AUTH', 'someone', 'secret')).value, /WRONGPASS/);
+
+        assert.equal((await guest.send('AUTH', 'secret')).value, 'OK');
+        assert.equal((await guest.send('SET', 'k', 'v')).value, 'OK');
+        assert.equal(textOf(await guest.send('GET', 'k')), 'v');
+
+        // Authentication is per connection, and the ACL form targets `default`.
+        assert.match((await peer.send('GET', 'k')).value, /NOAUTH/);
+        assert.equal((await peer.send('AUTH', 'default', 'secret')).value, 'OK');
+        assert.equal(textOf(await peer.send('GET', 'k')), 'v');
+
+        // HELLO and RESET stay available before authentication.
+        const fresh = await connectClient(server.port);
+        try {
+            assert.equal((await fresh.send('HELLO', '3')).type, 'map');
+            assert.equal((await fresh.send('RESET')).value, 'RESET');
+        }
+        finally {
+            fresh.close();
+        }
+    }
+    finally {
+        guest.close();
+        peer.close();
+        await server.close();
+    }
+});
+
+test('AUTH without a configured password reports the legacy error', () => {
+    const store = new Store(temporaryDir());
+    const state = session(2);
+    const legacy = execute(store, state, [Buffer.from('AUTH'), Buffer.from('x')]);
+    assert.equal(legacy.reply.type, 'error');
+    assert.match(legacy.reply.value, /called without any password configured/);
+
+    const acl = execute(store, state, [Buffer.from('AUTH'), Buffer.from('default'), Buffer.from('x')]);
+    assert.equal(acl.reply.type, 'simple');
+    assert.equal(acl.reply.value, 'OK');
+});

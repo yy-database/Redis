@@ -146,6 +146,7 @@ export async function startServer(
         port = 0,
         store: providedStore,
         appendfsync = 'everysec',
+        requirepass,
     }: {
         dataDir?: string;
         host?: string;
@@ -153,6 +154,8 @@ export async function startServer(
         store?: Store;
         /** `everysec` syncs once per second, `always` syncs on every snapshot write. */
         appendfsync?: 'always' | 'everysec';
+        /** Password for the default user; absent leaves the server open. */
+        requirepass?: string;
     } = {},
 ): Promise<ServerHandle> {
     const directory = providedStore !== undefined ? providedStore.dataDir() : dataDir as string;
@@ -199,6 +202,8 @@ export async function startServer(
             protocol: 2,
             queued: null,
             watched: [],
+            authenticated: requirepass === undefined,
+            requirepass,
             name: '',
             hub,
             pubsub,
