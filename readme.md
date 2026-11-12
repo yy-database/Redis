@@ -238,7 +238,9 @@ Tests and gates:
   files. The only extra file is the transient `.redis-server.lock`, which never
   carries data.
 - **Buffered counters.** An unflushed `INCR` is lost on a crash. Only a completed
-  flush, another mutation, or a clean close makes it durable.
+  flush, another mutation, or a clean close makes it durable. Under the default
+  `everysec` policy a power loss can additionally drop writes that are not yet
+  fsynced.
 - **UTF-8 composition layer.** The TypeScript `Store.get` returns a UTF-8
   string, so a non-UTF-8 value such as `00 ff 01` comes back from `GET` as
   `00 ef bf bd 01`. The Node-API `Store` exported by the platform binding and

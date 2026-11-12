@@ -16,10 +16,17 @@ The package exposes the same primitives the binaries compose: `startServer`,
 ## Limits and costs
 
 `.yykv` is a whole-snapshot format: every write that reaches the shard
-re-serializes the shard body and rewrites the file through a synced temporary
-file plus an atomic rename. Write amplification therefore grows linearly with
-the number of records in the shard. Measured on one Windows/NTFS host with the
-debug binding, one isolated `SET` costs (median of three):
+re-serializes the shard body and rewrites the file through a temporary file plus
+an atomic rename. Write amplification therefore grows linearly with the number of
+records in the shard. The server batches every command that arrives in one socket
+read into a single rewrite, so a pipelined burst or a `MULTI` queue pays one
+rewrite rather than one per command. `startServer({ appendfsync })` selects
+`everysec` (default, fsync once per second and on `SAVE`, `BGSAVE` and close) or
+`always` (fsync every rewrite); `Redis`'s `redis-server` accepts the same choice
+as `--appendfsync`.
+
+Historical reference costs, recorded on one Windows/NTFS host with the debug
+binding before the in-place commit change (median of three, one isolated `SET`):
 
 | records in shard | single `SET` | bytes rewritten | write amplification |
 | ---------------- | ------------ | --------------- | ------------------- |
@@ -27,20 +34,23 @@ debug binding, one isolated `SET` costs (median of three):
 | 1e4              | 26.75 ms     | 499 KB          | 8,607×              |
 | 1e5              | 205 ms       | 5.09 MB         | 87,700×             |
 
-At 1e5 records an isolated single-key write takes about 205 ms, roughly five
-writes per second on one shard. That is a property of the format, not a tunable
-parameter.
+The byte counts still describe the layout. Rewriting a large shard remains
+format-bound: at 1e5 records a single isolated write moves about 11 MB.
 
-The high-throughput path is batching: `setMany` folds many keys into one
-snapshot write. The same 1e5 keys take about 0.2–0.5 s in one call, against
-roughly 2.8 h and about 250 GB written when issued as 1e5 separate `SET`
-commands.
+The high-throughput path is batching, and the server now applies it
+automatically: one socket read, a pipeline, or a `MULTI` queue folds into one
+snapshot write. Library users can do the same with `Store.beginBatch` /
+`Store.endBatch`, or load many keys at once with `setMany`, which folds them into
+a single write. The same 1e5 keys take about 0.2–0.5 s in one `setMany` call,
+against roughly 2.8 h and about 250 GB written when issued as 1e5 separate `SET`
+commands at the historical debug cost.
 
 `INCR` and `INCRBY` are buffered in memory and become durable only at a `flush`
 boundary: an explicit `Store.flush()`, any other mutation, or dropping the
-handle; the server also flushes when it closes. A crash loses every increment
-applied since the last flush, and reopening returns the value as of that flush,
-never below it.
+handle; the server also flushes when it closes. A process crash loses every
+increment applied since the last flush, and reopening returns the value as of
+that flush, never below it. Under the default `everysec` policy a power loss can
+additionally drop writes that were not yet fsynced.
 
 A directory whose `.yyds` catalog is valid but whose registered `.yykv` shard is
 absent fails to open with the error `catalog.shard-file: <id>.yykv is missing`.
@@ -59,4 +69,5 @@ Not supported:
 - Multiple shards per catalog: the `.yyds` reader accepts exactly one shard
   registration and rejects `count > 1`.
 - Sidecar indexes next to `.yykv`: no file outside the documented `.yyds` and
-  `.yykv` bytes carries state, so anything else would be a stale read.
+  `.yykv` bytes carries data, so anything else would be a stale read. The
+  transient `.redis-server.lock` only names the serving process.
