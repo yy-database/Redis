@@ -17,8 +17,11 @@ notes.
   their commands on one in-process store.
 - 16 logical databases (`SELECT 0` through `SELECT 15`), each stored under its
   own namespace in the same shard.
-- String values with absolute millisecond deadlines, counters, key renames,
-  pattern listing and cursor paging, plus `MULTI` / `EXEC` / `DISCARD`.
+- String, hash, list, set, sorted set and stream values, with absolute
+  millisecond deadlines, counters, key renames, pattern listing and cursor
+  paging, plus `MULTI` / `EXEC` / `DISCARD`.
+- Bitmap and bitfield commands, HyperLogLog, pub/sub, blocking list and sorted
+  set commands, and `SORT`.
 - One `.yyds` catalog plus one `.yykv` shard per data directory; the shard is
   rewritten as a whole snapshot on every write that reaches it.
 - A `redis-cli`-shaped client that supports one-shot commands, an interactive
@@ -30,37 +33,44 @@ extension). Neither binding owns a server loop or a process entry point.
 
 ## Supported commands
 
-Only the commands below are implemented. Anything else answers
+The command surface below is complete. Anything else answers
 `ERR unknown command '<name>'`, followed by `with args beginning with: ...` when
 arguments were sent.
 
 | Group | Commands |
 | ----- | -------- |
-| Connection and session | `PING` `ECHO` `QUIT` `HELLO` `SELECT` |
+| Connection and session | `PING` `ECHO` `QUIT` `HELLO` `SELECT` `RESET` |
 | Client metadata | `CLIENT SETINFO` `CLIENT SETNAME` `CLIENT GETNAME` `CLIENT ID` `CLIENT LIST` `CLIENT INFO` `CLIENT NO-EVICT` `CLIENT NO-TOUCH` `CLIENT UNPAUSE` `CLIENT KILL` |
 | Server introspection | `COMMAND` `COMMAND COUNT` `COMMAND INFO` `COMMAND DOCS` `INFO` `CONFIG GET` `CONFIG SET` `ACL WHOAMI` `ACL LIST` `ACL CAT` `ACL GETUSER` |
 | Transactions | `MULTI` `EXEC` `DISCARD` |
-| Strings | `GET` `SET` `SETNX` `SETEX` `GETSET` `GETDEL` `GETEX` `MGET` `MSET` `APPEND` `STRLEN` `TYPE` |
-| Counters | `INCR` `DECR` `INCRBY` `DECRBY` |
-| Keys and expiry | `DEL` `EXISTS` `EXPIRE` `PEXPIRE` `EXPIREAT` `PEXPIREAT` `PERSIST` `TTL` `PTTL` `RENAME` `RENAMENX` |
-| Database inspection | `KEYS` `SCAN` `DBSIZE` `FLUSHDB` `FLUSHALL` |
+| Strings and bitmaps | `GET` `SET` `SETNX` `SETEX` `PSETEX` `GETSET` `GETDEL` `GETEX` `MGET` `MSET` `APPEND` `STRLEN` `GETRANGE` `SETRANGE` `INCR` `DECR` `INCRBY` `DECRBY` `INCRBYFLOAT` `SETBIT` `GETBIT` `BITCOUNT` `BITPOS` `BITFIELD` `BITFIELD_RO` |
+| Keys and expiry | `DEL` `EXISTS` `TYPE` `EXPIRE` `PEXPIRE` `EXPIREAT` `PEXPIREAT` `EXPIRETIME` `PEXPIRETIME` `PERSIST` `TTL` `PTTL` `RENAME` `RENAMENX` `COPY` `RANDOMKEY` |
+| Database inspection | `KEYS` `SCAN` `DBSIZE` `FLUSHDB` `FLUSHALL` `OBJECT` |
+| Hashes | `HSET` `HSETNX` `HGET` `HGETALL` `HDEL` `HLEN` `HKEYS` `HVALS` `HEXISTS` `HINCRBY` `HINCRBYFLOAT` `HRANDFIELD` `HSCAN` |
+| Lists | `LPUSH` `RPUSH` `LPOP` `RPOP` `LRANGE` `LINDEX` `LLEN` `LINSERT` `LSET` `LTRIM` `LREM` `LPOS` `RPOPLPUSH` `LMOVE` `LMPOP` |
+| Sets | `SADD` `SREM` `SMEMBERS` `SCARD` `SISMEMBER` `SMISMEMBER` `SMOVE` `SRANDMEMBER` `SPOP` `SSCAN` `SINTER` `SUNION` `SDIFF` `SINTERSTORE` `SUNIONSTORE` `SDIFFSTORE` `SINTERCARD` |
+| Sorted sets | `ZADD` `ZINCRBY` `ZCARD` `ZCOUNT` `ZLEXCOUNT` `ZRANGE` `ZREVRANGE` `ZRANGEBYSCORE` `ZREVRANGEBYSCORE` `ZRANGEBYLEX` `ZREVRANGEBYLEX` `ZRANGESTORE` `ZRANK` `ZREVRANK` `ZSCORE` `ZMSCORE` `ZREM` `ZREMRANGEBYRANK` `ZREMRANGEBYSCORE` `ZREMRANGEBYLEX` `ZPOPMIN` `ZPOPMAX` `ZRANDMEMBER` `ZSCAN` `ZUNIONSTORE` `ZINTERSTORE` `ZDIFFSTORE` `ZUNION` `ZINTER` `ZDIFF` `ZINTERCARD` `ZMPOP` |
+| Streams | `XADD` `XLEN` `XRANGE` `XREVRANGE` `XDEL` `XTRIM` `XREAD` `XGROUP` `XACK` `XPENDING` `XCLAIM` `XAUTOCLAIM` `XINFO` |
+| HyperLogLog | `PFADD` `PFCOUNT` `PFMERGE` |
+| Pub/sub | `SUBSCRIBE` `UNSUBSCRIBE` `PSUBSCRIBE` `PUNSUBSCRIBE` `PUBLISH` `PUBSUB CHANNELS` `PUBSUB NUMSUB` `PUBSUB NUMPAT` |
+| Blocking | `BLPOP` `BRPOP` `BLMOVE` `BRPOPLPUSH` `BLMPOP` `BZPOPMIN` `BZPOPMAX` `BZMPOP` |
+| Sorting | `SORT` `SORT_RO` |
+| Persistence | `SAVE` `BGSAVE` `LASTSAVE` `BGREWRITEAOF` `SHUTDOWN` |
+| Latency and memory | `WAIT` `LATENCY` `SLOWLOG` `MEMORY` |
 
-Supported options are equally narrow:
+Supported options are narrower than the real server:
 
-- `SET` accepts `NX`, `XX`, `KEEPTTL`, `EX`, `PX`, `EXAT` and `PXAT`. It does not
-  accept `GET`.
+- `SET` accepts `NX`, `XX`, `KEEPTTL`, `EX`, `PX`, `EXAT` and `PXAT`, plus `GET`
+  for the previous value.
 - `GETEX` accepts `PERSIST`, `EX`, `PX`, `EXAT` and `PXAT`.
-- `EXPIRE` and its variants take exactly one integer argument. They do not accept
-  `NX`, `XX`, `GT` or `LT`.
+- `EXPIRE` and its variants accept `NX`, `XX`, `GT` and `LT`.
 - `SCAN` accepts `MATCH` and `COUNT`.
 - `QUIT` accepts any extra arguments, answers `OK` and closes the connection.
 - `CONFIG SET` only accepts the options in its whitelist. Everything else answers
   `ERR Unknown option or number of arguments for CONFIG SET - '<name>'`.
-- `TYPE` answers `string` for a live key and `none` for a missing one. No other
-  type exists.
-
-Every value is a string. Lists, hashes, sets, sorted sets, streams, bitmaps,
-HyperLogLog, geospatial indexes and pub/sub channels are not implemented.
+- Blocking commands wait inside the planner while the facade serves their
+  non-blocking form.
+- `TYPE` reports `string`, `hash`, `list`, `set`, `zset`, `stream` or `none`.
 
 ## Protocol
 
@@ -173,8 +183,8 @@ node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 -3 HELLO 3
 ```
 
 An installed `@yydb/redis` exposes the same entry points as `redis-server` and
-`redis-cli`. The server has no `SHUTDOWN` command; stop it with `SIGINT` or
-`SIGTERM`, which flushes buffered increments before closing.
+`redis-cli`. `SHUTDOWN` saves unless `NOSAVE` is given, flushes buffered
+increments and closes the listener. `SIGINT` and `SIGTERM` do the same.
 
 The Python wheel ships the `redis` package together with its compiled
 `redis._native` extension, so installing the wheel is enough to import the
@@ -203,16 +213,11 @@ Tests and gates:
 
 ## Known limits
 
-- **String-only surface.** There is no list, hash, set, sorted set, stream,
-  bitmap, HyperLogLog or geospatial type, and no `TYPE` value other than
-  `string` or `none`.
-- **Small command set.** The table above is complete. There is no `WATCH`,
-  `PUBLISH` / `SUBSCRIBE`, scripting, ACL, `AUTH`, `INFO`, `CONFIG`, `COMMAND`,
-  `DEBUG`, `SAVE` / `BGSAVE`, `SHUTDOWN`, cluster, Sentinel or replication
-  command.
-- **Option gaps.** `SET` cannot take `GET`; `EXPIRE` cannot take `NX` / `XX` /
-  `GT` / `LT`; `HELLO` cannot take `AUTH` / `SETNAME`; `CLIENT` supports only the
-  four subcommands listed above.
+- **No scripting or cluster surface.** There is no `EVAL` / `SCRIPT` / `FUNCTION`,
+  no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS, keyspace notification,
+  `AUTH`, `WATCH` / `UNWATCH` or `DEBUG`.
+- **Option gaps.** `HELLO` accepts only the protocol argument, so it cannot take
+  `AUTH` or `SETNAME`; `CLIENT` supports only the listed subcommands.
 - **Narrow glob.** `KEYS` matches only `*`, `?` and literal bytes. Character
   classes and escapes are not supported.
 - **Cursor semantics.** `SCAN` treats the cursor as a position in the current
@@ -226,10 +231,12 @@ Tests and gates:
 - **No eviction.** There is no `maxmemory` policy and no background reclamation.
 - **One shard, one process.** The catalog accepts exactly one shard
   registration. There is no partitioning, multi-shard routing, replication,
-  cluster or Sentinel. The data directory has no inter-process lock, so two
-  server processes must not share it.
-- **No sidecar state.** Everything is carried by the two documented files; any
-  extra index file would be stale.
+  cluster or Sentinel. A `.redis-server.lock` file names the process serving a
+  directory: a second live server is refused and a stale lock held by a dead
+  process is reclaimed.
+- **No index sidecar.** Everything data-bearing is carried by the two documented
+  files. The only extra file is the transient `.redis-server.lock`, which never
+  carries data.
 - **Buffered counters.** An unflushed `INCR` is lost on a crash. Only a completed
   flush, another mutation, or a clean close makes it durable.
 - **UTF-8 composition layer.** The TypeScript `Store.get` returns a UTF-8
@@ -249,14 +256,13 @@ Tests and gates:
 
 ## Format ownership
 
-Redis implements its own `.yyds` and `.yykv` codecs in
-`projects/redis.rs/redis-wasm/src/format.rs` and does not depend on the family's
-`database-formats` crate. It writes the v3 shard shape and the v0 catalog shape
-described above, but reads deliberately less than the shared codec accepts:
-inline values only, exactly one shard, and no resolved contract or owner
-sections. This document records the current behavior only and promises no wider
-interchange; the relationship between this codec and the shared format contract
-is not settled here.
+Redis owns the mapping from its record model onto the `database-formats`
+`.yyds` and `.yykv` codecs in `projects/redis.rs/redis-wasm/src/format.rs`.
+It writes the v3 shard shape and the v0 catalog shape described above, but reads
+deliberately less than the shared codec accepts: inline values only, exactly one
+shard, and no resolved contract or owner sections. This document records the
+current behavior only and promises no wider interchange beyond the shared
+format contract.
 
 ## License
 
