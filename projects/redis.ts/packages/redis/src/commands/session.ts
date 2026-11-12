@@ -47,6 +47,13 @@ export interface CommandPlan {
     block?: BlockDescriptor;
 }
 
+/** One key pinned by `WATCH`, with the version observed when the watch was taken. */
+export interface WatchedKey {
+    db: number;
+    key: Buffer;
+    version: number;
+}
+
 /**
  * One connection's session, as `server.js` builds it and the commands read it.
  *
@@ -59,6 +66,7 @@ export interface Session {
     protocol?: number;
     queued?: CommandRun[] | null;
     multiError?: boolean;
+    watched?: WatchedKey[];
     hub?: BlockingHub;
     pubsub?: PubSubTable;
     clients?: Map<number, Session>;

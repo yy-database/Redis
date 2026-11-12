@@ -42,7 +42,7 @@ arguments were sent.
 | Connection and session | `PING` `ECHO` `QUIT` `HELLO` `SELECT` `RESET` |
 | Client metadata | `CLIENT SETINFO` `CLIENT SETNAME` `CLIENT GETNAME` `CLIENT ID` `CLIENT LIST` `CLIENT INFO` `CLIENT NO-EVICT` `CLIENT NO-TOUCH` `CLIENT UNPAUSE` `CLIENT KILL` |
 | Server introspection | `COMMAND` `COMMAND COUNT` `COMMAND INFO` `COMMAND DOCS` `INFO` `CONFIG GET` `CONFIG SET` `ACL WHOAMI` `ACL LIST` `ACL CAT` `ACL GETUSER` |
-| Transactions | `MULTI` `EXEC` `DISCARD` |
+| Transactions | `MULTI` `EXEC` `DISCARD` `WATCH` `UNWATCH` |
 | Strings and bitmaps | `GET` `SET` `SETNX` `SETEX` `PSETEX` `GETSET` `GETDEL` `GETEX` `MGET` `MSET` `APPEND` `STRLEN` `GETRANGE` `SETRANGE` `INCR` `DECR` `INCRBY` `DECRBY` `INCRBYFLOAT` `SETBIT` `GETBIT` `BITCOUNT` `BITPOS` `BITFIELD` `BITFIELD_RO` |
 | Keys and expiry | `DEL` `EXISTS` `TYPE` `EXPIRE` `PEXPIRE` `EXPIREAT` `PEXPIREAT` `EXPIRETIME` `PEXPIRETIME` `PERSIST` `TTL` `PTTL` `RENAME` `RENAMENX` `COPY` `RANDOMKEY` |
 | Database inspection | `KEYS` `SCAN` `DBSIZE` `FLUSHDB` `FLUSHALL` `OBJECT` |
@@ -92,14 +92,18 @@ Supported options are narrower than the real server:
 - Commands are planned before they run, so `MULTI` reports a malformed command at
   queue time instead of queuing it. A rejected queued command poisons the
   transaction: `EXEC` answers `EXECABORT` and drops the whole queue. Otherwise
-  `EXEC` replays the valid queue in order with no rollback. `WATCH` and `UNWATCH`
-  are not implemented.
+  `EXEC` replays the valid queue in order with no rollback.
+- `WATCH` pins the mutation version of each named key for its connection. If any
+  pinned key is written or expires before `EXEC`, the transaction is abandoned
+  with a null array and the queue is dropped. `UNWATCH`, `DISCARD` and every
+  `EXEC` release the pins. `WATCH` inside `MULTI` is rejected without touching
+  the existing pins.
 - An empty multibulk request (`*0`) is ignored: it produces no reply and leaves
   the connection open.
 
 ## Storage backend
 
-A data directory contains exactly two files:
+A data directory contains exactly two data files:
 
 | File | Role |
 | ---- | ---- |
@@ -215,7 +219,7 @@ Tests and gates:
 
 - **No scripting or cluster surface.** There is no `EVAL` / `SCRIPT` / `FUNCTION`,
   no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS, keyspace notification,
-  `AUTH`, `WATCH` / `UNWATCH` or `DEBUG`.
+  `AUTH` or `DEBUG`.
 - **Option gaps.** `HELLO` accepts only the protocol argument, so it cannot take
   `AUTH` or `SETNAME`; `CLIENT` supports only the listed subcommands.
 - **Narrow glob.** `KEYS` matches only `*`, `?` and literal bytes. Character

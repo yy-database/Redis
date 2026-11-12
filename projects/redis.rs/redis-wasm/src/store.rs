@@ -1,7 +1,7 @@
 //! `.yykv` shard ownership: one shard file holds every Redis database index as
 //! its own namespace.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -59,6 +59,13 @@ pub struct Node {
     sync_always: bool,
     /// Set when the last snapshot write did not sync.
     unsynced: bool,
+    /// Keys pinned by `WATCH`, with their mutation version and reference count.
+    ///
+    /// Only watched keys are tracked, so the map stays bounded by the active
+    /// watches. Every commit that writes a watched logical key bumps its version,
+    /// including a byte-identical rewrite, which is what Redis signals as a
+    /// modification.
+    watched: HashMap<(String, Vec<u8>), (u64, u32)>,
 }
 
 impl Node {
@@ -112,6 +119,7 @@ impl Node {
             batch_depth: 0,
             sync_always: false,
             unsynced: false,
+            watched: HashMap::new(),
         })
     }
 
@@ -388,10 +396,9 @@ impl Node {
         let expires_at = self.deadline(db, key);
         let revision = self.bump_revision();
         let record_key = Key::new(namespace(db), key.to_vec());
-        self.records.insert(
-            record_key.clone(),
-            format::inline_record(record_key, total.to_string().into_bytes(), revision, expires_at),
-        );
+        let record = format::inline_record(record_key.clone(), total.to_string().into_bytes(), revision, expires_at);
+        self.records.insert(record_key.clone(), record);
+        self.touch_watched(&record_key);
         self.pending_increments = true;
         Ok(Ok(total))
     }
@@ -415,6 +422,49 @@ impl Node {
             self.flush()?;
         }
         Ok(())
+    }
+
+    /// Registers one watch on a logical key and returns its current version.
+    ///
+    /// Repeated watches of the same key share one entry through the reference
+    /// count, so a session can watch it twice without leaking a slot.
+    pub fn watch_key(&mut self, db: u8, key: &[u8]) -> u64 {
+        let entry = (namespace(db), key.to_vec());
+        let slot = self.watched.entry(entry).or_insert((0, 0));
+        slot.1 = slot.1.saturating_add(1);
+        slot.0
+    }
+
+    /// Drops one watch on a logical key, releasing the entry at zero references.
+    pub fn unwatch_key(&mut self, db: u8, key: &[u8]) {
+        let entry = (namespace(db), key.to_vec());
+        let Some(slot) = self.watched.get_mut(&entry) else {
+            return;
+        };
+        slot.1 = slot.1.saturating_sub(1);
+        if slot.1 == 0 {
+            self.watched.remove(&entry);
+        }
+    }
+
+    /// Current mutation version of a watched logical key, `0` when unwatched.
+    pub fn watch_version(&self, db: u8, key: &[u8]) -> u64 {
+        self.watched
+            .get(&(namespace(db), key.to_vec()))
+            .map(|slot| slot.0)
+            .unwrap_or(0)
+    }
+
+    /// Bumps the version of `key` when a session currently watches that logical key.
+    fn touch_watched(&mut self, key: &Key) {
+        // No watches means no version bookkeeping on the hot write path.
+        if self.watched.is_empty() {
+            return;
+        }
+        let entry = (logical_namespace(&key.namespace.0), key.bytes.clone());
+        if let Some(slot) = self.watched.get_mut(&entry) {
+            slot.0 = slot.0.saturating_add(1);
+        }
     }
 
     /// Selects whether every snapshot write is followed by `fsync`.
@@ -500,10 +550,16 @@ impl Node {
                     let revision = next_revision;
                     next_revision = next_revision.saturating_add(1);
                     let record = format::inline_record(key.clone(), value, revision, expires_at);
-                    previous.push((key.clone(), self.records.insert(key, record)));
+                    let old = self.records.insert(key.clone(), record);
+                    self.touch_watched(&key);
+                    previous.push((key, old));
                 }
                 Change::Delete { key } => {
-                    previous.push((key.clone(), self.records.remove(&key)));
+                    let old = self.records.remove(&key);
+                    if old.is_some() {
+                        self.touch_watched(&key);
+                    }
+                    previous.push((key, old));
                 }
             }
         }

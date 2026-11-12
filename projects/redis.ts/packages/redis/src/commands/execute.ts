@@ -2,7 +2,7 @@
 
 import { parseInteger } from '../native.js';
 import type { Store } from '../native.js';
-import { array, bulk, error as replyError, integer, map, simple } from '../reply.js';
+import { array, bulk, error as replyError, integer, map, nullArray, simple } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
 import { sweepExpired } from './expiry.js';
 import { planCollection, planHyperLogLog, planKeyspace, planSetAggregate, planSMisMember, planSort, planSPop, planString, planZSet } from './forward.js';
@@ -81,9 +81,29 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         session.subscriptions?.channels.clear();
         session.subscriptions?.patterns.clear();
         session.queued = null;
+        clearWatches(store, session);
         session.protocol = 2;
         session.db = 0;
         return { reply: simple('RESET') };
+    }
+    if (name === 'watch') {
+        if (args.length < 2) {
+            return { reply: wrongArity('watch') };
+        }
+        // `WATCH` is the one command upstream refuses to queue, so it never
+        // enters a transaction and the existing watch list stays untouched.
+        if (session.queued) {
+            return { reply: replyError('ERR WATCH inside MULTI is not allowed') };
+        }
+        const db = session.db ?? 0;
+        const watched = session.watched ?? (session.watched = []);
+        for (const key of args.slice(1)) {
+            if (watched.some(entry => entry.db === db && entry.key.equals(key))) {
+                continue;
+            }
+            watched.push({ db, key: Buffer.from(key), version: store.watchKey(db, key) });
+        }
+        return { reply: simple('OK') };
     }
     if (name === 'multi') {
         if (args.length !== 1) {
@@ -105,7 +125,18 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         session.queued = null;
         session.multiError = false;
         if (dirty) {
+            clearWatches(store, session);
             return { reply: replyError('EXECABORT Transaction discarded because of previous errors.') };
+        }
+        // Expired keys count as modified, so sweep them before comparing the
+        // watch versions. Without watches the sweep is skipped entirely.
+        if (session.watched !== undefined && session.watched.length > 0) {
+            sweepExpired(store);
+        }
+        const modified = watchedModified(store, session);
+        clearWatches(store, session);
+        if (modified) {
+            return { reply: nullArray() };
         }
         return { reply: array(queued.map(run => run()) as ReplySpec[]) };
     }
@@ -115,6 +146,7 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
         }
         session.queued = null;
         session.multiError = false;
+        clearWatches(store, session);
         return { reply: simple('OK') };
     }
 
@@ -171,8 +203,30 @@ function helloCommand(session: Session, args: Buffer[]): ExecuteResult {
     return { reply: hello(protocol, session.id) };
 }
 
+/** Whether any key pinned by `WATCH` was modified since it was pinned. */
+function watchedModified(store: Store, session: Session): boolean {
+    return (session.watched ?? []).some(entry => store.watchVersion(entry.db, entry.key) !== entry.version);
+}
+
+/** Releases every native watch held by one connection. */
+export function clearWatches(store: Store, session: Session): void {
+    for (const entry of session.watched ?? []) {
+        store.unwatchKey(entry.db, entry.key);
+    }
+    session.watched = [];
+}
+
 function plan(store: Store, session: Session, name: string, args: Buffer[]): CommandPlan {
     switch (name) {
+        case 'unwatch':
+            if (args.length !== 1) return { error: wrongArity('unwatch') };
+            return {
+                run: () => {
+                    clearWatches(store, session);
+                    return simple('OK');
+                },
+            };
+
         case 'ping':
             if (args.length > 2) return { error: wrongArity('ping') };
             return {

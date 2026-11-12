@@ -569,3 +569,66 @@ test('blocking timeouts truncate like the real server', async () => {
         await server.close();
     }
 });
+
+test('WATCH aborts EXEC when another connection writes the key', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const first = await connectClient(server.port);
+    const second = await connectClient(server.port);
+    try {
+        assert.equal((await first.send('SET', 'wk', 'one')).value, 'OK');
+        assert.equal((await first.send('WATCH', 'wk')).value, 'OK');
+        await second.send('SET', 'wk', 'two');
+        await first.send('MULTI');
+        assert.equal((await first.send('SET', 'wk', 'three')).value, 'QUEUED');
+        assert.equal((await first.send('EXEC')).type, 'null-array');
+        assert.equal(textOf(await first.send('GET', 'wk')), 'two');
+
+        // A byte-identical rewrite still counts as a modification.
+        await first.send('WATCH', 'wk');
+        await second.send('SET', 'wk', 'two');
+        await first.send('MULTI');
+        await first.send('SET', 'wk', 'four');
+        assert.equal((await first.send('EXEC')).type, 'null-array');
+
+        // With no modification the transaction runs and the watch is cleared.
+        await first.send('WATCH', 'wk');
+        await first.send('MULTI');
+        await first.send('SET', 'wk', 'five');
+        const committed = await first.send('EXEC');
+        assert.equal(committed.type, 'array');
+        assert.equal(committed.value[0].value, 'OK');
+        assert.equal(textOf(await first.send('GET', 'wk')), 'five');
+
+        // UNWATCH releases the pin.
+        await first.send('WATCH', 'wk');
+        assert.equal((await first.send('UNWATCH')).value, 'OK');
+        await second.send('SET', 'wk', 'six');
+        await first.send('MULTI');
+        await first.send('SET', 'wk', 'seven');
+        assert.equal((await first.send('EXEC')).type, 'array');
+        assert.equal(textOf(await first.send('GET', 'wk')), 'seven');
+
+        // DISCARD drops the pin without poisoning the next transaction.
+        await first.send('WATCH', 'wk');
+        await first.send('MULTI');
+        assert.equal((await first.send('DISCARD')).value, 'OK');
+        await second.send('SET', 'wk', 'eight');
+        await first.send('MULTI');
+        await first.send('SET', 'wk', 'nine');
+        assert.equal((await first.send('EXEC')).type, 'array');
+
+        // WATCH inside MULTI is rejected but leaves the transaction usable.
+        await first.send('MULTI');
+        const rejected = await first.send('WATCH', 'wk');
+        assert.equal(rejected.type, 'error');
+        assert.match(rejected.value, /WATCH inside MULTI is not allowed/);
+        await first.send('SET', 'wk', 'ten');
+        assert.equal((await first.send('EXEC')).type, 'array');
+        assert.equal(textOf(await first.send('GET', 'wk')), 'ten');
+    }
+    finally {
+        first.close();
+        second.close();
+        await server.close();
+    }
+});

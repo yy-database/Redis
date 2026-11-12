@@ -6,7 +6,7 @@ import type { AddressInfo, Socket } from 'node:net';
 import { join, resolve } from 'node:path';
 import { BlockingHub } from './blocking.js';
 import type { BlockEntry } from './blocking.js';
-import { execute, PubSubHub } from './commands.js';
+import { clearWatches, execute, PubSubHub } from './commands.js';
 import { sweepExpired } from './commands/expiry.js';
 import { slowlogObserve } from './commands/introspection.js';
 import type { ExecuteResult } from './commands/execute.js';
@@ -198,6 +198,7 @@ export async function startServer(
             db: 0,
             protocol: 2,
             queued: null,
+            watched: [],
             name: '',
             hub,
             pubsub,
@@ -322,11 +323,13 @@ export async function startServer(
         socket.on('close', () => {
             if (blocked !== null) hub.cancel(blocked);
             pubsub.detach(session);
+            clearWatches(store, session);
             connections.delete(socket);
             clients.delete(id);
             store.serverRelease(id);
         });
         socket.on('error', () => {
+            clearWatches(store, session);
             connections.delete(socket);
             clients.delete(id);
             store.serverRelease(id);

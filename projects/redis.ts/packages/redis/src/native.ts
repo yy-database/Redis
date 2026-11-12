@@ -67,6 +67,9 @@ interface NativeStore {
     endBatch(): void;
     setSyncAlways(always: boolean): void;
     sync(): void;
+    watchKey(db: number, key: Buffer): number;
+    unwatchKey(db: number, key: Buffer): void;
+    watchVersion(db: number, key: Buffer): number;
     size(db: number): number;
     dataDir(): string;
     hashCommand(db: number, protocol: number, args: Buffer[]): string;
@@ -244,6 +247,21 @@ export class Store {
     /** Flushes an unsynced snapshot to stable storage. */
     sync(): void {
         this.native.sync();
+    }
+
+    /** Registers one `WATCH` on a logical key and returns its mutation version. */
+    watchKey(db: number, key: string | Buffer): number {
+        return this.native.watchKey(db, bytes(key));
+    }
+
+    /** Drops one `WATCH` on a logical key. */
+    unwatchKey(db: number, key: string | Buffer): void {
+        this.native.unwatchKey(db, bytes(key));
+    }
+
+    /** Current mutation version of a watched logical key, `0` when unwatched. */
+    watchVersion(db: number, key: string | Buffer): number {
+        return this.native.watchVersion(db, bytes(key));
     }
 
     size(db: number): number {

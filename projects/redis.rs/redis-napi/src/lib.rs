@@ -699,6 +699,24 @@ impl Store {
         self.shard().sync().map_err(reason)
     }
 
+    /// Registers one `WATCH` on a logical key and returns its mutation version.
+    #[napi]
+    pub fn watch_key(&mut self, db: u8, key: Buffer) -> u64 {
+        self.shard().watch_key(db, &key)
+    }
+
+    /// Drops one `WATCH` on a logical key.
+    #[napi]
+    pub fn unwatch_key(&mut self, db: u8, key: Buffer) {
+        self.shard().unwatch_key(db, &key);
+    }
+
+    /// Current mutation version of a watched logical key, `0` when unwatched.
+    #[napi]
+    pub fn watch_version(&self, db: u8, key: Buffer) -> u64 {
+        self.shard().watch_version(db, &key)
+    }
+
     /// Number of live keys in one database.
     #[napi]
     pub fn size(&self, db: u8) -> u32 {
