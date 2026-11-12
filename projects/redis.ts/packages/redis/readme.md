@@ -25,6 +25,8 @@ rewrite rather than one per command. `startServer({ appendfsync })` selects
 `always` (fsync every rewrite); `Redis`'s `redis-server` accepts the same choice
 as `--appendfsync`. `startServer({ requirepass })` and `--requirepass` require
 `AUTH` on every new connection before other commands run.
+`startServer({ notifyKeyspaceEvents })` and `--notify-keyspace-events` publish
+the `expired` keyspace and keyevent channels; no other event class is emitted.
 
 Historical reference costs, recorded on one Windows/NTFS host with the debug
 binding before the in-place commit change (median of three, one isolated `SET`):

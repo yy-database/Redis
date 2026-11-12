@@ -41,6 +41,13 @@ pub struct Increment {
     pub error: Option<String>,
 }
 
+/// One logical key a sweep removed because its deadline elapsed.
+#[napi(object)]
+pub struct ExpiredKey {
+    pub db: u32,
+    pub key: Buffer,
+}
+
 fn reason(error: impl ToString) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
@@ -663,12 +670,20 @@ impl Store {
 
     /// Drops every record whose deadline elapsed at `now_unix_ms`.
     ///
-    /// Returns the number of distinct logical keys that expired. One pass walks
-    /// the shard in Rust, so a large keyspace costs one native call instead of
-    /// one call per key and kind from the host loop.
+    /// Returns the distinct logical keys that expired, so the host can publish
+    /// keyspace notifications for them. One pass walks the shard in Rust, so a
+    /// large keyspace costs one native call instead of one call per key and kind
+    /// from the host loop.
     #[napi]
-    pub fn sweep_expired(&mut self, now_unix_ms: i64) -> std::result::Result<u32, napi::Error> {
-        Ok(self.shard().sweep_expired(now_unix_ms).map_err(reason)? as u32)
+    pub fn sweep_expired(&mut self, now_unix_ms: i64) -> std::result::Result<Vec<ExpiredKey>, napi::Error> {
+        let expired = self.shard().sweep_expired(now_unix_ms).map_err(reason)?;
+        Ok(expired
+            .into_iter()
+            .map(|entry| ExpiredKey {
+                db: u32::from(entry.db),
+                key: Buffer::from(entry.key),
+            })
+            .collect())
     }
 
     /// Opens a batch whose mutations share one snapshot write.

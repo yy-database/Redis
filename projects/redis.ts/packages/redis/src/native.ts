@@ -31,6 +31,12 @@ export type ValueKind = '' | 'hash' | 'list' | 'set' | 'zset' | 'stream';
 /** Outcome of one `rename` call. */
 export type RenameOutcome = 'renamed' | 'missing' | 'destination-present';
 
+/** One logical key a sweep removed because its deadline elapsed. */
+export interface ExpiredKey {
+    db: number;
+    key: Buffer;
+}
+
 /** The raw surface of the platform binding, as the napi crate exports it. */
 interface NativeBinding {
     decodeCommand(input: Buffer): DecodedCommand | null;
@@ -62,7 +68,7 @@ interface NativeStore {
     flush(): void;
     incrBy(db: number, key: Buffer, delta: number): Increment;
     flushDb(db: number): void;
-    sweepExpired(nowUnixMs: number): number;
+    sweepExpired(nowUnixMs: number): ExpiredKey[];
     beginBatch(): void;
     endBatch(): void;
     setSyncAlways(always: boolean): void;
@@ -224,8 +230,8 @@ export class Store {
         this.native.flushDb(db);
     }
 
-    /** Drops every record already past its deadline; returns the expired key count. */
-    sweepExpired(nowUnixMs: number): number {
+    /** Drops every record already past its deadline; returns the expired keys. */
+    sweepExpired(nowUnixMs: number): ExpiredKey[] {
         return this.native.sweepExpired(nowUnixMs);
     }
 

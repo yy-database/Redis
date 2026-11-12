@@ -15,6 +15,7 @@ import { decodeCommand, encodeReply, Store } from './native.js';
 import type { DecodedCommand } from './native.js';
 import { error as replyError } from './reply.js';
 import type { ReplySpec } from './reply.js';
+import { notifyExpired, parseNotificationFlags } from './notifications.js';
 
 const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
 
@@ -147,6 +148,7 @@ export async function startServer(
         store: providedStore,
         appendfsync = 'everysec',
         requirepass,
+        notifyKeyspaceEvents = '',
     }: {
         dataDir?: string;
         host?: string;
@@ -156,6 +158,8 @@ export async function startServer(
         appendfsync?: 'always' | 'everysec';
         /** Password for the default user; absent leaves the server open. */
         requirepass?: string;
+        /** Keyspace notification flags; only the `expired` class is emitted today. */
+        notifyKeyspaceEvents?: string;
     } = {},
 ): Promise<ServerHandle> {
     const directory = providedStore !== undefined ? providedStore.dataDir() : dataDir as string;
@@ -350,9 +354,12 @@ export async function startServer(
         releaseLock();
         throw error;
     }
+    const notifications = parseNotificationFlags(notifyKeyspaceEvents);
     // Active expiry: the upstream samples the keyspace on a fast cadence, so a
     // hundred-millisecond sweep keeps `expired` close to the real counter.
-    const expiryTimer = setInterval(() => sweepExpired(store, stats), 100);
+    const expiryTimer = setInterval(() => {
+        sweepExpired(store, stats, (db, key) => notifyExpired(pubsub, notifications, db, key));
+    }, 100);
     expiryTimer.unref();
     // The buffered counters reach the shard on a one-second cadence, and the
     // `everysec` fsync policy makes the shard stable on the same cadence, so a

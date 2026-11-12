@@ -446,6 +446,17 @@ async function connectClient(port) {
                 flush();
             });
         },
+        /** Waits for the next unsolicited frame, such as a pub/sub delivery. */
+        next() {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error('timed out waiting for a frame')), 5_000);
+                waiters.push(spec => {
+                    clearTimeout(timer);
+                    resolve(spec);
+                });
+                flush();
+            });
+        },
         close() {
             socket.destroy();
         },
@@ -701,4 +712,32 @@ test('AUTH without a configured password reports the legacy error', () => {
     const acl = execute(store, state, [Buffer.from('AUTH'), Buffer.from('default'), Buffer.from('x')]);
     assert.equal(acl.reply.type, 'simple');
     assert.equal(acl.reply.value, 'OK');
+});
+
+test('expired keys publish keyspace notifications when enabled', async () => {
+    const server = await startServer({ dataDir: temporaryDir(), notifyKeyspaceEvents: 'KEx' });
+    const subscriber = await connectClient(server.port);
+    const writer = await connectClient(server.port);
+    try {
+        await subscriber.send('SUBSCRIBE', '__keyspace@0__:ttl-key');
+        await subscriber.send('SUBSCRIBE', '__keyevent@0__:expired');
+        await writer.send('PSETEX', 'ttl-key', '60', 'v');
+
+        const keyspace = await subscriber.next();
+        assert.equal(keyspace.type, 'array');
+        assert.equal(textOf(keyspace.value[0]), 'message');
+        assert.equal(textOf(keyspace.value[1]), '__keyspace@0__:ttl-key');
+        assert.equal(textOf(keyspace.value[2]), 'expired');
+
+        const keyevent = await subscriber.next();
+        assert.equal(keyevent.type, 'array');
+        assert.equal(textOf(keyevent.value[0]), 'message');
+        assert.equal(textOf(keyevent.value[1]), '__keyevent@0__:expired');
+        assert.equal(textOf(keyevent.value[2]), 'ttl-key');
+    }
+    finally {
+        subscriber.close();
+        writer.close();
+        await server.close();
+    }
 });

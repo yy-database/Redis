@@ -107,6 +107,9 @@ Supported options are narrower than the real server:
   `WRONGPASS invalid username-password pair or user is disabled.`. When no
   password is configured the legacy single-argument form reports that, while
   `AUTH default <anything>` succeeds because the default user is `nopass`.
+- With `--notify-keyspace-events` set, an expiry sweep publishes `expired` on
+  `__keyspace@<db>__:<key>` and `__keyevent@<db>__:expired` when `K` / `E` and
+  `x` (or `A`) are selected. No other event class is emitted yet.
 - An empty multibulk request (`*0`) is ignored: it produces no reply and leaves
   the connection open.
 
@@ -191,6 +194,7 @@ directly from the workspace:
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data --appendfsync always
 node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data --requirepass secret
+node projects/redis.ts/packages/redis/bin/redis-server.mjs --port 6379 --data-dir ./data --notify-keyspace-events KEx
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 SET greeting hello
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 GET greeting
 node projects/redis.ts/packages/redis/bin/redis-cli.mjs -p 6379 -3 HELLO 3
@@ -228,8 +232,10 @@ Tests and gates:
 ## Known limits
 
 - **No scripting or cluster surface.** There is no `EVAL` / `SCRIPT` / `FUNCTION`,
-  no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS, keyspace notification
-  or `DEBUG`. `AUTH` covers the single default user, not additional ACL users.
+  no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS or `DEBUG`. `AUTH` covers
+  the single default user, not additional ACL users.
+- **Notification coverage.** Only the `expired` event class is published. The
+  flags come from `--notify-keyspace-events` at startup, not `CONFIG SET`.
 - **Client options.** `CLIENT` supports only the subcommands listed above.
 - **Narrow glob.** `KEYS` matches only `*`, `?` and literal bytes. Character
   classes and escapes are not supported.

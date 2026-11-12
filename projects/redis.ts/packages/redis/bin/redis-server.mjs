@@ -4,7 +4,7 @@
 import { startServer } from '../dist/server.js';
 
 function usage() {
-    return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>] [--appendfsync <always|everysec>] [--requirepass <password>]';
+    return 'usage: redis-server [--host <host>] [--port <port>] [--data-dir <dir>] [--appendfsync <always|everysec>] [--requirepass <password>] [--notify-keyspace-events <flags>]';
 }
 
 function parseArguments(argv) {
@@ -15,7 +15,7 @@ function parseArguments(argv) {
             console.log(usage());
             process.exit(0);
         }
-        if (argument === '--host' || argument === '--port' || argument === '--data-dir' || argument === '--appendfsync' || argument === '--requirepass') {
+        if (argument === '--host' || argument === '--port' || argument === '--data-dir' || argument === '--appendfsync' || argument === '--requirepass' || argument === '--notify-keyspace-events') {
             const value = argv[index + 1];
             if (value === undefined) {
                 throw new Error(`${argument} needs a value`);
@@ -30,6 +30,7 @@ function parseArguments(argv) {
                 options.appendfsync = value;
             }
             else if (argument === '--requirepass') options.requirepass = value;
+            else if (argument === '--notify-keyspace-events') options.notifyKeyspaceEvents = value;
             else options.dataDir = value;
             continue;
         }

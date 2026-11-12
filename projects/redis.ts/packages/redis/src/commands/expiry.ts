@@ -11,12 +11,20 @@ import type { Store } from '../native.js';
  *
  * Returns the number of keys that expired during the pass and, when a `stats`
  * object is given, adds it to `stats.expired` the way the upstream counts
- * `expired_keys`.
+ * `expired_keys`. `onExpired` receives every key the pass removed, which is what
+ * the server uses to publish keyspace notifications.
  */
-export function sweepExpired(store: Store, stats?: Record<string, number>): number {
+export function sweepExpired(
+    store: Store,
+    stats?: Record<string, number>,
+    onExpired?: (db: number, key: Buffer) => void,
+): number {
     const expired = store.sweepExpired(Date.now());
-    if (stats !== undefined && expired > 0) {
-        stats.expired = (stats.expired ?? 0) + expired;
+    for (const entry of expired) {
+        onExpired?.(entry.db, entry.key);
     }
-    return expired;
+    if (stats !== undefined && expired.length > 0) {
+        stats.expired = (stats.expired ?? 0) + expired.length;
+    }
+    return expired.length;
 }

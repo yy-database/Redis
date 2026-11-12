@@ -23,6 +23,15 @@ pub const NAMESPACE_PREFIX: &str = "redis:db";
 /// never overlap, so the same logical key can only be read as one kind at a time.
 pub const KINDS: [&str; 6] = ["", "hash", "list", "set", "zset", "stream"];
 
+/// One logical key a sweep removed because its deadline elapsed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpiredKey {
+    /// Database index the key lived in.
+    pub db: u8,
+    /// Opaque key bytes.
+    pub key: Vec<u8>,
+}
+
 /// One `.yyds` catalog plus one `.yykv` shard on disk.
 ///
 /// The `.yykv` snapshot carries one checksum over its whole body and a record
@@ -356,25 +365,28 @@ impl Node {
 
     /// Removes every record whose deadline elapsed at `now_unix_ms`.
     ///
-    /// Returns how many distinct logical keys expired. A record that is already
-    /// past its deadline is hidden from reads but still occupies the shard, so
-    /// the sweep deletes exactly those records rather than probing the keyspace
-    /// key by key. Removing them is one ordinary snapshot commit, which means a
-    /// pass with nothing to drop never touches the file.
-    pub fn sweep_expired(&mut self, now_unix_ms: i64) -> io::Result<usize> {
+    /// Returns the distinct logical keys that expired, ordered by database and
+    /// key bytes. A record that is already past its deadline is hidden from
+    /// reads but still occupies the shard, so the sweep deletes exactly those
+    /// records rather than probing the keyspace key by key. Removing them is one
+    /// ordinary snapshot commit, which means a pass with nothing to drop never
+    /// touches the file.
+    pub fn sweep_expired(&mut self, now_unix_ms: i64) -> io::Result<Vec<ExpiredKey>> {
         let mut expired = BTreeSet::new();
         let mut changes = Vec::new();
         for (key, record) in &self.records {
             if record.is_expired_at(now_unix_ms) {
-                expired.insert((logical_namespace(&key.namespace.0), key.bytes.clone()));
+                if let Some(db) = database_index(&key.namespace.0) {
+                    expired.insert((db, key.bytes.clone()));
+                }
                 changes.push(Change::Delete { key: key.clone() });
             }
         }
         if changes.is_empty() {
-            return Ok(0);
+            return Ok(Vec::new());
         }
         self.commit(changes)?;
-        Ok(expired.len())
+        Ok(expired.into_iter().map(|(db, key)| ExpiredKey { db, key }).collect())
     }
 
     /// Adds `delta` to an integer value, preserving its deadline.
@@ -705,6 +717,13 @@ fn logical_namespace(candidate: &str) -> String {
         }
     }
     candidate.to_owned()
+}
+
+/// Database index encoded in a record namespace, `None` when it is not a shard namespace.
+fn database_index(candidate: &str) -> Option<u8> {
+    let rest = candidate.strip_prefix(NAMESPACE_PREFIX)?;
+    let index = rest.split_once(':').map_or(rest, |(index, _)| index);
+    index.parse().ok()
 }
 
 /// Whether a record namespace belongs to the database named by `base`.
