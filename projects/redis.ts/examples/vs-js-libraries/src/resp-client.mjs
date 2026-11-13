@@ -1,5 +1,5 @@
 import { connect } from 'node:net';
-import { encodeCommand } from '../../shared/product.mjs';
+import { encodeCommand, encodeCommands } from '../../shared/product.mjs';
 
 const CRLF = '\r\n';
 
@@ -60,11 +60,13 @@ export function createRespClient({ host = '127.0.0.1', port, onPush = null } = {
   const socket = connect({ host, port });
   let buffer = Buffer.alloc(0);
   let failure = null;
+  let ready = false;
   const pending = [];
 
-  const ready = new Promise((resolve, reject) => {
+  const opened = new Promise((resolve, reject) => {
     socket.once('connect', () => {
       socket.setNoDelay(true);
+      ready = true;
       resolve();
     });
     socket.once('error', reject);
@@ -107,7 +109,7 @@ export function createRespClient({ host = '127.0.0.1', port, onPush = null } = {
   }
 
   socket.on('data', chunk => {
-    buffer = Buffer.concat([buffer, chunk]);
+    buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);
     flush();
   });
   socket.on('error', error => fail(error));
@@ -120,20 +122,20 @@ export function createRespClient({ host = '127.0.0.1', port, onPush = null } = {
   }
 
   async function command(args) {
-    await ready;
+    // A ready socket skips the promise hop, which matters for sequential cells.
+    if (!ready) await opened;
     if (failure) throw failure;
     const reply = enqueue();
-    socket.write(Buffer.from(encodeCommand(args)));
+    socket.write(encodeCommand(args));
     return reply;
   }
 
   async function pipeline(commands) {
-    await ready;
+    if (!ready) await opened;
     if (failure) throw failure;
     if (commands.length === 0) return [];
     const replies = commands.map(() => enqueue());
-    const payload = Buffer.concat(commands.map(args => Buffer.from(encodeCommand(args))));
-    socket.write(payload);
+    socket.write(encodeCommands(commands));
     return Promise.all(replies);
   }
 

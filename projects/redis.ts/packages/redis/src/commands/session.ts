@@ -54,6 +54,15 @@ export interface WatchedKey {
     version: number;
 }
 
+/** Server-wide options this product adds on top of the upstream command surface. */
+export interface ServerSettings {
+    appendfsync: 'always' | 'everysec';
+    requirepass?: string;
+    /** Raw `notify-keyspace-events` string, reported by `CONFIG GET`. */
+    notifyKeyspaceEvents: string;
+    notifications: { keyspace: boolean; keyevent: boolean; expired: boolean };
+}
+
 /**
  * One connection's session, as `server.js` builds it and the commands read it.
  *
@@ -71,6 +80,8 @@ export interface Session {
     authenticated?: boolean;
     /** Password configured on the server, absent when the default user has none. */
     requirepass?: string;
+    /** Live server options, shared by every connection of one listener. */
+    settings?: ServerSettings;
     hub?: BlockingHub;
     pubsub?: PubSubTable;
     clients?: Map<number, Session>;

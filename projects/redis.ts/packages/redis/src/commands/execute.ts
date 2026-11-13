@@ -6,12 +6,13 @@ import type { Store } from '../native.js';
 import { array, bulk, error as replyError, integer, map, nullArray, simple } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
 import { sweepExpired } from './expiry.js';
+import { planConfig } from './config.js';
 import { planCollection, planHyperLogLog, planKeyspace, planSetAggregate, planSMisMember, planSort, planSPop, planString, planZSet } from './forward.js';
 import { DATABASES, commandName, unknownCommand, wrongArity } from './kinds.js';
 import { planIntrospection } from './introspection.js';
 import { planPersistence } from './persistence.js';
 import { planPubsub, pubsubSubcommand, pubsubSubcommandError, publish, SUBSCRIBER_COMMANDS, subscribed, subscriptionFrames } from './pubsub.js';
-import { planStream, planXRead, planXGroup, planXAck, planXPending, planXClaim, planXAutoClaim, planXInfo } from './streams.js';
+import { planStream, planXRead, planXReadGroup, planXGroup, planXAck, planXPending, planXClaim, planXAutoClaim, planXInfo } from './streams.js';
 import type { BlockDescriptor, CommandPlan, RunOutcome, ServerOutcome, Session } from './session.js';
 
 /** The frames one executed command owes the connection. */
@@ -75,7 +76,7 @@ function authenticate(session: Session, args: Buffer[]): ReplySpec {
  * answers with a dedicated message when no password is configured at all.
  */
 function credentialError(session: Session, username: string, password: Buffer, legacy: boolean): ReplySpec | null {
-    const configured = session.requirepass;
+    const configured = session.settings?.requirepass ?? session.requirepass;
     if (configured === undefined) {
         if (legacy) {
             return replyError(
@@ -96,7 +97,8 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
     }
     const name = commandName(args);
 
-    if (session.authenticated === false && !UNAUTHENTICATED_COMMANDS.has(name)) {
+    if (session.authenticated === false && (session.settings?.requirepass ?? session.requirepass) !== undefined
+        && !UNAUTHENTICATED_COMMANDS.has(name)) {
         return { reply: noAuth() };
     }
 
@@ -375,9 +377,11 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'client':
         case 'command':
         case 'info':
-        case 'config':
         case 'acl':
             return { run: () => store.serverCommand(session.id ?? 0, session.db, session.protocol ?? 2, args) };
+
+        case 'config':
+            return planConfig(store, session, args);
 
         case 'save':
         case 'bgsave':
@@ -403,6 +407,8 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'scan':
         case 'type':
         case 'object':
+        case 'move':
+        case 'swapdb':
             return planKeyspace(store, session, name, args);
 
         case 'get':
@@ -416,6 +422,7 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'mget':
         case 'mset':
         case 'del':
+        case 'unlink':
         case 'exists':
         case 'strlen':
         case 'append':
@@ -501,6 +508,9 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
 
         case 'xread':
             return planXRead(store, session, args);
+
+        case 'xreadgroup':
+            return planXReadGroup(store, session, args);
 
         case 'xgroup':
             return planXGroup(store, session, args);

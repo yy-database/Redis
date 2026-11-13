@@ -19,6 +19,29 @@ export interface DecodedReply {
     spec: string;
 }
 
+/** Every complete request decoded from the front of one buffer. */
+export interface DecodedCommands {
+    consumed: number;
+    commands: DecodedCommand[];
+    /** Framing error found after the decoded requests, or absent. */
+    error?: string | null;
+}
+
+/** Every complete reply decoded from the front of one buffer. */
+export interface DecodedReplies {
+    consumed: number;
+    specs: string[];
+    /** Framing error found after the decoded replies, or absent. */
+    error?: string | null;
+}
+
+/** One server-face reply plus the connection effects the binding reports. */
+export interface ServerCommandOutcome {
+    reply: ReplySpec;
+    close: boolean;
+    killed: number[];
+}
+
 /** Result of adding `delta` to an integer value. */
 export interface Increment {
     value: number | null;
@@ -40,9 +63,13 @@ export interface ExpiredKey {
 /** The raw surface of the platform binding, as the napi crate exports it. */
 interface NativeBinding {
     decodeCommand(input: Buffer): DecodedCommand | null;
+    decodeCommands(input: Buffer): DecodedCommands;
     encodeCommand(args: Buffer[]): Buffer;
+    encodeCommands(commands: Buffer[][]): Buffer;
     encodeReply(spec: string, protocol: number): Buffer;
+    encodeReplies(specs: string, protocol: number): Buffer;
     decodeReply(input: Buffer): DecodedReply | null;
+    decodeReplies(input: Buffer): DecodedReplies;
     parseInteger(value: Buffer): number | null;
     repairShard(dataDir: string): string;
     Store: new (dataDir: string) => NativeStore;
@@ -134,12 +161,19 @@ function primitives(): NativeBinding {
     return load();
 }
 
-const bytes = (value: string | Buffer): Buffer => Buffer.from(value);
+const bytes = (value: string | Buffer): Buffer => (Buffer.isBuffer(value) ? value : Buffer.from(value));
 
 export const decodeCommand = (input: string | Buffer): DecodedCommand | null => primitives().decodeCommand(bytes(input));
+export const decodeCommands = (input: string | Buffer): DecodedCommands => primitives().decodeCommands(bytes(input));
 export const encodeCommand = (args: (string | Buffer)[]): Buffer => primitives().encodeCommand(args.map(bytes));
+/** Encodes many commands into one buffer, so a pipeline crosses the binding once. */
+export const encodeCommands = (commands: (string | Buffer)[][]): Buffer => primitives().encodeCommands(commands.map(args => args.map(bytes)));
 export const encodeReply = (spec: ReplySpec, protocol: number): Buffer => primitives().encodeReply(JSON.stringify(spec), protocol);
+/** Encodes many replies into one buffer, so a burst crosses the binding once. */
+export const encodeReplies = (specs: ReplySpec[], protocol: number): Buffer => primitives().encodeReplies(JSON.stringify(specs), protocol);
 export const decodeReply = (input: string | Buffer): DecodedReply | null => primitives().decodeReply(bytes(input));
+/** Decodes every complete reply in the buffer, leaving the trailing partial frame. */
+export const decodeReplies = (input: string | Buffer): DecodedReplies => primitives().decodeReplies(bytes(input));
 export const parseInteger = (value: string | Buffer): number | null => primitives().parseInteger(bytes(value));
 export const repairShard = (dataDir: string): string => primitives().repairShard(String(dataDir));
 
@@ -314,7 +348,7 @@ export class Store {
     }
 
     /** Server-face commands keep their per-connection session state inside the binding. */
-    serverCommand(session: number, db: number, protocol: number, args: (string | Buffer)[]): ReplySpec {
+    serverCommand(session: number, db: number, protocol: number, args: (string | Buffer)[]): ServerCommandOutcome {
         return JSON.parse(this.native.serverCommand(session, db, protocol, args.map(bytes)));
     }
 

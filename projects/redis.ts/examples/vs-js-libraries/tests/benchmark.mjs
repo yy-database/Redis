@@ -7,7 +7,9 @@
 // 环境变量：BENCH_ROUNDS (3), BENCH_WARMUP (1), BENCH_SET (100), BENCH_GET (500),
 //   BENCH_PIPE (500), BENCH_PING (1000), BENCH_BATCH (500), BENCH_COLL (200),
 //   BENCH_BIG (20), BENCH_BIG_GET (50), BENCH_BIG_BYTES (65536), BENCH_CONNECT (50),
-//   BENCH_STREAM (200), BENCH_PUBSUB (100), BENCH_TTL (30), BENCH_TXN (100)
+//   BENCH_STREAM (200), BENCH_PUBSUB (100), BENCH_TTL (30), BENCH_TXN (100),
+//   BENCH_INCR (500), BENCH_MSET (500), BENCH_DEL (200), BENCH_MOVE (200),
+//   BENCH_BLOCK (100), BENCH_PING_CONC (800), BENCH_CONC (8), BENCH_GROUP (100)
 // 真机对照：设 BENCH_ORACLE_HOST / BENCH_ORACLE_PORT 指向真实 redis-server 后，
 //   同一矩阵以 `ioredis` 为固定客户端再跑一轮，作为 oracle 列写进报告。
 
@@ -52,6 +54,14 @@ const STREAM_COUNT = count('BENCH_STREAM', 200);
 const PUBSUB_COUNT = count('BENCH_PUBSUB', 100);
 const TTL_COUNT = count('BENCH_TTL', 30);
 const TXN_COUNT = count('BENCH_TXN', 100);
+const INCR_COUNT = count('BENCH_INCR', 500);
+const MSET_COUNT = count('BENCH_MSET', 500);
+const DEL_COUNT = count('BENCH_DEL', 200);
+const MOVE_COUNT = count('BENCH_MOVE', 200);
+const BLOCK_COUNT = count('BENCH_BLOCK', 100);
+const PING_CONC = count('BENCH_PING_CONC', 800);
+const CONCURRENCY = count('BENCH_CONC', 8);
+const GROUP_COUNT = count('BENCH_GROUP', 100);
 const ROUNDS = count('BENCH_ROUNDS', 3);
 const WARMUP = count('BENCH_WARMUP', 1);
 const BIG_VALUE = 'b'.repeat(BIG_BYTES);
@@ -101,6 +111,35 @@ const workloads = [
     async run({ client }) {
       for (let index = 0; index < SET_COUNT; index += 1) {
         await client.set(`bench:set:${index}`, VALUE);
+      }
+    },
+  },
+  {
+    name: 'mset-seq',
+    scenario: 'redis-string-mset',
+    ops: MSET_COUNT,
+    params: { keys: String(MSET_COUNT), value_bytes: '64' },
+    dataScale: `keys=${MSET_COUNT}`,
+    async run({ client }) {
+      const args = [];
+      for (let index = 0; index < MSET_COUNT; index += 1) {
+        args.push(`bench:mset:${index}`, VALUE);
+      }
+      await client.call(['MSET', ...args]);
+    },
+  },
+  {
+    name: 'incr-seq',
+    scenario: 'redis-string-incr',
+    ops: INCR_COUNT,
+    params: { ops: String(INCR_COUNT) },
+    dataScale: 'keys=1',
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:counter']);
+    },
+    async run({ client }) {
+      for (let index = 0; index < INCR_COUNT; index += 1) {
+        await client.call(['INCR', 'bench:counter']);
       }
     },
   },
@@ -265,6 +304,104 @@ const workloads = [
     },
   },
   {
+    name: 'blpop-roundtrip',
+    scenario: 'redis-list-blpop-push',
+    ops: BLOCK_COUNT,
+    params: { roundtrips: String(BLOCK_COUNT), timeout_seconds: '5' },
+    dataScale: 'keys=0,list=bench:blocking',
+    async prepare(ctx) {
+      ctx.blocker = await createClient(ctx.clientName, { host: ctx.host, port: ctx.port });
+    },
+    async cleanup(ctx) {
+      await ctx.blocker?.close();
+    },
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:blocking']);
+    },
+    async run({ client, blocker }) {
+      for (let index = 0; index < BLOCK_COUNT; index += 1) {
+        const payload = `v${index}`;
+        // Park the consumer first, then wake it from the writer connection.
+        const parked = blocker.call(['BLPOP', 'bench:blocking', '5']);
+        const pushed = await client.call(['RPUSH', 'bench:blocking', payload]);
+        if (pushed !== 1) throw new Error(`blpop-roundtrip push replied ${pushed}`);
+        const popped = await parked;
+        if (!Array.isArray(popped) || popped[1] !== payload) {
+          throw new Error(`blpop-roundtrip mismatch at ${index}: ${JSON.stringify(popped)}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'scan-full',
+    scenario: 'redis-scan-full-keyspace',
+    ops: COLL,
+    params: { keys: String(COLL), count_hint: '50' },
+    dataScale: `keys=${COLL}`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:scan');
+    },
+    async run({ client }) {
+      let cursor = '0';
+      let seen = 0;
+      do {
+        const [next, keys] = await client.call(['SCAN', cursor, 'COUNT', '50']);
+        cursor = String(next);
+        seen += keys.length;
+      } while (cursor !== '0');
+      if (seen !== COLL) throw new Error(`scan-full visited ${seen}, expected ${COLL}`);
+    },
+  },
+  {
+    name: 'ping-concurrent',
+    scenario: 'redis-ping-concurrent',
+    ops: PING_CONC,
+    params: { ops: String(PING_CONC), connections: String(CONCURRENCY) },
+    dataScale: `connections=${CONCURRENCY}`,
+    async prepare(ctx) {
+      ctx.peers = await Promise.all(Array.from({ length: CONCURRENCY }, () => (
+        createClient(ctx.clientName, { host: ctx.host, port: ctx.port })
+      )));
+    },
+    async cleanup(ctx) {
+      await Promise.all((ctx.peers ?? []).map(peer => peer.close()));
+    },
+    async run({ peers }) {
+      // Every connection keeps its own request/response chain; the server sees
+      // them interleaved on one event loop.
+      const perPeer = Math.ceil(PING_CONC / peers.length);
+      await Promise.all(peers.map(async peer => {
+        for (let index = 0; index < perPeer; index += 1) {
+          await peer.ping();
+        }
+      }));
+    },
+  },
+  {
+    name: 'stream-group',
+    scenario: 'redis-stream-consumer-group',
+    ops: GROUP_COUNT * 3,
+    params: { entries: String(GROUP_COUNT), group: 'workers', consumer: 'c1' },
+    dataScale: `entries=${GROUP_COUNT}`,
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:group']);
+      await ctx.client.call(['XGROUP', 'CREATE', 'bench:group', 'workers', '0', 'MKSTREAM']);
+    },
+    async run({ client }) {
+      for (let index = 0; index < GROUP_COUNT; index += 1) {
+        const id = await client.call(['XADD', 'bench:group', '*', 'f', `v${index}`]);
+        const read = await client.call([
+          'XREADGROUP', 'GROUP', 'workers', 'c1', 'COUNT', '1', 'STREAMS', 'bench:group', '>',
+        ]);
+        if (!Array.isArray(read) || read.length === 0) {
+          throw new Error(`stream-group read missed entry ${index}`);
+        }
+        const acked = await client.call(['XACK', 'bench:group', 'workers', String(id)]);
+        if (acked !== 1) throw new Error(`stream-group ack replied ${acked}`);
+      }
+    },
+  },
+  {
     name: 'ttl-setex-expire',
     scenario: 'redis-ttl-setex-expire',
     ops: TTL_COUNT * 3,
@@ -332,6 +469,43 @@ const workloads = [
     },
   },
   {
+    name: 'del-seq',
+    scenario: 'redis-key-del',
+    ops: DEL_COUNT,
+    params: { keys: String(DEL_COUNT) },
+    dataScale: `keys=${DEL_COUNT}`,
+    async reset(ctx) {
+      await preload(ctx, DEL_COUNT, 'bench:del');
+    },
+    async run({ client }) {
+      for (let index = 0; index < DEL_COUNT; index += 1) {
+        const removed = await client.call(['DEL', `bench:del:${index}`]);
+        if (removed !== 1) throw new Error(`del-seq miss at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'move-seq',
+    scenario: 'redis-key-move',
+    ops: MOVE_COUNT,
+    params: { ops: String(MOVE_COUNT), databases: '2' },
+    dataScale: `keys=${MOVE_COUNT},databases=2`,
+    async reset(ctx) {
+      // Re-seed the source database and empty the destination outside timing.
+      await ctx.client.call(['SELECT', '1']);
+      await ctx.client.call(['FLUSHDB']);
+      await ctx.client.call(['SELECT', '0']);
+      await ctx.client.call(['FLUSHDB']);
+      await preload(ctx, MOVE_COUNT, 'bench:move');
+    },
+    async run({ client }) {
+      for (let index = 0; index < MOVE_COUNT; index += 1) {
+        const moved = await client.call(['MOVE', `bench:move:${index}`, '1']);
+        if (moved !== 1) throw new Error(`move-seq blocked at ${index}`);
+      }
+    },
+  },
+  {
     name: 'ping',
     scenario: 'redis-ping-rtt',
     ops: PING_COUNT,
@@ -384,10 +558,14 @@ async function measure(clientName, workload, target) {
     context.client = client;
     await workload.prepare?.(context);
     for (let round = 0; round < WARMUP; round += 1) {
+      await workload.reset?.(context);
       await workload.run(context);
     }
     const samples = [];
     for (let round = 0; round < ROUNDS; round += 1) {
+      // Destructive workloads re-seed outside the timed region so every round
+      // starts from the same state without paying the setup cost.
+      await workload.reset?.(context);
       const start = process.hrtime.bigint();
       await workload.run(context);
       samples.push(elapsedMs(start));
@@ -435,7 +613,7 @@ const results = {};
 const oracle = await oracleTarget();
 
 console.log(`Redis RESP2 scenario matrix (${WARMUP} warmup + ${ROUNDS} measured rounds per cell)`);
-console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
+console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
 console.log(`Stats: benchSummary via ${benchSummarySource}`);
 console.log('Server: fresh emulated server and dataDir per (workload, client); rounds share one server and one connection');
 console.log('');
@@ -510,6 +688,9 @@ const runProvenance = {
     ping: String(PING_COUNT), coll: String(COLL), big: String(BIG_COUNT),
     big_get: String(BIG_GET), big_bytes: String(BIG_BYTES), connect: String(CONNECT_COUNT),
     stream: String(STREAM_COUNT), pubsub: String(PUBSUB_COUNT), ttl: String(TTL_COUNT), txn: String(TXN_COUNT),
+    incr: String(INCR_COUNT), mset: String(MSET_COUNT), del: String(DEL_COUNT), move: String(MOVE_COUNT),
+    block: String(BLOCK_COUNT), ping_conc: String(PING_CONC), conc: String(CONCURRENCY),
+    group: String(GROUP_COUNT),
   },
   data_scale: `matrix=${workloads.length}x${reportClients.length}`,
   rustc_version: rustcVersion,
@@ -563,7 +744,8 @@ emulated server refuses to be mistaken for the oracle (\`INFO\` shows
 const report = `# Benchmark report
 
 Command: \`pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark\`
-Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
+Binding: \`${process.env.BENCH_BINDING_PROFILE ?? 'debug'}\` — build with \`pnpm build:release\` and set \`BENCH_BINDING_PROFILE=release\` for product numbers
+Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
 Baseline: \`ioredis\` against the emulated server = \`1.00x\`
 Ratio: subject_time / baseline_time (smaller is faster). Fastest cell in each row is bold.
 Stats: median/p95/min/max/rounds come from \`database.harness::summarize\` via \`benchSummary\` (${benchSummarySource}); nearest-rank p95, even-length median averages the middle pair. Per-op milliseconds come from \`database.harness::per_op_ms\` via \`benchPerOpMs\`, the same DTO the summary returns. No median, p95 or per-op formula lives in this example.
@@ -600,11 +782,17 @@ ${oracleSection}
 
 ## Intentional deltas
 
+- This host shows large run-to-run variance: repeating the same tree can move one
+  cell by up to about 2x. Compare cells inside one report rather than absolute
+  numbers across reports, and set \`BENCH_ROUNDS\` higher when a decision needs it.
 - One fresh emulated server and data directory per (workload, client); the warmup
   and measured rounds of that cell share one server and one connection. Preload
   stays outside the timed region.
 - Collection workloads start each round with \`DEL\` so rounds stay idempotent; the
   \`DEL\` is inside the timed region and counted in ops on every client.
+- Destructive point workloads (\`incr-seq\`, \`del-seq\`, \`move-seq\`) re-seed through the
+  untimed \`reset\` hook before every round, so the timed region only measures the
+  command under test.
 - The \`connect\` workload measures establish + one readiness \`PING\` + close per op,
   so every client pays a full handshake regardless of its lazy-connect behavior.
 - The product client has no reconnect, offline queue, or retry behavior. A socket
@@ -612,6 +800,10 @@ ${oracleSection}
   machinery (offline queue disabled).
 - No pooling and no auto-pipelining anywhere; pipelined cells send explicit
   equal-size batches of ${BATCH}. All clients use RESP2 on one TCP connection.
+- The product harness encodes one pipeline with the batch \`encodeCommands\`
+  primitive and the emulated server decodes and encodes each socket burst with the
+  batch \`decodeCommands\` / \`encodeReplies\` primitives, so a pipeline crosses the
+  binding twice regardless of its length.
 - \`SET\` rewrites the whole \`.yykv\` snapshot, so absolute \`SET\` numbers (including
   \`set-big\`) are snapshot-bound; \`GET\`, \`ping\` and the collection reads isolate
   round-trip overhead.

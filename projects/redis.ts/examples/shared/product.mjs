@@ -13,3 +13,4 @@ const product = await import('../../packages/redis/dist/index.js');
 
 export const startServer = product.startServer;
 export const encodeCommand = product.encodeCommand;
+export const encodeCommands = product.encodeCommands;

@@ -10,14 +10,17 @@ import { clearWatches, execute, PubSubHub } from './commands.js';
 import { sweepExpired } from './commands/expiry.js';
 import { slowlogObserve } from './commands/introspection.js';
 import type { ExecuteResult } from './commands/execute.js';
-import type { Session } from './commands/session.js';
-import { decodeCommand, encodeReply, Store } from './native.js';
+import type { ServerSettings, Session } from './commands/session.js';
+import { decodeCommand, decodeCommands, encodeReply, encodeReplies, Store } from './native.js';
 import type { DecodedCommand } from './native.js';
 import { error as replyError } from './reply.js';
 import type { ReplySpec } from './reply.js';
 import { notifyExpired, parseNotificationFlags } from './notifications.js';
 
 const PROTOCOL_ERROR = 'ERR Protocol error or request limit exceeded';
+
+/** Replies buffered before a long pipeline is flushed mid-burst. */
+const MAX_BUFFERED_FRAMES = 512;
 
 /** Run identifier reported by `INFO server`, one per process. */
 const RUN_ID = Array.from({ length: 40 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
@@ -172,7 +175,15 @@ export async function startServer(
         releaseLock();
         throw error;
     }
-    store.setSyncAlways(appendfsync === 'always');
+    // One live settings object per listener: `CONFIG SET` mutates it in place and
+    // every session and timer reads the current values instead of a startup copy.
+    const settings: ServerSettings = {
+        appendfsync,
+        requirepass,
+        notifyKeyspaceEvents,
+        notifications: parseNotificationFlags(notifyKeyspaceEvents),
+    };
+    store.setSyncAlways(settings.appendfsync === 'always');
     const connections = new Set<Socket>();
     // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
     const clients = new Map<number, Session>();
@@ -206,8 +217,9 @@ export async function startServer(
             protocol: 2,
             queued: null,
             watched: [],
-            authenticated: requirepass === undefined,
-            requirepass,
+            authenticated: settings.requirepass === undefined,
+            requirepass: settings.requirepass,
+            settings,
             name: '',
             hub,
             pubsub,
@@ -231,15 +243,42 @@ export async function startServer(
         // frame is written straight to its socket, after any ack frames of the
         // command that produced it.
         session.deliver = frame => {
+            flushOut();
             if (!socket.destroyed) socket.write(encodeReply(frame, session.protocol as number));
         };
         pubsub.attach(session);
-        let pending = Buffer.alloc(0);
+        let pending: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+        // Requests decoded from one socket read but not executed yet. A blocking
+        // command leaves the rest here until the hub wakes this connection.
+        let queued: DecodedCommand[] = [];
+        let protocolError: string | null = null;
         let blocked: BlockEntry | null = null;
-        function send(frame: ReplySpec): void {
-            const encoded = encodeReply(frame, session.protocol as number);
+        // Replies buffered for the current pump pass, encoded and written once.
+        let outgoing: ReplySpec[] = [];
+        function flushOut(): void {
+            if (outgoing.length === 0) {
+                return;
+            }
+            const frames = outgoing;
+            outgoing = [];
+            if (socket.destroyed) {
+                return;
+            }
+            // A single reply takes the cheap scalar encoder; a burst is encoded
+            // once as a JSON array so a long pipeline crosses the binding once.
+            const encoded = frames.length === 1
+                ? encodeReply(frames[0], session.protocol as number)
+                : encodeReplies(frames, session.protocol as number);
             stats.netOutput += encoded.length;
             socket.write(encoded);
+        }
+        function send(frame: ReplySpec): void {
+            outgoing.push(frame);
+            // Bound the per-burst buffer: a very long pipeline streams replies in
+            // chunks instead of holding every spec until the input drains.
+            if (outgoing.length >= MAX_BUFFERED_FRAMES) {
+                flushOut();
+            }
         }
         function write(result: ExecuteResult): void {
             if (result.frames !== undefined) {
@@ -252,30 +291,66 @@ export async function startServer(
             send(result.reply as ReplySpec);
         }
         function pump(): void {
-            if (pending.length === 0 || blocked !== null) {
+            if (blocked !== null) {
+                return;
+            }
+            if (queued.length === 0 && pending.length === 0) {
+                flushOut();
                 return;
             }
             // One socket read can carry a whole pipelined burst or a `MULTI`
             // queue. Mutations land in memory as each command runs, and the
             // shard is rewritten once when the burst ends instead of once per
-            // command. Replies are already buffered on the socket before the
-            // batch closes, so no client observes the deferred write.
+            // command. Requests and replies cross the binding once per burst,
+            // and the replies reach the socket in one write.
             store.beginBatch();
             try {
-                while (pending.length > 0 && blocked === null) {
-                    let decoded: DecodedCommand | null;
-                    try {
-                        decoded = decodeCommand(pending);
+                while (blocked === null) {
+                    if (queued.length === 0) {
+                        if (protocolError !== null) {
+                            send(replyError(PROTOCOL_ERROR));
+                            flushOut();
+                            socket.destroy();
+                            return;
+                        }
+                        if (pending.length === 0) {
+                            break;
+                        }
+                        // The common case is one command per socket read, so the
+                        // scalar decoder runs first and the batch decoder only
+                        // touches the remainder of a genuine burst.
+                        try {
+                            const first = decodeCommand(pending);
+                            if (first === null) {
+                                break;
+                            }
+                            pending = pending.subarray(first.consumed);
+                            queued.push(first);
+                            protocolError = null;
+                            if (pending.length > 0) {
+                                const batch = decodeCommands(pending);
+                                pending = pending.subarray(batch.consumed);
+                                queued.push(...batch.commands);
+                                protocolError = batch.error ?? null;
+                            }
+                        }
+                        catch {
+                            send(replyError(PROTOCOL_ERROR));
+                            flushOut();
+                            socket.destroy();
+                            return;
+                        }
+                        if (queued.length === 0) {
+                            if (protocolError !== null) {
+                                send(replyError(PROTOCOL_ERROR));
+                                flushOut();
+                                socket.destroy();
+                                return;
+                            }
+                            break;
+                        }
                     }
-                    catch {
-                        send(replyError(PROTOCOL_ERROR));
-                        socket.destroy();
-                        return;
-                    }
-                    if (decoded === null) {
-                        return;
-                    }
-                    pending = pending.subarray(decoded.consumed);
+                    const decoded = queued.shift() as DecodedCommand;
                     // Redis consumes `*0` and a negative multibulk length as an
                     // empty request and never answers it, so the loop just moves on.
                     if (decoded.args.length === 0) {
@@ -310,10 +385,12 @@ export async function startServer(
                     if (result.shutdown) {
                         // `SHUTDOWN` has already persisted when it asked to leave;
                         // the whole server goes down, so this loop stops pumping.
+                        flushOut();
                         performShutdown();
                         return;
                     }
                     if (result.close) {
+                        flushOut();
                         socket.end();
                         return;
                     }
@@ -321,12 +398,14 @@ export async function startServer(
             }
             finally {
                 store.endBatch();
+                flushOut();
             }
         }
         socket.on('data', chunk => {
             stats.netInput += chunk.length;
             stats.reads += 1;
-            pending = Buffer.concat([pending, chunk]);
+            // Most reads start on an empty buffer; keep the chunk without a copy.
+            pending = pending.length === 0 ? chunk : Buffer.concat([pending, chunk]);
             pump();
         });
         socket.on('close', () => {
@@ -354,11 +433,11 @@ export async function startServer(
         releaseLock();
         throw error;
     }
-    const notifications = parseNotificationFlags(notifyKeyspaceEvents);
     // Active expiry: the upstream samples the keyspace on a fast cadence, so a
-    // hundred-millisecond sweep keeps `expired` close to the real counter.
+    // hundred-millisecond sweep keeps `expired` close to the real counter. The
+    // flags are read on every pass so `CONFIG SET notify-keyspace-events` applies live.
     const expiryTimer = setInterval(() => {
-        sweepExpired(store, stats, (db, key) => notifyExpired(pubsub, notifications, db, key));
+        sweepExpired(store, stats, (db, key) => notifyExpired(pubsub, settings.notifications, db, key));
     }, 100);
     expiryTimer.unref();
     // The buffered counters reach the shard on a one-second cadence, and the

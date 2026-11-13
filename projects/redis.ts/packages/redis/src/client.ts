@@ -12,7 +12,7 @@ import type { ConnectionOptions as NodeTlsConnectionOptions, TLSSocket } from 'n
 import { CommandHost, replyToValue, toBuffers } from './redis.js';
 import type { WireSpec } from './redis.js';
 import { DATABASES } from './commands/kinds.js';
-import { decodeReply, encodeCommand } from './native.js';
+import { decodeReplies, encodeCommand, encodeCommands } from './native.js';
 import { configurationError, errorFromReply, fromNative, invalidState, RedisError } from './errors.js';
 import type {
     ClientState,
@@ -174,7 +174,7 @@ export class RedisClient extends CommandHost {
     readonly #waiters: Waiter[] = [];
     #state: ClientState = 'new';
     #socket?: Socket | TLSSocket;
-    #buffer = Buffer.alloc(0);
+    #buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     #protocol = 2;
     #connecting?: Promise<void>;
     #closing?: Promise<void>;
@@ -279,12 +279,58 @@ export class RedisClient extends CommandHost {
         return replyToValue(spec);
     }
 
-    /** Sends many command lines back to back and answers with their raw specs. */
+    /** Sends many command lines in one socket write and answers with their raw specs. */
     async #sendMany(requests: Buffer[][]): Promise<WireSpec[]> {
         if (this.#state !== 'ready') {
             throw invalidState('pipeline', this.#state, 'execute');
         }
-        return Promise.all(requests.map(args => this.#request(args)));
+        const socket = this.#socket;
+        if (socket === undefined) {
+            throw new RedisError('the connection is not open', {
+                code: 'connection-closed',
+                phase: 'execute',
+                execution: 'not-sent',
+                retry: 'never',
+            });
+        }
+        if (requests.length === 0) {
+            return [];
+        }
+        let encoded: Buffer;
+        try {
+            encoded = encodeCommands(requests);
+        }
+        catch (error) {
+            throw fromNative(error, 'execute', 'not-sent');
+        }
+        const waiters: Waiter[] = [];
+        const replies = requests.map(() => new Promise<WireSpec>((resolve, reject) => {
+            const waiter: Waiter = { resolve, reject };
+            waiters.push(waiter);
+            this.#waiters.push(waiter);
+        }));
+        socket.write(encoded, error => {
+            if (error === undefined || error === null) {
+                return;
+            }
+            const destroyed = (error as NodeJS.ErrnoException).code === 'ERR_STREAM_DESTROYED'
+                || (error as NodeJS.ErrnoException).code === 'ERR_STREAM_ALREADY_FINISHED';
+            const failure = new RedisError(`the request could not be delivered: ${error.message}`, {
+                code: 'write-failed',
+                phase: 'execute',
+                execution: destroyed ? 'not-sent' : 'unknown',
+                retry: destroyed ? 'safe' : 'application-decision',
+                cause: error,
+            });
+            for (const waiter of waiters) {
+                const index = this.#waiters.indexOf(waiter);
+                if (index >= 0) {
+                    this.#waiters.splice(index, 1);
+                }
+                waiter.reject(failure);
+            }
+        });
+        return Promise.all(replies);
     }
 
     async #doConnect(): Promise<void> {
@@ -443,34 +489,41 @@ export class RedisClient extends CommandHost {
     }
 
     #onData(chunk: Buffer): void {
-        this.#buffer = Buffer.concat([this.#buffer, chunk]);
+        this.#buffer = this.#buffer.length === 0 ? chunk : Buffer.concat([this.#buffer, chunk]);
         this.#pump();
     }
 
     #pump(): void {
         while (this.#buffer.length > 0) {
-            let decoded;
+            let batch;
             try {
-                decoded = decodeReply(this.#buffer);
+                batch = decodeReplies(this.#buffer);
             }
             catch (error) {
                 this.#failAll(fromNative(error, 'execute', 'unknown'));
                 this.#teardown();
                 return;
             }
-            if (decoded === null) {
+            if (batch.consumed === 0 && (batch.error === undefined || batch.error === null)) {
                 return;
             }
-            this.#buffer = this.#buffer.subarray(decoded.consumed);
-            const spec = JSON.parse(decoded.spec) as WireSpec;
-            if (spec.type === 'push') {
-                continue;
+            this.#buffer = this.#buffer.subarray(batch.consumed);
+            for (const raw of batch.specs) {
+                const spec = JSON.parse(raw) as WireSpec;
+                if (spec.type === 'push') {
+                    continue;
+                }
+                const waiter = this.#waiters.shift();
+                if (waiter === undefined) {
+                    continue;
+                }
+                waiter.resolve(spec);
             }
-            const waiter = this.#waiters.shift();
-            if (waiter === undefined) {
-                continue;
+            if (batch.error !== undefined && batch.error !== null) {
+                this.#failAll(fromNative(batch.error, 'execute', 'unknown'));
+                this.#teardown();
+                return;
             }
-            waiter.resolve(spec);
         }
     }
 

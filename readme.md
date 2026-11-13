@@ -43,14 +43,14 @@ arguments were sent.
 | Client metadata | `CLIENT SETINFO` `CLIENT SETNAME` `CLIENT GETNAME` `CLIENT ID` `CLIENT LIST` `CLIENT INFO` `CLIENT NO-EVICT` `CLIENT NO-TOUCH` `CLIENT UNPAUSE` `CLIENT KILL` |
 | Server introspection | `COMMAND` `COMMAND COUNT` `COMMAND INFO` `COMMAND DOCS` `INFO` `CONFIG GET` `CONFIG SET` `ACL WHOAMI` `ACL LIST` `ACL CAT` `ACL GETUSER` |
 | Transactions | `MULTI` `EXEC` `DISCARD` `WATCH` `UNWATCH` |
-| Strings and bitmaps | `GET` `SET` `SETNX` `SETEX` `PSETEX` `GETSET` `GETDEL` `GETEX` `MGET` `MSET` `APPEND` `STRLEN` `GETRANGE` `SETRANGE` `INCR` `DECR` `INCRBY` `DECRBY` `INCRBYFLOAT` `SETBIT` `GETBIT` `BITCOUNT` `BITPOS` `BITFIELD` `BITFIELD_RO` |
-| Keys and expiry | `DEL` `EXISTS` `TYPE` `EXPIRE` `PEXPIRE` `EXPIREAT` `PEXPIREAT` `EXPIRETIME` `PEXPIRETIME` `PERSIST` `TTL` `PTTL` `RENAME` `RENAMENX` `COPY` `RANDOMKEY` |
-| Database inspection | `KEYS` `SCAN` `DBSIZE` `FLUSHDB` `FLUSHALL` `OBJECT` |
+| Strings and bitmaps | `GET` `SET` `SETNX` `SETEX` `PSETEX` `GETSET` `GETDEL` `GETEX` `MGET` `MSET` `APPEND` `STRLEN` `GETRANGE` `SETRANGE` `INCR` `DECR` `INCRBY` `DECRBY` `INCRBYFLOAT` `SETBIT` `GETBIT` `BITCOUNT` `BITPOS` `BITFIELD` `BITFIELD_RO` `DEL` `UNLINK` |
+| Keys and expiry | `EXISTS` `TYPE` `EXPIRE` `PEXPIRE` `EXPIREAT` `PEXPIREAT` `EXPIRETIME` `PEXPIRETIME` `PERSIST` `TTL` `PTTL` `RENAME` `RENAMENX` `COPY` `MOVE` `RANDOMKEY` |
+| Database inspection | `KEYS` `SCAN` `DBSIZE` `FLUSHDB` `FLUSHALL` `SWAPDB` `OBJECT` |
 | Hashes | `HSET` `HSETNX` `HGET` `HGETALL` `HDEL` `HLEN` `HKEYS` `HVALS` `HEXISTS` `HINCRBY` `HINCRBYFLOAT` `HRANDFIELD` `HSCAN` |
 | Lists | `LPUSH` `RPUSH` `LPOP` `RPOP` `LRANGE` `LINDEX` `LLEN` `LINSERT` `LSET` `LTRIM` `LREM` `LPOS` `RPOPLPUSH` `LMOVE` `LMPOP` |
 | Sets | `SADD` `SREM` `SMEMBERS` `SCARD` `SISMEMBER` `SMISMEMBER` `SMOVE` `SRANDMEMBER` `SPOP` `SSCAN` `SINTER` `SUNION` `SDIFF` `SINTERSTORE` `SUNIONSTORE` `SDIFFSTORE` `SINTERCARD` |
 | Sorted sets | `ZADD` `ZINCRBY` `ZCARD` `ZCOUNT` `ZLEXCOUNT` `ZRANGE` `ZREVRANGE` `ZRANGEBYSCORE` `ZREVRANGEBYSCORE` `ZRANGEBYLEX` `ZREVRANGEBYLEX` `ZRANGESTORE` `ZRANK` `ZREVRANK` `ZSCORE` `ZMSCORE` `ZREM` `ZREMRANGEBYRANK` `ZREMRANGEBYSCORE` `ZREMRANGEBYLEX` `ZPOPMIN` `ZPOPMAX` `ZRANDMEMBER` `ZSCAN` `ZUNIONSTORE` `ZINTERSTORE` `ZDIFFSTORE` `ZUNION` `ZINTER` `ZDIFF` `ZINTERCARD` `ZMPOP` |
-| Streams | `XADD` `XLEN` `XRANGE` `XREVRANGE` `XDEL` `XTRIM` `XREAD` `XGROUP` `XACK` `XPENDING` `XCLAIM` `XAUTOCLAIM` `XINFO` |
+| Streams | `XADD` `XLEN` `XRANGE` `XREVRANGE` `XDEL` `XTRIM` `XREAD` `XREADGROUP` `XGROUP` `XACK` `XPENDING` `XCLAIM` `XAUTOCLAIM` `XINFO` |
 | HyperLogLog | `PFADD` `PFCOUNT` `PFMERGE` |
 | Pub/sub | `SUBSCRIBE` `UNSUBSCRIBE` `PSUBSCRIBE` `PUNSUBSCRIBE` `PUBLISH` `PUBSUB CHANNELS` `PUBSUB NUMSUB` `PUBSUB NUMPAT` |
 | Blocking | `BLPOP` `BRPOP` `BLMOVE` `BRPOPLPUSH` `BLMPOP` `BZPOPMIN` `BZPOPMAX` `BZMPOP` |
@@ -66,8 +66,14 @@ Supported options are narrower than the real server:
 - `EXPIRE` and its variants accept `NX`, `XX`, `GT` and `LT`.
 - `SCAN` accepts `MATCH` and `COUNT`.
 - `QUIT` accepts any extra arguments, answers `OK` and closes the connection.
-- `CONFIG SET` only accepts the options in its whitelist. Everything else answers
+- `CONFIG SET` accepts the facade's option table plus `requirepass`,
+  `notify-keyspace-events`, `appendfsync`, `slowlog-log-slower-than` and
+  `slowlog-max-len`, which the host applies to the running server. Everything
+  outside that table answers
   `ERR Unknown option or number of arguments for CONFIG SET - '<name>'`.
+- `CONFIG GET` reports `requirepass` (as an empty string when unset),
+  `notify-keyspace-events`, `appendfsync` and the two slow log knobs alongside
+  the facade's options.
 - Blocking commands wait inside the planner while the facade serves their
   non-blocking form.
 - `TYPE` reports `string`, `hash`, `list`, `set`, `zset`, `stream` or `none`.
@@ -103,13 +109,17 @@ Supported options are narrower than the real server:
   the existing pins.
 - `AUTH` checks the single default user. Until it succeeds, every command except
   `AUTH`, `HELLO`, `QUIT` and `RESET` answers `NOAUTH Authentication required.`.
+  `CONFIG SET requirepass <password>` changes the password of the running server
+  and an empty value removes it; connections opened later must authenticate,
+  while connections already authenticated stay authorized.
   A bad password answers
   `WRONGPASS invalid username-password pair or user is disabled.`. When no
   password is configured the legacy single-argument form reports that, while
   `AUTH default <anything>` succeeds because the default user is `nopass`.
 - With `--notify-keyspace-events` set, an expiry sweep publishes `expired` on
   `__keyspace@<db>__:<key>` and `__keyevent@<db>__:expired` when `K` / `E` and
-  `x` (or `A`) are selected. No other event class is emitted yet.
+  `x` (or `A`) are selected. `CONFIG SET notify-keyspace-events <flags>` changes
+  the same flags on the running listener. No other event class is emitted yet.
 - An empty multibulk request (`*0`) is ignored: it produces no reply and leaves
   the connection open.
 
@@ -136,7 +146,8 @@ shard is written before the catalog on a fresh directory, so a crash between
 the two renames reopens by recreating the catalog around the shard that already
 exists.
 
-`fsync` follows the `appendfsync` policy:
+`fsync` follows the `appendfsync` policy, which `--appendfsync` sets at startup
+and `CONFIG SET appendfsync always|everysec` switches on a running server:
 
 | Policy | Behavior |
 | ------ | -------- |
@@ -184,6 +195,10 @@ Build the Node-API binding into the matching platform package:
 pnpm install
 pnpm build
 ```
+
+`pnpm build` uses the debug profile. Use `pnpm build:release` for the optimized
+binding that the published platform packages ship and that the benchmark report
+measures.
 
 `pnpm build` runs `cargo build -p redis-napi`, copies the artifact to
 `projects/redis.ts/platforms/redis-<platform>/redis.<platform>.node`, and
@@ -235,10 +250,13 @@ Tests and gates:
   no `CLUSTER`, `REPLICAOF` / `FAILOVER`, Sentinel, TLS or `DEBUG`. `AUTH` covers
   the single default user, not additional ACL users.
 - **Notification coverage.** Only the `expired` event class is published. The
-  flags come from `--notify-keyspace-events` at startup, not `CONFIG SET`.
+  flags come from `--notify-keyspace-events` at startup and can be changed with
+  `CONFIG SET notify-keyspace-events`.
 - **Client options.** `CLIENT` supports only the subcommands listed above.
-- **Narrow glob.** `KEYS` matches only `*`, `?` and literal bytes. Character
-  classes and escapes are not supported.
+- **`SCAN MATCH` glob.** `KEYS` served by the TypeScript server supports the full
+  Redis dialect (`*`, `?`, `[...]`, `[^...]`, ranges and backslash escapes).
+  `SCAN MATCH` still runs in the upstream facade, which matches only `*`, `?` and
+  literal bytes.
 - **Cursor semantics.** `SCAN` treats the cursor as a position in the current
   ascending key list and pages from there. It is not an opaque Redis cursor, and
   a keyspace change between calls can skip or repeat keys.

@@ -112,7 +112,10 @@ abort the queue on both sides.
 
 No gaps left. `CLIENT`, `COMMAND`, `INFO`, `CONFIG` and `ACL` are served by
 `EmbeddedServerFace`; the TypeScript side only forwards them through
-`Store.serverCommand` and no longer keeps a planner copy.
+`Store.serverCommand`. `CONFIG` is the one overlay: the host answers the options
+it owns at runtime (`requirepass`, `notify-keyspace-events`, `appendfsync` and
+the two `slowlog-*` knobs) and merges them into the facade's `CONFIG GET` reply,
+while every other option and every error text still comes from the facade.
 
 Each host connection owns one embedded session keyed by the connection id, and
 all sessions share one `ClientRegistry`. `CLIENT SETNAME` / `SETINFO`,
@@ -125,6 +128,16 @@ host, which closes the matching socket; the host also calls
 `CLIENT KILL` on the current session is reported through the `close` flag and is
 not repeated in the killed list. Detached sessions have no socket, so their
 `addr` / `laddr` are `127.0.0.1:0` by construction.
+
+## Host-served commands
+
+`UNLINK`, `MOVE`, `SWAPDB` and `KEYS` have no facade entry that fits, so the
+TypeScript planner serves them without changing the shard layout. `UNLINK`
+forwards the `DEL` semantics, `MOVE` copies every kind namespace of one logical
+key together with its deadline and refuses an occupied destination, `SWAPDB`
+captures both databases before erasing either side, and `KEYS` applies the same
+byte-exact glob the gateway uses for pattern subscriptions so classes and escapes
+work. One command still reaches the shard as a single batch write.
 
 ## Verifying a gap
 

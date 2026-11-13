@@ -37,6 +37,17 @@ pnpm install
 pnpm build
 ```
 
+For product-representative performance numbers build the optimized binding instead
+(the development build above is a debug profile):
+
+```shell
+pnpm build:release
+```
+
+The benchmark report records which profile produced it through the
+`BENCH_BINDING_PROFILE` environment variable; set it to `release` when the binding
+was built with `pnpm build:release`.
+
 The examples resolve `ioredis` and `redis` from the repository root `node_modules`,
 just like the SQLite examples (`express` is used by the `with-express` example). Every
 example loads `../../shared/product.mjs` first, which points the product at the
@@ -66,12 +77,24 @@ stable scenario id, so runs can be compared across revisions:
 |----------|----------|-------|
 | `get-seq` | `redis-string-get` | awaited `GET` point reads |
 | `set-seq` | `redis-string-set` | awaited `SET` point writes |
+| `mset-seq` | `redis-string-mset` | one `MSET` over the whole key batch |
+| `incr-seq` | `redis-string-incr` | awaited `INCR` on one counter |
 | `set-pipeline` | `redis-pipeline-set` | `SET` throughput in explicit pipelines |
 | `get-pipeline` | `redis-pipeline-get` | `GET` throughput in explicit pipelines |
 | `hash-hset-hget` | `redis-hash-hset-hget` | `HSET` + `HGET` on one hash |
 | `list-rpush-lrange` | `redis-list-rpush-lrange` | `RPUSH` + `LRANGE` on one list |
 | `set-sadd-smembers` | `redis-set-sadd-smembers` | `SADD` + `SMEMBERS` on one set |
 | `zset-zadd-zrange` | `redis-zset-zadd-zrange` | `ZADD` + `ZRANGE WITHSCORES` on one zset |
+| `del-seq` | `redis-key-del` | awaited `DEL` of preloaded keys |
+| `move-seq` | `redis-key-move` | awaited `MOVE` between two databases |
+| `blpop-roundtrip` | `redis-list-blpop-push` | parked `BLPOP` woken by a peer `RPUSH` |
+| `scan-full` | `redis-scan-full-keyspace` | full `SCAN` sweep over the preloaded keyspace |
+| `ping-concurrent` | `redis-ping-concurrent` | `PING` over several parallel connections |
+| `pubsub-roundtrip` | `redis-pubsub-publish-deliver` | publish + delivery round-trip |
+| `streams-xadd-xrange` | `redis-stream-xadd-xrange` | `XADD` + `XRANGE` on one stream |
+| `stream-group` | `redis-stream-consumer-group` | `XADD` + `XREADGROUP` + `XACK` through one group |
+| `ttl-setex-expire` | `redis-ttl-setex-expire` | `SETEX` + `EXPIRE` + expiry wait |
+| `multi-exec` | `redis-txn-multi-exec` | `MULTI` / `EXEC` transaction |
 | `set-big` | `redis-big-value-set` | large-value `SET` |
 | `get-big` | `redis-big-value-get` | large-value `GET` |
 | `ping` | `redis-ping-rtt` | awaited `PING` round-trips |
@@ -79,13 +102,17 @@ stable scenario id, so runs can be compared across revisions:
 
 Defaults are `BENCH_SET=100`, `BENCH_GET=500`, `BENCH_PIPE=500`, `BENCH_PING=1000`,
 `BENCH_BATCH=500`, `BENCH_COLL=200`, `BENCH_BIG=20`, `BENCH_BIG_GET=50`,
-`BENCH_BIG_BYTES=65536`, `BENCH_CONNECT=50`, `BENCH_ROUNDS=3`, `BENCH_WARMUP=1`. The
+`BENCH_BIG_BYTES=65536`, `BENCH_CONNECT=50`, `BENCH_INCR=500`, `BENCH_MSET=500`,
+`BENCH_DEL=200`, `BENCH_MOVE=200`, `BENCH_BLOCK=100`, `BENCH_PING_CONC=800`,
+`BENCH_CONC=8`, `BENCH_GROUP=100`, `BENCH_ROUNDS=3`, `BENCH_WARMUP=1`. The
 `SET` counts are lower than the other workloads because each `SET` rewrites the whole
 `.yykv` snapshot, so larger key spaces grow super-linearly.
 
 Every cell starts a fresh temporary data directory and a fresh server, runs its untimed
 preload on that empty server, warms up, and only then collects `BENCH_ROUNDS` timed
-samples on one connection. Statistics never come from a local formula: median, p95,
+samples on one connection. Destructive workloads (`incr-seq`, `del-seq`, `move-seq`)
+re-seed their starting state through an untimed `reset` hook before every round, so no
+round measures a previous round's leftovers. Statistics never come from a local formula: median, p95,
 min, max, and rounds come from `database.harness::summarize` through
 `src/harness-bench.mjs` (`harnessBenchSummary` on the platform binding when present,
 otherwise the crate's golden vectors, re-asserted on every load). Reports carry

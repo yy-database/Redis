@@ -129,6 +129,36 @@ export const SLOWLOG_MAX_ARGC = 32;
 /** Upstream trims each logged string argument to this many bytes. */
 export const SLOWLOG_MAX_STRING_LEN = 128;
 
+/**
+ * Live `slowlog-log-slower-than` and `slowlog-max-len`.
+ *
+ * `CONFIG SET` changes them on the running server, so the log never keeps a
+ * startup copy. A negative threshold disables logging, matching upstream.
+ */
+let slowlogThresholdUs = SLOWLOG_LOG_SLOWER_THAN_US;
+let slowlogCapacity = SLOWLOG_MAX_LEN;
+
+/** Current `slowlog-log-slower-than`, in microseconds. */
+export function slowlogLogSlowerThanUs(): number {
+    return slowlogThresholdUs;
+}
+
+/** Current `slowlog-max-len`. */
+export function slowlogMaxLen(): number {
+    return slowlogCapacity;
+}
+
+/** Applies a live `slowlog-log-slower-than`; a negative value disables logging. */
+export function setSlowlogLogSlowerThan(thresholdUs: number): void {
+    slowlogThresholdUs = thresholdUs;
+}
+
+/** Applies a live `slowlog-max-len` and trims the log immediately. */
+export function setSlowlogMaxLen(maxLen: number): void {
+    slowlogCapacity = maxLen;
+    slowlogTrim();
+}
+
 /** One logged slow query, shaped like the upstream `slowlogEntry`. */
 export interface SlowlogEntry {
     id: number;
@@ -171,9 +201,9 @@ function slowlogTrimArg(arg: Buffer): Buffer {
     return Buffer.concat([arg.subarray(0, SLOWLOG_MAX_STRING_LEN), Buffer.from('...')]);
 }
 
-/** Drops the oldest entries so the log never exceeds {@link SLOWLOG_MAX_LEN}. */
+/** Drops the oldest entries so the log never exceeds the live capacity. */
 function slowlogTrim(): void {
-    while (slowlog.length > SLOWLOG_MAX_LEN) {
+    while (slowlog.length > slowlogCapacity) {
         slowlog.pop();
     }
 }
@@ -187,7 +217,7 @@ function slowlogTrim(): void {
  * Returns whether an entry was added.
  */
 export function slowlogObserve(durationUs: number, args: Buffer[], session: Session): boolean {
-    if (durationUs < SLOWLOG_LOG_SLOWER_THAN_US) {
+    if (slowlogThresholdUs < 0 || durationUs < slowlogThresholdUs) {
         return false;
     }
     const cmdArgc = args.length;

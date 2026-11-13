@@ -45,8 +45,10 @@ pub struct ExpiredKey {
 /// [`Node::begin_batch`] and [`Node::end_batch`] bracket a burst of commands
 /// that share one socket read: every mutation inside the burst is applied to
 /// memory immediately, while the shard is encoded once when the outermost batch
-/// closes. Reads always observe the latest state, so ordering inside the burst
-/// does not change.
+/// closes. Counter updates are the exception: they stay buffered until a
+/// committed mutation, an explicit [`Node::flush`], or a drop, so a sequential
+/// `INCR` stream does not rewrite the snapshot per command. Reads always observe
+/// the latest state, so ordering inside the burst does not change.
 #[derive(Debug)]
 pub struct Node {
     data_dir: PathBuf,
@@ -425,12 +427,17 @@ impl Node {
         self.batch_depth = self.batch_depth.saturating_add(1);
     }
 
-    /// Closes one batch and, at the outermost depth, writes any pending state.
+    /// Closes one batch and, at the outermost depth, writes committed mutations.
+    ///
+    /// Counter updates stay buffered: they reach the shard on the next committed
+    /// mutation, on [`Node::flush`] (the server's one-second timer and its
+    /// shutdown path), or when the node is dropped. That keeps a sequential
+    /// `INCR` stream from rewriting the whole snapshot once per command.
     pub fn end_batch(&mut self) -> io::Result<()> {
         if self.batch_depth > 0 {
             self.batch_depth -= 1;
         }
-        if self.batch_depth == 0 {
+        if self.batch_depth == 0 && self.dirty {
             self.flush()?;
         }
         Ok(())

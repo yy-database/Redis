@@ -9,8 +9,8 @@ import { rewriteKind } from '../chunks.js';
 import { integerError, kindOf, text, wrongArity, wrongType } from '../kinds.js';
 import type { CommandPlan, Session } from '../session.js';
 import { STREAM_ID_ERROR, U64_MAX, ZERO_ID, encodeStream, readStream } from './body.js';
-import { compareStreamIds, parseExplicitStreamId, parseStreamBound, parseTrimOptions, resolveStreamId, streamMeta, trimStream } from './state.js';
-import type { StreamEntry, StreamId } from './types.js';
+import { compareStreamIds, ensureConsumer, entryReply, findConsumer, findEntry, findGroup, parseExplicitStreamId, parseStreamBound, parseTrimOptions, resolveStreamId, streamMeta, trimStream } from './state.js';
+import type { StreamEntry, StreamId, StreamPending } from './types.js';
 
 const STREAM_UNBALANCED = "ERR Unbalanced 'xread' list of streams: for each stream key an ID, '+', or '$' must be specified.";
 const BLOCK_NOT_INTEGER = 'ERR timeout is not an integer or out of range';
@@ -109,10 +109,165 @@ export function planXRead(store: Store, session: Session, args: Buffer[]): Comma
 }
 
 /**
- * Plans `XADD`, `XLEN`, `XRANGE`, `XREVRANGE`, `XDEL`, `XTRIM` and `XREAD`.
+ * Plans `XREADGROUP`.
  *
- * Consumer groups land in a later slice, so `XGROUP`, `XACK`, `XPENDING` and
- * `XCLAIM` still answer the unknown command error.
+ * `>` claims entries past the group's last-delivered id and records each one in
+ * the consumer's pending list unless `NOACK` is set. An explicit id replays that
+ * consumer's pending history instead, incrementing delivery counts. Every key and
+ * group is validated before a single entry is claimed, so an error never leaves a
+ * half-updated group behind.
+ */
+export function planXReadGroup(store: Store, session: Session, args: Buffer[]): CommandPlan {
+    const db = session.db;
+    if (text(args[1] ?? '').toUpperCase() !== 'GROUP') {
+        return { error: replyError(MISSING_GROUP) };
+    }
+    if (args.length < 7) return { error: wrongArity('xreadgroup') };
+    const groupName = args[2];
+    const consumerName = args[3];
+    let count: number | null = null;
+    let timeoutMs: number | null = null;
+    let noack = false;
+    let index = 4;
+    for (;;) {
+        const token = text(args[index] ?? '').toUpperCase();
+        if (token === 'COUNT') {
+            const value = args[index + 1] === undefined ? null : parseInteger(text(args[index + 1]));
+            if (value === null) return { error: integerError() };
+            count = value <= 0 ? null : value;
+            index += 2;
+            continue;
+        }
+        if (token === 'BLOCK') {
+            const value = args[index + 1] === undefined ? null : parseInteger(text(args[index + 1]));
+            if (value === null) return { error: replyError(BLOCK_NOT_INTEGER) };
+            if (value < 0) return { error: replyError(BLOCK_NEGATIVE) };
+            timeoutMs = value;
+            index += 2;
+            continue;
+        }
+        if (token === 'NOACK') {
+            noack = true;
+            index += 1;
+            continue;
+        }
+        if (token === 'STREAMS') break;
+        return { error: replyError('ERR syntax error') };
+    }
+
+    const tokens = args.slice(index + 1);
+    if (tokens.length < 2) return { error: wrongArity('xreadgroup') };
+    if (tokens.length % 2 !== 0) return { error: replyError(STREAM_UNBALANCED) };
+    const half = tokens.length / 2;
+    const keys = tokens.slice(0, half);
+    const fresh: boolean[] = [];
+    const cursors: StreamId[] = [];
+    for (let position = 0; position < half; position += 1) {
+        const raw = text(tokens[half + position]);
+        if (raw === '>') {
+            fresh.push(true);
+            cursors.push(ZERO_ID);
+            continue;
+        }
+        const id = parseExplicitStreamId(raw);
+        if (id === null) return { error: replyError(STREAM_ID_ERROR) };
+        fresh.push(false);
+        cursors.push(id);
+    }
+
+    const attempt = () => {
+        // Validate every stream and group before claiming anything.
+        const states = [];
+        for (let position = 0; position < half; position += 1) {
+            const key = keys[position];
+            const kind = kindOf(store, db, key);
+            if (kind !== null && kind !== 'stream') return wrongType();
+            if (kind === null) return readGroupMissing(key, groupName);
+            const stream = readStream(store, db, key);
+            if (stream === null || stream.error === true) return wrongType();
+            if (findGroup(stream, groupName) === undefined) return readGroupMissing(key, groupName);
+            states.push(stream);
+        }
+
+        const now = Date.now();
+        const rows: ReplySpec[] = [];
+        const touched = new Set<number>();
+        for (let position = 0; position < half; position += 1) {
+            const stream = states[position];
+            const group = findGroup(stream, groupName);
+            if (group === undefined) continue;
+            const replies: ReplySpec[] = [];
+            if (fresh[position]) {
+                const selected: StreamEntry[] = [];
+                for (const entry of stream.entries) {
+                    if (compareStreamIds(entry, group.lastId) <= 0) continue;
+                    selected.push(entry);
+                    if (count !== null && selected.length >= count) break;
+                }
+                if (selected.length === 0) continue;
+                const consumer = ensureConsumer(group, consumerName, now);
+                consumer.deliveryTime = now;
+                consumer.activeTime = now;
+                for (const entry of selected) {
+                    replies.push(entryReply(entry));
+                    if (!noack) {
+                        consumer.pending.push({ ms: entry.ms, seq: entry.seq, deliveryTime: now, deliveryCount: 1 });
+                    }
+                }
+                const last = selected[selected.length - 1];
+                group.lastId = { ms: last.ms, seq: last.seq };
+                if (group.entriesRead !== null) {
+                    group.entriesRead = Math.min(stream.entriesAdded, group.entriesRead + selected.length);
+                }
+            }
+            else {
+                const consumer = findConsumer(group, consumerName);
+                if (consumer === undefined) continue;
+                const delivered: StreamPending[] = [];
+                for (const pending of consumer.pending) {
+                    if (compareStreamIds(pending, cursors[position]) <= 0) continue;
+                    const entry = findEntry(stream, pending);
+                    // A trimmed or deleted entry keeps its id with a nil payload.
+                    replies.push(entry === undefined
+                        ? array([bulk(`${pending.ms}-${pending.seq}`), nullReply()])
+                        : entryReply(entry));
+                    delivered.push(pending);
+                    if (count !== null && delivered.length >= count) break;
+                }
+                if (delivered.length === 0) continue;
+                consumer.deliveryTime = now;
+                consumer.activeTime = now;
+                for (const pending of delivered) {
+                    pending.deliveryTime = now;
+                    pending.deliveryCount += 1;
+                }
+            }
+            touched.add(position);
+            rows.push(array([bulk(keys[position]), array(replies)]));
+        }
+        if (touched.size === 0) return null;
+        for (const position of touched) {
+            const key = keys[position];
+            const stream = states[position];
+            rewriteKind(store, db, 'stream', key, encodeStream(stream.entries, stream.last, streamMeta(stream)));
+        }
+        return array(rows);
+    };
+
+    if (timeoutMs === null) return { run: () => attempt() ?? nullArray() };
+    return blockingPlan(db, keys, timeoutMs, attempt, nullArray());
+}
+
+/** Error text a real server answers for `XREADGROUP` without a `GROUP` clause. */
+const MISSING_GROUP = 'ERR Missing GROUP keyword or consumer/group name in XREADGROUP';
+
+/** `NOGROUP` wording for `XREADGROUP`, which names the missing key and group. */
+function readGroupMissing(key: Buffer, group: Buffer): ReplySpec {
+    return replyError(`NOGROUP No such key '${text(key)}' or consumer group '${text(group)}' in XREADGROUP with GROUP option`);
+}
+
+/**
+ * Plans `XADD`, `XLEN`, `XRANGE`, `XREVRANGE`, `XDEL`, `XTRIM` and `XREAD`.
  */
 export function planStream(store: Store, session: Session, name: string, args: Buffer[]): CommandPlan {
     const db = session.db;

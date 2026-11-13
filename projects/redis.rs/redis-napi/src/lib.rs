@@ -34,6 +34,28 @@ pub struct DecodedReply {
     pub spec: String,
 }
 
+/// Every complete request decoded from the front of one buffer.
+#[napi(object)]
+pub struct DecodedCommands {
+    /// Bytes covered by `commands`, stopping before any framing error.
+    pub consumed: u32,
+    /// Complete requests in wire order, including empty ones the host must skip.
+    pub commands: Vec<DecodedCommand>,
+    /// Framing error found after the decoded requests, or `None`.
+    pub error: Option<String>,
+}
+
+/// Every complete reply decoded from the front of one buffer.
+#[napi(object)]
+pub struct DecodedReplies {
+    /// Bytes covered by `specs`, stopping before any framing error.
+    pub consumed: u32,
+    /// Reply specifications in wire order.
+    pub specs: Vec<String>,
+    /// Framing error found after the decoded replies, or `None`.
+    pub error: Option<String>,
+}
+
 /// Result of adding `delta` to an integer value.
 #[napi(object)]
 pub struct Increment {
@@ -81,12 +103,52 @@ pub fn encode_command(args: Vec<Buffer>) -> Buffer {
     Buffer::from(redis_wasm::resp::encode_command(&args))
 }
 
+/// Encodes several commands back to back for one pipeline write.
+#[napi]
+pub fn encode_commands(commands: Vec<Vec<Buffer>>) -> Buffer {
+    let commands = commands
+        .into_iter()
+        .map(|args| args.into_iter().map(|arg| arg.to_vec()).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    Buffer::from(redis_wasm::resp::encode_commands(&commands))
+}
+
+/// Decodes every complete request at the front of `input`.
+#[napi]
+pub fn decode_commands(input: Buffer) -> std::result::Result<DecodedCommands, napi::Error> {
+    let batch = redis_wasm::resp::decode_commands(&input);
+    Ok(DecodedCommands {
+        consumed: batch.consumed as u32,
+        commands: batch
+            .requests
+            .into_iter()
+            .map(|(request, length)| DecodedCommand {
+                consumed: length as u32,
+                args: request.args.into_iter().map(Buffer::from).collect(),
+            })
+            .collect(),
+        error: batch.error,
+    })
+}
+
 /// Encodes one reply specification for the negotiated protocol version.
 #[napi]
 pub fn encode_reply(spec: String, protocol: u8) -> std::result::Result<Buffer, napi::Error> {
     let spec: serde_json::Value = serde_json::from_str(&spec).map_err(reason)?;
     let reply = Reply::from_spec(&spec).map_err(reason)?;
     Ok(Buffer::from(redis_wasm::resp::encode_reply(&reply, protocol)))
+}
+
+/// Encodes several reply specifications, carried as one JSON array.
+#[napi]
+pub fn encode_replies(specs: String, protocol: u8) -> std::result::Result<Buffer, napi::Error> {
+    let specs: Vec<serde_json::Value> = serde_json::from_str(&specs).map_err(reason)?;
+    let replies = specs
+        .iter()
+        .map(Reply::from_spec)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(reason)?;
+    Ok(Buffer::from(redis_wasm::resp::encode_replies(&replies, protocol)))
 }
 
 /// Parses one reply from the front of `input`, or `null` when more bytes are needed.
@@ -100,6 +162,17 @@ pub fn decode_reply(input: Buffer) -> std::result::Result<Option<DecodedReply>, 
         Ok(None) => Ok(None),
         Err(error) => Err(reason(error)),
     }
+}
+
+/// Decodes every complete reply at the front of `input`.
+#[napi]
+pub fn decode_replies(input: Buffer) -> std::result::Result<DecodedReplies, napi::Error> {
+    let batch = redis_wasm::resp::decode_replies(&input);
+    Ok(DecodedReplies {
+        consumed: batch.consumed as u32,
+        specs: batch.replies.iter().map(|reply| reply.to_spec().to_string()).collect(),
+        error: batch.error,
+    })
 }
 
 /// Parses a canonical Redis integer, rejecting leading zeros and a plus sign.

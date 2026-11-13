@@ -334,11 +334,114 @@ pub fn encode_command(args: &[Vec<u8>]) -> Vec<u8> {
     out
 }
 
+/// Encodes several commands back to back, as one pipeline write.
+pub fn encode_commands(commands: &[Vec<Vec<u8>>]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(
+        commands
+            .iter()
+            .flat_map(|args| args.iter())
+            .map(|arg| arg.len() + 16)
+            .sum::<usize>()
+            + 16,
+    );
+    for args in commands {
+        out.extend_from_slice(&encode_command(args));
+    }
+    out
+}
+
+/// Several complete requests decoded from the front of one buffer.
+pub struct CommandBatch {
+    /// Bytes covered by `requests`, stopping before any framing error.
+    pub consumed: usize,
+    /// Complete requests with their own wire length, including empty ones the
+    /// caller must skip.
+    pub requests: Vec<(Request, usize)>,
+    /// Framing error found after the decoded requests, or `None`.
+    pub error: Option<String>,
+}
+
+/// Decodes every complete request at the front of `input`.
+///
+/// A framing error stops the batch and is reported together with the requests
+/// that precede it, so a caller can run the valid prefix before closing.
+pub fn decode_commands(input: &[u8]) -> CommandBatch {
+    let mut consumed = 0;
+    let mut requests = Vec::new();
+    while consumed < input.len() {
+        match decode_command(&input[consumed..]) {
+            Ok(Some((request, length))) => {
+                consumed += length;
+                requests.push((request, length));
+            }
+            Ok(None) => break,
+            Err(error) => {
+                return CommandBatch {
+                    consumed,
+                    requests,
+                    error: Some(error),
+                };
+            }
+        }
+    }
+    CommandBatch {
+        consumed,
+        requests,
+        error: None,
+    }
+}
+
 /// Encodes one reply with an explicit protocol version.
 pub fn encode_reply(reply: &Reply, protocol: u8) -> Vec<u8> {
     let mut out = Vec::new();
     reply.encode(protocol, &mut out);
     out
+}
+
+/// Encodes several replies back to back, as one pipeline response.
+pub fn encode_replies(replies: &[Reply], protocol: u8) -> Vec<u8> {
+    let mut out = Vec::new();
+    for reply in replies {
+        reply.encode(protocol, &mut out);
+    }
+    out
+}
+
+/// Several complete replies decoded from the front of one buffer.
+pub struct ReplyBatch {
+    /// Bytes covered by `replies`, stopping before any framing error.
+    pub consumed: usize,
+    /// Complete replies in wire order.
+    pub replies: Vec<Reply>,
+    /// Framing error found after the decoded replies, or `None`.
+    pub error: Option<String>,
+}
+
+/// Decodes every complete reply at the front of `input`.
+pub fn decode_replies(input: &[u8]) -> ReplyBatch {
+    let mut consumed = 0;
+    let mut replies = Vec::new();
+    while consumed < input.len() {
+        match decode_reply(&input[consumed..]) {
+            Ok(Some((reply, length))) => {
+                consumed += length;
+                replies.push(reply);
+            }
+            Ok(None) => break,
+            Err(error) => {
+                return ReplyBatch {
+                    consumed,
+                    replies,
+                    error: Some(error),
+                };
+            }
+        }
+    }
+    ReplyBatch {
+        consumed,
+        replies,
+        error: None,
+    }
 }
 
 /// Parses one reply from the front of `input`, returning the consumed byte count.
@@ -581,5 +684,28 @@ mod tests {
 
         let small = Reply::Bulk(b"hello".to_vec()).to_spec();
         assert!(small.get("bytes").is_some());
+    }
+
+    #[test]
+    fn batches_round_trip_and_leave_the_partial_tail() {
+        use super::{decode_commands, decode_replies, encode_commands, encode_replies};
+        let commands = vec![
+            vec![b"SET".to_vec(), b"a".to_vec(), b"1".to_vec()],
+            vec![b"GET".to_vec(), b"a".to_vec()],
+        ];
+        let mut wire = encode_commands(&commands);
+        let complete = wire.len();
+        wire.extend_from_slice(b"*2\r\n$3\r\nGET");
+        let batch = decode_commands(&wire);
+        assert_eq!(batch.consumed, complete);
+        assert_eq!(batch.requests.len(), 2);
+        assert!(batch.error.is_none());
+
+        let replies = vec![Reply::Simple("OK".to_owned()), Reply::Bulk(b"1".to_vec())];
+        let encoded = encode_replies(&replies, 2);
+        let decoded = decode_replies(&encoded);
+        assert_eq!(decoded.consumed, encoded.len());
+        assert_eq!(decoded.replies, replies);
+        assert!(decoded.error.is_none());
     }
 }

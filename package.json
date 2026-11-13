@@ -4,6 +4,7 @@
     "scripts": {
         "check": "cargo check --manifest-path projects/redis.rs/Cargo.toml --workspace",
         "build": "node scripts/build-platforms.mjs && pnpm --filter @yydb/redis build",
+        "build:release": "node scripts/build-platforms.mjs --release && pnpm --filter @yydb/redis build",
         "test": "cargo test --manifest-path projects/redis.rs/Cargo.toml --workspace --all-targets",
         "test:ts": "pnpm --filter @yydb/redis-harness test",
         "test:py": "node scripts/run-python-tests.mjs",

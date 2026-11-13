@@ -741,3 +741,230 @@ test('expired keys publish keyspace notifications when enabled', async () => {
         await server.close();
     }
 });
+
+test('CONFIG SET requirepass gates the connections opened after it', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const writer = await connectClient(server.port);
+    try {
+        const set = await writer.send('CONFIG', 'SET', 'requirepass', 'secret');
+        assert.equal(set.value, 'OK');
+        const reported = await writer.send('CONFIG', 'GET', 'requirepass');
+        assert.equal(reported.type, 'array');
+        assert.equal(textOf(reported.value[0]), 'requirepass');
+        assert.equal(textOf(reported.value[1]), 'secret');
+
+        // The connection that was already authenticated stays usable.
+        assert.equal((await writer.send('SET', 'live', 'v')).value, 'OK');
+
+        const guest = await connectClient(server.port);
+        try {
+            assert.match((await guest.send('GET', 'live')).value, /NOAUTH/);
+            assert.equal((await guest.send('AUTH', 'secret')).value, 'OK');
+            assert.equal(textOf(await guest.send('GET', 'live')), 'v');
+        }
+        finally {
+            guest.close();
+        }
+
+        // An empty password removes the requirement again.
+        assert.equal((await writer.send('CONFIG', 'SET', 'requirepass', '')).value, 'OK');
+        const open = await connectClient(server.port);
+        try {
+            assert.equal(textOf(await open.send('GET', 'live')), 'v');
+        }
+        finally {
+            open.close();
+        }
+    }
+    finally {
+        writer.close();
+        await server.close();
+    }
+});
+
+test('CONFIG SET notify-keyspace-events applies to the running listener', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const subscriber = await connectClient(server.port);
+    const writer = await connectClient(server.port);
+    try {
+        await subscriber.send('SUBSCRIBE', '__keyevent@0__:expired');
+        assert.equal((await writer.send('CONFIG', 'SET', 'notify-keyspace-events', 'Ex')).value, 'OK');
+        assert.equal(textOf((await writer.send('CONFIG', 'GET', 'notify-keyspace-events')).value[1]), 'Ex');
+
+        await writer.send('PSETEX', 'live-ttl', '60', 'v');
+        const event = await subscriber.next();
+        assert.equal(textOf(event.value[0]), 'message');
+        assert.equal(textOf(event.value[1]), '__keyevent@0__:expired');
+        assert.equal(textOf(event.value[2]), 'live-ttl');
+    }
+    finally {
+        subscriber.close();
+        writer.close();
+        await server.close();
+    }
+});
+
+test('CONFIG SET appendfsync validates the policy and reports it live', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const writer = await connectClient(server.port);
+    try {
+        assert.equal(textOf((await writer.send('CONFIG', 'GET', 'appendfsync')).value[1]), 'everysec');
+
+        const rejected = await writer.send('CONFIG', 'SET', 'appendfsync', 'sometimes');
+        assert.equal(rejected.type, 'error');
+        assert.match(rejected.value, /argument\(s\) must be one of the following: always, everysec/);
+
+        assert.equal((await writer.send('CONFIG', 'SET', 'appendfsync', 'always')).value, 'OK');
+        assert.equal(textOf((await writer.send('CONFIG', 'GET', 'appendfsync')).value[1]), 'always');
+
+        const unknown = await writer.send('CONFIG', 'SET', 'nosuchoption', 'x');
+        assert.equal(unknown.type, 'error');
+        assert.match(unknown.value, /Unknown option or number of arguments for CONFIG SET - 'nosuchoption'/);
+    }
+    finally {
+        writer.close();
+        await server.close();
+    }
+});
+
+test('CONFIG SET slowlog thresholds apply to the running server', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const writer = await connectClient(server.port);
+    try {
+        assert.equal((await writer.send('CONFIG', 'SET', 'slowlog-log-slower-than', '0')).value, 'OK');
+        assert.equal(textOf((await writer.send('CONFIG', 'GET', 'slowlog-log-slower-than')).value[1]), '0');
+
+        // A zero threshold logs every command, including these CONFIG calls.
+        await writer.send('PING');
+        assert.ok((await writer.send('SLOWLOG', 'LEN')).value >= 1);
+
+        assert.equal((await writer.send('CONFIG', 'SET', 'slowlog-max-len', '2')).value, 'OK');
+        assert.equal(textOf((await writer.send('CONFIG', 'GET', 'slowlog-max-len')).value[1]), '2');
+        await writer.send('PING');
+        await writer.send('PING');
+        await writer.send('PING');
+        assert.equal((await writer.send('SLOWLOG', 'LEN')).value, 2);
+
+        // A negative threshold disables logging without clearing the log.
+        assert.equal((await writer.send('CONFIG', 'SET', 'slowlog-log-slower-than', '-1')).value, 'OK');
+        await writer.send('PING');
+        assert.equal((await writer.send('SLOWLOG', 'LEN')).value, 2);
+
+        const invalid = await writer.send('CONFIG', 'SET', 'slowlog-max-len', '-1');
+        assert.equal(invalid.type, 'error');
+        assert.match(invalid.value, /argument couldn't be parsed into an integer/);
+    }
+    finally {
+        // The slow log is process-wide, so the next test must see the defaults.
+        await writer.send('CONFIG', 'SET', 'slowlog-log-slower-than', '10000').catch(() => {});
+        await writer.send('CONFIG', 'SET', 'slowlog-max-len', '128').catch(() => {});
+        writer.close();
+        await server.close();
+    }
+});
+
+test('UNLINK removes keys and MOVE transfers across databases', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const writer = await connectClient(server.port);
+    try {
+        await writer.send('SET', 'u1', 'one');
+        await writer.send('SET', 'u2', 'two');
+        assert.equal((await writer.send('UNLINK', 'u1', 'u2', 'missing')).value, 2);
+        assert.equal((await writer.send('EXISTS', 'u1', 'u2')).value, 0);
+        assert.equal((await writer.send('UNLINK', 'u1')).value, 0);
+
+        await writer.send('SET', 'moving', 'v');
+        await writer.send('PEXPIRE', 'moving', '60000');
+        assert.equal((await writer.send('MOVE', 'moving', '1')).value, 1);
+        assert.equal((await writer.send('EXISTS', 'moving')).value, 0);
+        assert.equal((await writer.send('SELECT', '1')).value, 'OK');
+        assert.equal(textOf(await writer.send('GET', 'moving')), 'v');
+        assert.ok((await writer.send('PTTL', 'moving')).value > 0);
+
+        // An occupied destination keeps both keys where they were.
+        await writer.send('SET', 'occupied', 'target');
+        await writer.send('SELECT', '0');
+        await writer.send('SET', 'occupied', 'source');
+        assert.equal((await writer.send('MOVE', 'occupied', '1')).value, 0);
+        assert.equal(textOf(await writer.send('GET', 'occupied')), 'source');
+
+        const same = await writer.send('MOVE', 'occupied', '0');
+        assert.equal(same.type, 'error');
+        assert.match(same.value, /source and destination objects are the same/);
+        const range = await writer.send('MOVE', 'occupied', '16');
+        assert.equal(range.type, 'error');
+        assert.match(range.value, /DB index is out of range/);
+    }
+    finally {
+        writer.close();
+        await server.close();
+    }
+});
+
+test('KEYS supports the full Redis glob dialect', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const writer = await connectClient(server.port);
+    try {
+        for (const key of ['hello', 'hallo', 'hxllo', 'hello2', 'he*lo']) {
+            await writer.send('SET', key, '1');
+        }
+        const keys = async pattern => (await writer.send('KEYS', pattern)).value.map(entry => textOf(entry));
+        assert.deepEqual(await keys('h?llo'), ['hallo', 'hello', 'hxllo']);
+        assert.deepEqual(await keys('h[ae]llo'), ['hallo', 'hello']);
+        assert.deepEqual(await keys('h[^e]llo'), ['hallo', 'hxllo']);
+        assert.deepEqual(await keys('h[a-b]llo'), ['hallo']);
+        assert.deepEqual(await keys('he\\*lo'), ['he*lo']);
+    }
+    finally {
+        writer.close();
+        await server.close();
+    }
+});
+
+test('buffered counters become durable on a mutation and a clean close', async () => {
+    const directory = temporaryDir();
+    const server = await startServer({ dataDir: directory });
+    const writer = await connectClient(server.port);
+    try {
+        for (let index = 0; index < 50; index += 1) {
+            await writer.send('INCR', 'counter');
+        }
+        // A committed mutation carries the buffered counter into the shard.
+        await writer.send('SET', 'marker', 'x');
+        const store = new Store(directory);
+        assert.equal(store.get(0, 'counter'), '50');
+    }
+    finally {
+        writer.close();
+        await server.close();
+    }
+    const reopened = new Store(directory);
+    assert.equal(reopened.get(0, 'counter'), '50');
+});
+
+test('SWAPDB exchanges both databases', async () => {
+    const server = await startServer({ dataDir: temporaryDir() });
+    const writer = await connectClient(server.port);
+    try {
+        await writer.send('SET', 'zero', 'from-0');
+        await writer.send('SELECT', '1');
+        await writer.send('SET', 'one', 'from-1');
+        assert.equal((await writer.send('SWAPDB', '0', '1')).value, 'OK');
+
+        // The connection keeps its selected index while the contents swap.
+        assert.equal(textOf(await writer.send('GET', 'zero')), 'from-0');
+        assert.equal((await writer.send('GET', 'one')).type, 'null');
+        await writer.send('SELECT', '0');
+        assert.equal(textOf(await writer.send('GET', 'one')), 'from-1');
+        assert.equal((await writer.send('GET', 'zero')).type, 'null');
+
+        // A self-swap is a no-op rather than an error.
+        assert.equal((await writer.send('SWAPDB', '0', '0')).value, 'OK');
+        const range = await writer.send('SWAPDB', '0', '16');
+        assert.match(range.value, /DB index is out of range/);
+    }
+    finally {
+        writer.close();
+        await server.close();
+    }
+});
