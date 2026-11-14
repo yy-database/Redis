@@ -10,7 +10,7 @@
 //   BENCH_STREAM (200), BENCH_PUBSUB (100), BENCH_TTL (30), BENCH_TXN (100),
 //   BENCH_INCR (500), BENCH_MSET (500), BENCH_DEL (200), BENCH_MOVE (200),
 //   BENCH_BLOCK (100), BENCH_PING_CONC (800), BENCH_CONC (8), BENCH_GROUP (100),
-//   BENCH_REPEAT (10), BENCH_WORKLOADS (all)
+//   BENCH_REPEAT (10), BENCH_COLL_LARGE (2000), BENCH_WORKLOADS (all)
 // 真机对照：设 BENCH_ORACLE_HOST / BENCH_ORACLE_PORT 指向真实 redis-server 后，
 //   同一矩阵以 `ioredis` 为固定客户端再跑一轮，作为 oracle 列写进报告。
 
@@ -63,6 +63,7 @@ const BLOCK_COUNT = count('BENCH_BLOCK', 100);
 const PING_CONC = count('BENCH_PING_CONC', 800);
 const CONCURRENCY = count('BENCH_CONC', 8);
 const GROUP_COUNT = count('BENCH_GROUP', 100);
+const LARGE_COLL = count('BENCH_COLL_LARGE', 2_000);
 const ROUNDS = count('BENCH_ROUNDS', 3);
 const WARMUP = count('BENCH_WARMUP', 1);
 const REPEAT = count('BENCH_REPEAT', 10);
@@ -177,6 +178,45 @@ const workloads = [
           commands.push(['GET', `bench:pipeget:${index}`]);
         }
         await client.pipeline(commands);
+      }
+    },
+  },
+  {
+    name: 'pipeline-mixed',
+    scenario: 'redis-pipeline-mixed-families',
+    ops: PIPE_COUNT,
+    params: {
+      ops: String(PIPE_COUNT),
+      batch: String(BATCH),
+      value_bytes: '64',
+      families: 'SET,GET,INCR,HSET,LPUSH,SADD',
+    },
+    dataScale: `keys=${PIPE_COUNT}`,
+    async prepare(ctx) {
+      await preload(ctx, PIPE_COUNT, 'bench:mixget');
+    },
+    async reset(ctx) {
+      // The write families grow their collections and counter across rounds, so
+      // every round starts from the same preloaded state outside the timed region.
+      await ctx.client.call(['DEL', 'bench:mix:hash', 'bench:mix:list', 'bench:mix:sset', 'bench:mix:counter']);
+    },
+    async run({ client }) {
+      for (let start = 0; start < PIPE_COUNT; start += BATCH) {
+        const commands = [];
+        for (let index = start; index < Math.min(start + BATCH, PIPE_COUNT); index += 1) {
+          switch (index % 6) {
+            case 0: commands.push(['SET', `bench:mix:${index}`, VALUE]); break;
+            case 1: commands.push(['GET', `bench:mixget:${index}`]); break;
+            case 2: commands.push(['INCR', 'bench:mix:counter']); break;
+            case 3: commands.push(['HSET', 'bench:mix:hash', `f${index}`, `v${index}`]); break;
+            case 4: commands.push(['LPUSH', 'bench:mix:list', `e${index}`]); break;
+            default: commands.push(['SADD', 'bench:mix:sset', `m${index}`]); break;
+          }
+        }
+        const replies = await client.pipeline(commands);
+        if (!Array.isArray(replies) || replies.length !== commands.length) {
+          throw new Error(`mixed pipeline replies ${Array.isArray(replies) ? replies.length : replies}, expected ${commands.length}`);
+        }
       }
     },
   },
@@ -645,6 +685,99 @@ const workloads = [
     },
   },
   {
+    name: 'set-membership-ops',
+    scenario: 'redis-set-membership-cardinality',
+    ops: REPEAT * 3,
+    params: { members: String(COLL), repeat: String(REPEAT), commands: 'SMISMEMBER,SINTERCARD,SRANDMEMBER' },
+    dataScale: `keys=2,members=${COLL}`,
+    async reset(ctx) {
+      const left = Array.from({ length: COLL }, (_, index) => `m${index}`);
+      const right = Array.from({ length: COLL }, (_, index) => `m${index + Math.floor(COLL / 2)}`);
+      await ctx.client.call(['DEL', 'bench:mem:a', 'bench:mem:b']);
+      await ctx.client.call(['SADD', 'bench:mem:a', ...left]);
+      await ctx.client.call(['SADD', 'bench:mem:b', ...right]);
+    },
+    async run({ client }) {
+      const members = Array.from({ length: COLL }, (_, index) => `m${index}`);
+      const half = Math.ceil(COLL / 2);
+      for (let round = 0; round < REPEAT; round += 1) {
+        const flags = await client.call(['SMISMEMBER', 'bench:mem:a', ...members]);
+        if (!Array.isArray(flags) || flags.length !== COLL || flags.some(flag => flag !== 1)) {
+          throw new Error(`SMISMEMBER replied ${Array.isArray(flags) ? flags.length : flags} members`);
+        }
+        const cardinality = await client.call(['SINTERCARD', '2', 'bench:mem:a', 'bench:mem:b']);
+        if (cardinality !== half) throw new Error(`SINTERCARD replied ${cardinality}, expected ${half}`);
+        const picks = await client.call(['SRANDMEMBER', 'bench:mem:a', String(half)]);
+        if (!Array.isArray(picks) || picks.length !== half) {
+          throw new Error(`SRANDMEMBER replied ${Array.isArray(picks) ? picks.length : picks}, expected ${half}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'zset-pop-ops',
+    scenario: 'redis-zset-pop-random-score',
+    ops: 4,
+    params: { members: String(COLL), commands: 'ZMSCORE,ZRANDMEMBER,ZPOPMIN,ZPOPMAX' },
+    dataScale: `key=1,members=${COLL}`,
+    async reset(ctx) {
+      const args = [];
+      for (let index = 0; index < COLL; index += 1) {
+        args.push(String(index), `z${index}`);
+      }
+      await ctx.client.call(['DEL', 'bench:zpop']);
+      await ctx.client.call(['ZADD', 'bench:zpop', ...args]);
+    },
+    async run({ client }) {
+      const members = Array.from({ length: COLL }, (_, index) => `z${index}`);
+      const half = Math.floor(COLL / 2);
+      const scores = await client.call(['ZMSCORE', 'bench:zpop', ...members]);
+      if (!Array.isArray(scores) || scores.length !== COLL) {
+        throw new Error(`ZMSCORE replied ${Array.isArray(scores) ? scores.length : scores}, expected ${COLL}`);
+      }
+      const random = await client.call(['ZRANDMEMBER', 'bench:zpop', String(COLL)]);
+      if (!Array.isArray(random) || random.length !== COLL) {
+        throw new Error(`ZRANDMEMBER replied ${Array.isArray(random) ? random.length : random}, expected ${COLL}`);
+      }
+      // RESP2 flattens `WITHSCORES` pairs on a real server; the emulator may nest
+      // them. Both shapes carry the same pair count.
+      const pairCount = rows => (Array.isArray(rows[0]) ? rows.length : rows.length / 2);
+      const lowest = await client.call(['ZPOPMIN', 'bench:zpop', String(half)]);
+      if (pairCount(lowest) !== half) throw new Error(`ZPOPMIN replied ${pairCount(lowest)} pairs`);
+      const highest = await client.call(['ZPOPMAX', 'bench:zpop', String(half)]);
+      if (pairCount(highest) !== half) throw new Error(`ZPOPMAX replied ${pairCount(highest)} pairs`);
+    },
+  },
+  {
+    name: 'large-collection-read',
+    scenario: 'redis-large-collection-full-read',
+    ops: REPEAT * 2,
+    params: { members: String(LARGE_COLL), repeat: String(REPEAT), commands: 'SMEMBERS,ZRANGE' },
+    dataScale: `keys=2,members=${LARGE_COLL}`,
+    async prepare(ctx) {
+      const members = Array.from({ length: LARGE_COLL }, (_, index) => `m${index}`);
+      const scored = [];
+      for (let index = 0; index < LARGE_COLL; index += 1) {
+        scored.push(String(index), `m${index}`);
+      }
+      await ctx.client.call(['DEL', 'bench:largeset', 'bench:largezset']);
+      await ctx.client.call(['SADD', 'bench:largeset', ...members]);
+      await ctx.client.call(['ZADD', 'bench:largezset', ...scored]);
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const members = await client.call(['SMEMBERS', 'bench:largeset']);
+        if (!Array.isArray(members) || members.length !== LARGE_COLL) {
+          throw new Error(`SMEMBERS replied ${Array.isArray(members) ? members.length : members}, expected ${LARGE_COLL}`);
+        }
+        const rows = await client.call(['ZRANGE', 'bench:largezset', '0', '-1']);
+        if (!Array.isArray(rows) || rows.length !== LARGE_COLL) {
+          throw new Error(`ZRANGE replied ${Array.isArray(rows) ? rows.length : rows}, expected ${LARGE_COLL}`);
+        }
+      }
+    },
+  },
+  {
     name: 'zset-score-ops',
     scenario: 'redis-zset-increment-rank',
     ops: COLL * 3,
@@ -1003,7 +1136,7 @@ const results = {};
 const oracle = await oracleTarget();
 
 console.log(`Redis RESP2 scenario matrix (${WARMUP} warmup + ${ROUNDS} measured rounds per cell)`);
-console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_REPEAT=${REPEAT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
+console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_REPEAT=${REPEAT}, BENCH_COLL_LARGE=${LARGE_COLL}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
 console.log(`Stats: benchSummary via ${benchSummarySource}`);
 console.log('Server: fresh emulated server and dataDir per (workload, client); rounds share one server and one connection');
 console.log('');
@@ -1080,7 +1213,7 @@ const runProvenance = {
     stream: String(STREAM_COUNT), pubsub: String(PUBSUB_COUNT), ttl: String(TTL_COUNT), txn: String(TXN_COUNT),
     incr: String(INCR_COUNT), mset: String(MSET_COUNT), del: String(DEL_COUNT), move: String(MOVE_COUNT),
     block: String(BLOCK_COUNT), ping_conc: String(PING_CONC), conc: String(CONCURRENCY),
-    group: String(GROUP_COUNT), repeat: String(REPEAT),
+    group: String(GROUP_COUNT), repeat: String(REPEAT), coll_large: String(LARGE_COLL),
   },
   data_scale: `matrix=${workloads.length}x${reportClients.length}`,
   rustc_version: rustcVersion,
@@ -1150,7 +1283,7 @@ const report = `# Benchmark report
 
 Command: \`pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark\`
 Binding: \`${process.env.BENCH_BINDING_PROFILE ?? 'debug'}\` — build with \`pnpm build:release\` and set \`BENCH_BINDING_PROFILE=release\` for product numbers
-Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_REPEAT=${REPEAT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
+Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_REPEAT=${REPEAT}\`, \`BENCH_COLL_LARGE=${LARGE_COLL}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
 Baseline: \`ioredis\` against the emulated server = \`1.00x\`
 Ratio: subject_time / baseline_time (smaller is faster). Fastest cell in each row is bold.
 Stats: median/p95/min/max/rounds come from \`database.harness::summarize\` via \`benchSummary\` (${benchSummarySource}); nearest-rank p95, even-length median averages the middle pair. Per-op milliseconds come from \`database.harness::per_op_ms\` via \`benchPerOpMs\`, the same DTO the summary returns. No median, p95 or per-op formula lives in this example.
@@ -1214,9 +1347,12 @@ ${oracleSection}
   primitive and the emulated server decodes and encodes each socket burst with the
   batch \`decodeCommands\` / \`encodeReplies\` primitives, so a pipeline crosses the
   binding twice regardless of its length.
-- \`SET\` rewrites the whole \`.yykv\` snapshot, so absolute \`SET\` numbers (including
-  \`set-big\`) are snapshot-bound; \`GET\`, \`ping\` and the collection reads isolate
-  round-trip overhead.
+- The socket server applies mutations in memory and writes the whole \`.yykv\`
+  snapshot on its one-second flush cadence, so sequential \`SET\` and collection
+  writes no longer pay a full-shard rewrite per command. A pipeline still folds
+  into one in-memory batch, and a batch that mutates while counters are buffered
+  writes through immediately. \`GET\`, \`ping\` and the collection reads still
+  isolate round-trip overhead.
 - Command names delegated to the native command families are matched
   case-sensitively by the current backend, so the peer adapters use explicit
   uppercase command forms.
@@ -1245,6 +1381,20 @@ ${oracleSection}
   \`BENCH_COLL\` for their key/field count. Micro cells repeat \`BENCH_REPEAT\` times
   inside one timed run so a single sub-millisecond call does not dominate the
   median, and every \`ops\` value is the real command count sent in a round.
+- \`pipeline-mixed\` sends one equal-size \`BENCH_BATCH\` burst per chunk and cycles
+  SET / GET / INCR / HSET / LPUSH / SADD inside it, so a single socket read crosses
+  every forwarded family instead of repeating one command. GET keys are preloaded
+  in \`prepare\`; the growing collections and counter are dropped in \`reset\` before
+  every round, outside the timed region.
+- \`set-membership-ops\` and \`zset-pop-ops\` cover the remaining family verbs
+  (\`SMISMEMBER\`, \`SINTERCARD\`, \`SRANDMEMBER\`; \`ZMSCORE\`, \`ZRANDMEMBER\`,
+  \`ZPOPMIN\`, \`ZPOPMAX\`). Both re-seed their keys in \`reset\` so every round sees
+  the same cardinality, and both normalize the RESP2 nested-versus-flat
+  \`WITHSCORES\` shape the same way \`zset-zadd-zrange\` does.
+- \`large-collection-read\` builds one \`BENCH_COLL_LARGE\`-member set and zset in
+  \`prepare\` and reads them whole with \`SMEMBERS\` and \`ZRANGE 0 -1\` per
+  \`BENCH_REPEAT\` round, isolating full-collection reply encoding and allocation
+  from the per-command round trip the \`BENCH_COLL\` cells measure.
 
 ## Machine-readable summary
 
