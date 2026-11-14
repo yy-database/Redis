@@ -95,6 +95,23 @@ stable scenario id, so runs can be compared across revisions:
 | `stream-group` | `redis-stream-consumer-group` | `XADD` + `XREADGROUP` + `XACK` through one group |
 | `ttl-setex-expire` | `redis-ttl-setex-expire` | `SETEX` + `EXPIRE` + expiry wait |
 | `multi-exec` | `redis-txn-multi-exec` | `MULTI` / `EXEC` transaction |
+| `watch-exec` | `redis-txn-watch-exec` | `WATCH` + `MULTI` + `EXEC` success path |
+| `mget-seq` | `redis-string-mget` | one `MGET` over the whole key batch |
+| `append-getrange` | `redis-string-append-getrange` | `APPEND` growth + trailing `GETRANGE` |
+| `getdel-getex` | `redis-string-getdel-getex` | `GETEX ... EX` then `GETDEL` per key |
+| `set-options` | `redis-string-set-options` | `SET ... NX` then `SET ... XX GET` |
+| `exists-type` | `redis-key-exists-type` | `EXISTS` + `TYPE` on every key |
+| `expire-persist` | `redis-key-expire-persist` | `EXPIRE` + `TTL` + `PERSIST` on every key |
+| `hash-hgetall-hdel` | `redis-hash-hgetall-hdel` | multi-field `HSET`, `HGETALL`, `HDEL` |
+| `list-lpush-lpop` | `redis-list-lpush-lpop` | `LPUSH` growth + `LPOP` drain |
+| `set-algebra` | `redis-set-sinter-sunion-sdiff` | repeated `SINTER` / `SUNION` / `SDIFF` |
+| `zset-score-ops` | `redis-zset-increment-rank` | `ZINCRBY` + `ZSCORE` + `ZRANK` per member |
+| `bitfield-ops` | `redis-bitfield-increment` | repeated `BITFIELD INCRBY` + `GET` |
+| `hll-ops` | `redis-hyperloglog-add-count` | `PFADD` per element + `PFCOUNT` |
+| `sort-ops` | `redis-sort-list` | repeated `SORT_RO` over a numeric list |
+| `keys-random` | `redis-keys-random-dbsize` | `KEYS` + `RANDOMKEY` + `DBSIZE` |
+| `stream-xread` | `redis-stream-xread` | `XREAD` from the stream start |
+| `server-face-ops` | `redis-server-face` | `INFO` + `COMMAND COUNT` + `CONFIG GET` / `SET` |
 | `set-big` | `redis-big-value-set` | large-value `SET` |
 | `get-big` | `redis-big-value-get` | large-value `GET` |
 | `ping` | `redis-ping-rtt` | awaited `PING` round-trips |
@@ -104,9 +121,16 @@ Defaults are `BENCH_SET=100`, `BENCH_GET=500`, `BENCH_PIPE=500`, `BENCH_PING=100
 `BENCH_BATCH=500`, `BENCH_COLL=200`, `BENCH_BIG=20`, `BENCH_BIG_GET=50`,
 `BENCH_BIG_BYTES=65536`, `BENCH_CONNECT=50`, `BENCH_INCR=500`, `BENCH_MSET=500`,
 `BENCH_DEL=200`, `BENCH_MOVE=200`, `BENCH_BLOCK=100`, `BENCH_PING_CONC=800`,
-`BENCH_CONC=8`, `BENCH_GROUP=100`, `BENCH_ROUNDS=3`, `BENCH_WARMUP=1`. The
+`BENCH_CONC=8`, `BENCH_GROUP=100`, `BENCH_REPEAT=10`, `BENCH_ROUNDS=3`,
+`BENCH_WARMUP=1`. The
 `SET` counts are lower than the other workloads because each `SET` rewrites the whole
 `.yykv` snapshot, so larger key spaces grow super-linearly.
+
+`BENCH_WORKLOADS=name[,name]` narrows one run to a subset (for example
+`BENCH_WORKLOADS=expire-persist,ping`), which keeps a focused rerun short while the
+full matrix stays the default. The micro cells that cover a single sub-millisecond
+command repeat `BENCH_REPEAT` times inside one timed run, and their `ops` value is the
+real command count sent per round.
 
 Every cell starts a fresh temporary data directory and a fresh server, runs its untimed
 preload on that empty server, warms up, and only then collects `BENCH_ROUNDS` timed
@@ -153,3 +177,6 @@ pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark
   `GET` and `PING` isolate round-trip overhead.
 - The emulated server answers `ZRANGE ... WITHSCORES` with nested pairs even under
   RESP2; the workload normalizes both shapes outside the timed command count.
+- `redis-unknown-wasm32` is probed on every run. Its placeholder artifact is reported
+  as `n/a` with the reason instead of being skipped silently; the row becomes a real
+  measurement once a wasm-bindgen entry ships.

@@ -1,17 +1,17 @@
 //! Sorted-set forwarding, range-option checks and the `Z*` plans.
 
-import { parseInteger } from '../native.js';
+import { encodeReply, parseInteger } from '../native.js';
 import type { Store } from '../native.js';
 import { error as replyError, nullArray } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
 import { blockingPlan, deferredFailure, notifyPush, parseBlockingTimeout } from './blocking-plan.js';
 import { SUFFIX, integerError, text, unknownCommand, wrongArity, wrongType } from './kinds.js';
 import { parseScanCursor, parseScanOptions } from './scan.js';
-import type { CommandPlan, Session } from './session.js';
+import type { CommandPlan, CommandRun, Session } from './session.js';
 
 /** Forwards one zset request to the upstream facade after rejecting a stream key. */
-export function forwardZSet(store: Store, session: Session, args: Buffer[], keys: Buffer[], notifyKeys: Buffer[] = []): () => ReplySpec {
-    return () => {
+export function forwardZSet(store: Store, session: Session, args: Buffer[], keys: Buffer[], notifyKeys: Buffer[] = []): CommandRun {
+    const run = (() => {
         for (const key of keys) {
             if (store.existsKind(session.db, SUFFIX.stream, key)) return wrongType();
         }
@@ -20,13 +20,29 @@ export function forwardZSet(store: Store, session: Session, args: Buffer[], keys
             for (const key of notifyKeys) notifyPush(session, session.db, key);
         }
         return reply;
+    }) as CommandRun;
+    run.frame = () => {
+        for (const key of keys) {
+            if (store.existsKind(session.db, SUFFIX.stream, key)) {
+                return { frame: encodeReply(wrongType(), session.protocol ?? 2), error: true };
+            }
+        }
+        const raw = store.zsetCommandFrame(session.db, session.protocol ?? 2, args);
+        if (!raw.error) {
+            for (const key of notifyKeys) notifyPush(session, session.db, key);
+        }
+        return raw;
     };
+    return run;
 }
 
 /** One non-blocking attempt for a blocking zset command, mapping the empty reply to `null`. */
 export function forwardBlockingZSet(store: Store, session: Session, args: Buffer[], keys: Buffer[]): () => ReplySpec | null {
     return () => {
-        const reply = forwardZSet(store, session, args, keys)();
+        for (const key of keys) {
+            if (store.existsKind(session.db, SUFFIX.stream, key)) return wrongType();
+        }
+        const reply = store.zsetCommand(session.db, session.protocol ?? 2, args);
         if (reply.type === 'null' || reply.type === 'null-array') return null;
         return reply;
     };

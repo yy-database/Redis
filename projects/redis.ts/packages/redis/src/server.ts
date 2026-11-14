@@ -254,7 +254,12 @@ export async function startServer(
         let protocolError: string | null = null;
         let blocked: BlockEntry | null = null;
         // Replies buffered for the current pump pass, encoded and written once.
-        let outgoing: ReplySpec[] = [];
+        // An entry is either a reply specification or ready-made reply bytes
+        // produced by a forwarding facade call.
+        let outgoing: (ReplySpec | Buffer)[] = [];
+        function encodeOutgoing(frame: ReplySpec | Buffer): Buffer {
+            return Buffer.isBuffer(frame) ? frame : encodeReply(frame, session.protocol as number);
+        }
         function flushOut(): void {
             if (outgoing.length === 0) {
                 return;
@@ -266,13 +271,16 @@ export async function startServer(
             }
             // A single reply takes the cheap scalar encoder; a burst is encoded
             // once as a JSON array so a long pipeline crosses the binding once.
+            // A burst that carries ready-made frames is concatenated instead.
             const encoded = frames.length === 1
-                ? encodeReply(frames[0], session.protocol as number)
-                : encodeReplies(frames, session.protocol as number);
+                ? encodeOutgoing(frames[0])
+                : frames.some(frame => Buffer.isBuffer(frame))
+                    ? Buffer.concat(frames.map(encodeOutgoing))
+                    : encodeReplies(frames as ReplySpec[], session.protocol as number);
             stats.netOutput += encoded.length;
             socket.write(encoded);
         }
-        function send(frame: ReplySpec): void {
+        function send(frame: ReplySpec | Buffer): void {
             outgoing.push(frame);
             // Bound the per-burst buffer: a very long pipeline streams replies in
             // chunks instead of holding every spec until the input drains.
@@ -281,6 +289,10 @@ export async function startServer(
             }
         }
         function write(result: ExecuteResult): void {
+            if (result.frame !== undefined) {
+                send(result.frame);
+                return;
+            }
             if (result.frames !== undefined) {
                 for (const frame of result.frames) send(frame);
                 return;
@@ -357,7 +369,7 @@ export async function startServer(
                         continue;
                     }
                     const startedAt = process.hrtime.bigint();
-                    const result = execute(store, session, decoded.args);
+                    const result = execute(store, session, decoded.args, true);
                     if (result.block === undefined) {
                         slowlogObserve(Number((process.hrtime.bigint() - startedAt) / 1000n), decoded.args, session);
                     }

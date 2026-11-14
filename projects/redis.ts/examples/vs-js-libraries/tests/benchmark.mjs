@@ -9,12 +9,13 @@
 //   BENCH_BIG (20), BENCH_BIG_GET (50), BENCH_BIG_BYTES (65536), BENCH_CONNECT (50),
 //   BENCH_STREAM (200), BENCH_PUBSUB (100), BENCH_TTL (30), BENCH_TXN (100),
 //   BENCH_INCR (500), BENCH_MSET (500), BENCH_DEL (200), BENCH_MOVE (200),
-//   BENCH_BLOCK (100), BENCH_PING_CONC (800), BENCH_CONC (8), BENCH_GROUP (100)
+//   BENCH_BLOCK (100), BENCH_PING_CONC (800), BENCH_CONC (8), BENCH_GROUP (100),
+//   BENCH_REPEAT (10), BENCH_WORKLOADS (all)
 // 真机对照：设 BENCH_ORACLE_HOST / BENCH_ORACLE_PORT 指向真实 redis-server 后，
 //   同一矩阵以 `ioredis` 为固定客户端再跑一轮，作为 oracle 列写进报告。
 
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { statSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -64,6 +65,7 @@ const CONCURRENCY = count('BENCH_CONC', 8);
 const GROUP_COUNT = count('BENCH_GROUP', 100);
 const ROUNDS = count('BENCH_ROUNDS', 3);
 const WARMUP = count('BENCH_WARMUP', 1);
+const REPEAT = count('BENCH_REPEAT', 10);
 const BIG_VALUE = 'b'.repeat(BIG_BYTES);
 
 const clientNames = ['ioredis', '@yydb/redis', 'node-redis'];
@@ -441,6 +443,384 @@ const workloads = [
     },
   },
   {
+    name: 'mget-seq',
+    scenario: 'redis-string-mget',
+    ops: COLL,
+    params: { keys: String(COLL), value_bytes: '64' },
+    dataScale: `keys=${COLL}`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:mget');
+    },
+    async run({ client }) {
+      const keys = Array.from({ length: COLL }, (_, index) => `bench:mget:${index}`);
+      const values = await client.call(['MGET', ...keys]);
+      if (!Array.isArray(values) || values.length !== COLL) {
+        throw new Error(`mget returned ${Array.isArray(values) ? values.length : values} values, expected ${COLL}`);
+      }
+      if (values[0] !== VALUE || values[COLL - 1] !== VALUE) throw new Error('mget value mismatch');
+    },
+  },
+  {
+    name: 'append-getrange',
+    scenario: 'redis-string-append-getrange',
+    ops: COLL + 1,
+    params: { appends: String(COLL), chunk_bytes: '16' },
+    dataScale: 'key=1',
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:append']);
+    },
+    async run({ client }) {
+      const chunk = 'c'.repeat(16);
+      for (let index = 0; index < COLL; index += 1) {
+        const length = await client.call(['APPEND', 'bench:append', chunk]);
+        if (length !== (index + 1) * 16) {
+          throw new Error(`append length ${length} at ${index}, expected ${(index + 1) * 16}`);
+        }
+      }
+      const tail = await client.call(['GETRANGE', 'bench:append', '-16', '-1']);
+      if (typeof tail !== 'string' || tail !== chunk) throw new Error(`getrange tail was ${tail}`);
+    },
+  },
+  {
+    name: 'getdel-getex',
+    scenario: 'redis-string-getdel-getex',
+    ops: COLL * 2,
+    params: { keys: String(COLL), ttl_seconds: '100' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async reset(ctx) {
+      const commands = [];
+      for (let index = 0; index < COLL; index += 1) {
+        commands.push(['SET', `bench:getdel:${index}`, VALUE, 'EX', '100']);
+      }
+      for (let start = 0; start < commands.length; start += BATCH) {
+        await ctx.client.pipeline(commands.slice(start, start + BATCH));
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:getdel:${index}`;
+        const refreshed = await client.call(['GETEX', key, 'EX', '100']);
+        if (refreshed !== VALUE) throw new Error(`getex mismatch at ${index}: ${refreshed}`);
+        const removed = await client.call(['GETDEL', key]);
+        if (removed !== VALUE) throw new Error(`getdel mismatch at ${index}: ${removed}`);
+      }
+    },
+  },
+  {
+    name: 'set-options',
+    scenario: 'redis-string-set-options',
+    ops: COLL * 2,
+    params: { keys: String(COLL), options: 'NX,XX,GET' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async reset(ctx) {
+      const commands = [];
+      for (let index = 0; index < COLL; index += 1) {
+        commands.push(['DEL', `bench:setopt:${index}`]);
+      }
+      for (let start = 0; start < commands.length; start += BATCH) {
+        await ctx.client.pipeline(commands.slice(start, start + BATCH));
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:setopt:${index}`;
+        const created = await client.call(['SET', key, VALUE, 'NX']);
+        if (created !== 'OK') throw new Error(`SET NX replied ${created} at ${index}`);
+        const previous = await client.call(['SET', key, `${VALUE}x`, 'XX', 'GET']);
+        if (previous !== VALUE) throw new Error(`SET XX GET replied ${previous} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'exists-type',
+    scenario: 'redis-key-exists-type',
+    ops: COLL * 2,
+    params: { keys: String(COLL) },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:exists');
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:exists:${index}`;
+        const present = await client.call(['EXISTS', key]);
+        if (present !== 1) throw new Error(`EXISTS replied ${present} at ${index}`);
+        const type = await client.call(['TYPE', key]);
+        if (type !== 'string') throw new Error(`TYPE replied ${type} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'expire-persist',
+    scenario: 'redis-key-expire-persist',
+    ops: COLL * 3,
+    params: { keys: String(COLL), ttl_seconds: '100' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:expire');
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:expire:${index}`;
+        const attached = await client.call(['EXPIRE', key, '100']);
+        if (attached !== 1) throw new Error(`EXPIRE replied ${attached} at ${index}`);
+        const remaining = await client.call(['TTL', key]);
+        if (!(remaining > 0 && remaining <= 100)) {
+          throw new Error(`TTL replied ${remaining} at ${index}`);
+        }
+        const persisted = await client.call(['PERSIST', key]);
+        if (persisted !== 1) throw new Error(`PERSIST replied ${persisted} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'hash-hgetall-hdel',
+    scenario: 'redis-hash-hgetall-hdel',
+    ops: COLL + 2,
+    params: { fields: String(COLL) },
+    dataScale: `key=1,fields=${COLL}`,
+    async run({ client }) {
+      await client.call(['DEL', 'bench:hashall']);
+      const pairs = [];
+      const fields = [];
+      for (let index = 0; index < COLL; index += 1) {
+        pairs.push(`f${index}`, `v${index}`);
+        fields.push(`f${index}`);
+      }
+      await client.call(['HSET', 'bench:hashall', ...pairs]);
+      const flat = await client.call(['HGETALL', 'bench:hashall']);
+      if (!Array.isArray(flat) || flat.length !== COLL * 2) {
+        throw new Error(`HGETALL returned ${Array.isArray(flat) ? flat.length : flat} items, expected ${COLL * 2}`);
+      }
+      const removed = await client.call(['HDEL', 'bench:hashall', ...fields]);
+      if (removed !== COLL) throw new Error(`HDEL removed ${removed}, expected ${COLL}`);
+    },
+  },
+  {
+    name: 'list-lpush-lpop',
+    scenario: 'redis-list-lpush-lpop',
+    ops: COLL * 2,
+    params: { elements: String(COLL) },
+    dataScale: 'key=1,elements=' + COLL,
+    async run({ client }) {
+      await client.call(['DEL', 'bench:lpoplist']);
+      for (let index = 0; index < COLL; index += 1) {
+        await client.call(['LPUSH', 'bench:lpoplist', `e${index}`]);
+      }
+      for (let index = 0; index < COLL; index += 1) {
+        const popped = await client.call(['LPOP', 'bench:lpoplist']);
+        if (popped !== `e${COLL - 1 - index}`) {
+          throw new Error(`LPOP replied ${popped} at ${index}, expected e${COLL - 1 - index}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'set-algebra',
+    scenario: 'redis-set-sinter-sunion-sdiff',
+    ops: REPEAT * 3,
+    params: { members: String(COLL), repeat: String(REPEAT) },
+    dataScale: `keys=2,members=${COLL}`,
+    async prepare(ctx) {
+      const left = Array.from({ length: COLL }, (_, index) => `m${index}`);
+      const right = Array.from({ length: COLL }, (_, index) => `m${index + Math.floor(COLL / 2)}`);
+      await ctx.client.call(['SADD', 'bench:alg:a', ...left]);
+      await ctx.client.call(['SADD', 'bench:alg:b', ...right]);
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const intersection = await client.call(['SINTER', 'bench:alg:a', 'bench:alg:b']);
+        const union = await client.call(['SUNION', 'bench:alg:a', 'bench:alg:b']);
+        const difference = await client.call(['SDIFF', 'bench:alg:a', 'bench:alg:b']);
+        if (!Array.isArray(intersection) || intersection.length !== Math.ceil(COLL / 2)) {
+          throw new Error(`SINTER size ${Array.isArray(intersection) ? intersection.length : intersection}`);
+        }
+        if (!Array.isArray(union) || union.length !== COLL + Math.floor(COLL / 2)) {
+          throw new Error(`SUNION size ${Array.isArray(union) ? union.length : union}`);
+        }
+        if (!Array.isArray(difference) || difference.length !== Math.floor(COLL / 2)) {
+          throw new Error(`SDIFF size ${Array.isArray(difference) ? difference.length : difference}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'zset-score-ops',
+    scenario: 'redis-zset-increment-rank',
+    ops: COLL * 3,
+    params: { members: String(COLL) },
+    dataScale: 'key=1,members=' + COLL,
+    async run({ client }) {
+      await client.call(['DEL', 'bench:zscore']);
+      for (let index = 0; index < COLL; index += 1) {
+        const member = `z${index}`;
+        const increment = String(index + 1);
+        await client.call(['ZINCRBY', 'bench:zscore', increment, member]);
+        const score = await client.call(['ZSCORE', 'bench:zscore', member]);
+        if (String(score) !== increment) throw new Error(`ZSCORE replied ${score} at ${index}`);
+        const rank = await client.call(['ZRANK', 'bench:zscore', member]);
+        if (rank !== index) throw new Error(`ZRANK replied ${rank} at ${index}, expected ${index}`);
+      }
+    },
+  },
+  {
+    name: 'bitfield-ops',
+    scenario: 'redis-bitfield-increment',
+    ops: COLL + 1,
+    params: { increments: String(COLL), type: 'u32' },
+    dataScale: 'key=1,bit_offset=0',
+    async run({ client }) {
+      await client.call(['DEL', 'bench:bitfield']);
+      let last = 0;
+      for (let index = 0; index < COLL; index += 1) {
+        const reply = await client.call(['BITFIELD', 'bench:bitfield', 'INCRBY', 'u32', '0', '1']);
+        last = Array.isArray(reply) ? reply[0] : reply;
+      }
+      if (last !== COLL) throw new Error(`BITFIELD INCRBY ended at ${last}, expected ${COLL}`);
+      const read = await client.call(['BITFIELD', 'bench:bitfield', 'GET', 'u32', '0']);
+      if ((Array.isArray(read) ? read[0] : read) !== COLL) throw new Error(`BITFIELD GET replied ${read}`);
+    },
+  },
+  {
+    name: 'hll-ops',
+    scenario: 'redis-hyperloglog-add-count',
+    ops: COLL + 1,
+    params: { elements: String(COLL) },
+    dataScale: 'key=1',
+    async run({ client }) {
+      await client.call(['DEL', 'bench:hll']);
+      for (let index = 0; index < COLL; index += 1) {
+        await client.call(['PFADD', 'bench:hll', `m${index}`]);
+      }
+      const count = await client.call(['PFCOUNT', 'bench:hll']);
+      // HyperLogLog is an estimator; a small cardinality may come back a few
+      // units off. Keep a 2% band instead of pinning the exact register estimate.
+      if (!(Math.abs(count - COLL) <= Math.ceil(COLL * 0.02))) {
+        throw new Error(`PFCOUNT replied ${count}, expected ${COLL} +/-2%`);
+      }
+    },
+  },
+  {
+    name: 'sort-ops',
+    scenario: 'redis-sort-list',
+    ops: REPEAT,
+    params: { elements: String(COLL), repeat: String(REPEAT), mode: 'SORT_RO' },
+    dataScale: 'key=1,elements=' + COLL,
+    async prepare(ctx) {
+      for (let start = 0; start < COLL; start += BATCH) {
+        const commands = [];
+        for (let index = start; index < Math.min(start + BATCH, COLL); index += 1) {
+          commands.push(['RPUSH', 'bench:sort', String((index * 7919) % COLL)]);
+        }
+        await ctx.client.pipeline(commands);
+      }
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const sorted = await client.call(['SORT_RO', 'bench:sort']);
+        if (!Array.isArray(sorted) || sorted.length !== COLL) {
+          throw new Error(`SORT_RO size ${Array.isArray(sorted) ? sorted.length : sorted}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'keys-random',
+    scenario: 'redis-keys-random-dbsize',
+    ops: REPEAT * 3,
+    params: { keys: String(COLL), repeat: String(REPEAT) },
+    dataScale: `keys=${COLL}`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:keys');
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const keys = await client.call(['KEYS', 'bench:keys:*']);
+        if (!Array.isArray(keys) || keys.length !== COLL) {
+          throw new Error(`KEYS matched ${Array.isArray(keys) ? keys.length : keys}, expected ${COLL}`);
+        }
+        const random = await client.call(['RANDOMKEY']);
+        if (typeof random !== 'string') throw new Error(`RANDOMKEY replied ${random}`);
+        const size = await client.call(['DBSIZE']);
+        if (size !== COLL) throw new Error(`DBSIZE replied ${size}, expected ${COLL}`);
+      }
+    },
+  },
+  {
+    name: 'stream-xread',
+    scenario: 'redis-stream-xread',
+    ops: REPEAT,
+    params: { entries: String(COLL), repeat: String(REPEAT) },
+    dataScale: 'key=1,entries=' + COLL,
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:xread']);
+      const commands = [];
+      for (let index = 0; index < COLL; index += 1) {
+        commands.push(['XADD', 'bench:xread', '*', 'f', `v${index}`]);
+      }
+      for (let start = 0; start < commands.length; start += BATCH) {
+        await ctx.client.pipeline(commands.slice(start, start + BATCH));
+      }
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const read = await client.call(['XREAD', 'COUNT', '100', 'STREAMS', 'bench:xread', '0']);
+        if (!Array.isArray(read) || read.length === 0) throw new Error('XREAD returned no stream');
+        const entries = read[0]?.[1];
+        if (!Array.isArray(entries) || entries.length !== Math.min(100, COLL)) {
+          throw new Error(`XREAD entries ${Array.isArray(entries) ? entries.length : entries}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'server-face-ops',
+    scenario: 'redis-server-face',
+    ops: REPEAT * 4,
+    params: { repeat: String(REPEAT), commands: 'INFO,COMMAND COUNT,CONFIG GET,CONFIG SET' },
+    dataScale: 'keys=0',
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const info = await client.call(['INFO', 'server']);
+        if (typeof info !== 'string' || !/^redis_version:/m.test(info)) {
+          throw new Error('INFO server did not report redis_version');
+        }
+        const commands = await client.call(['COMMAND', 'COUNT']);
+        if (!(typeof commands === 'number' && commands > 0)) {
+          throw new Error(`COMMAND COUNT replied ${commands}`);
+        }
+        const options = await client.call(['CONFIG', 'GET', 'appendfsync']);
+        if (!Array.isArray(options) || options[0] !== 'appendfsync') {
+          throw new Error(`CONFIG GET replied ${JSON.stringify(options)}`);
+        }
+        const set = await client.call(['CONFIG', 'SET', 'appendfsync', 'everysec']);
+        if (set !== 'OK') throw new Error(`CONFIG SET replied ${set}`);
+      }
+    },
+  },
+  {
+    name: 'watch-exec',
+    scenario: 'redis-txn-watch-exec',
+    ops: REPEAT * 4,
+    params: { keys: '1', repeat: String(REPEAT) },
+    dataScale: 'keys=1,value_bytes=64',
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:watch']);
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const watched = await client.call(['WATCH', 'bench:watch']);
+        if (watched !== 'OK') throw new Error(`WATCH replied ${watched}`);
+        await client.call(['MULTI']);
+        await client.call(['SET', 'bench:watch', VALUE]);
+        const replies = await client.call(['EXEC']);
+        if (!Array.isArray(replies) || replies.length !== 1 || replies[0] !== 'OK') {
+          throw new Error(`EXEC replied ${JSON.stringify(replies)}`);
+        }
+      }
+    },
+  },
+  {
     name: 'set-big',
     scenario: 'redis-big-value-set',
     ops: BIG_COUNT,
@@ -533,6 +913,16 @@ const workloads = [
   },
 ];
 
+// Optional subset for a focused rerun, e.g. `BENCH_WORKLOADS=expire-persist,ping`.
+// The full report stays the default; filtering only shortens the matrix.
+const requestedWorkloads = (process.env.BENCH_WORKLOADS ?? '').split(',').map(part => part.trim()).filter(Boolean);
+if (requestedWorkloads.length > 0) {
+  const unknown = requestedWorkloads.filter(name => !workloads.some(workload => workload.name === name));
+  if (unknown.length > 0) throw new Error(`unknown BENCH_WORKLOADS entries: ${unknown.join(', ')}`);
+  const requested = new Set(requestedWorkloads);
+  workloads.splice(0, workloads.length, ...workloads.filter(workload => requested.has(workload.name)));
+}
+
 async function preload(ctx, total, prefix, value = VALUE) {
   for (let start = 0; start < total; start += BATCH) {
     const commands = [];
@@ -613,7 +1003,7 @@ const results = {};
 const oracle = await oracleTarget();
 
 console.log(`Redis RESP2 scenario matrix (${WARMUP} warmup + ${ROUNDS} measured rounds per cell)`);
-console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
+console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_REPEAT=${REPEAT}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
 console.log(`Stats: benchSummary via ${benchSummarySource}`);
 console.log('Server: fresh emulated server and dataDir per (workload, client); rounds share one server and one connection');
 console.log('');
@@ -690,7 +1080,7 @@ const runProvenance = {
     stream: String(STREAM_COUNT), pubsub: String(PUBSUB_COUNT), ttl: String(TTL_COUNT), txn: String(TXN_COUNT),
     incr: String(INCR_COUNT), mset: String(MSET_COUNT), del: String(DEL_COUNT), move: String(MOVE_COUNT),
     block: String(BLOCK_COUNT), ping_conc: String(PING_CONC), conc: String(CONCURRENCY),
-    group: String(GROUP_COUNT),
+    group: String(GROUP_COUNT), repeat: String(REPEAT),
   },
   data_scale: `matrix=${workloads.length}x${reportClients.length}`,
   rustc_version: rustcVersion,
@@ -741,11 +1131,26 @@ matrix with \`ioredis\` as the fixed client (\`redis-server (oracle)\` column). 
 emulated server refuses to be mistaken for the oracle (\`INFO\` shows
 \`redis_mode:disguise\`).`;
 
+// `redis-unknown-wasm32` has no runnable artifact today. Detect the placeholder
+// instead of pretending the platform ran; the report then says n/a with a reason.
+const wasmArtifact = join(repoRoot, 'projects', 'redis.ts', 'platforms', 'redis-unknown-wasm32', 'redis.unknown-wasm32.node');
+const wasmCoverage = (() => {
+  try {
+    const { size } = statSync(wasmArtifact);
+    return size > 1024
+      ? 'ready — artifact present'
+      : `n/a — placeholder artifact (${size} bytes), no wasm-bindgen entry to load`;
+  }
+  catch {
+    return 'n/a — platform package not built';
+  }
+})();
+
 const report = `# Benchmark report
 
 Command: \`pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark\`
 Binding: \`${process.env.BENCH_BINDING_PROFILE ?? 'debug'}\` — build with \`pnpm build:release\` and set \`BENCH_BINDING_PROFILE=release\` for product numbers
-Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
+Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_REPEAT=${REPEAT}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
 Baseline: \`ioredis\` against the emulated server = \`1.00x\`
 Ratio: subject_time / baseline_time (smaller is faster). Fastest cell in each row is bold.
 Stats: median/p95/min/max/rounds come from \`database.harness::summarize\` via \`benchSummary\` (${benchSummarySource}); nearest-rank p95, even-length median averages the middle pair. Per-op milliseconds come from \`database.harness::per_op_ms\` via \`benchPerOpMs\`, the same DTO the summary returns. No median, p95 or per-op formula lives in this example.
@@ -779,6 +1184,11 @@ ${statsTable()}
 ${perOpTable()}
 
 ${oracleSection}
+
+## Additional platform coverage
+
+- \`redis-unknown-wasm32\`: ${wasmCoverage}
+- The matrix above runs on \`${process.platform}-${process.arch}\` with the ${process.env.BENCH_BINDING_PROFILE ?? 'debug'} binding.
 
 ## Intentional deltas
 
@@ -827,6 +1237,14 @@ ${oracleSection}
 - \`streams-xadd-xrange\` starts each round with \`DEL\` like the other collection
   cells; \`XADD\` auto-ids are server-generated, so every client pays the same id
   allocation cost inside the timed region.
+- The command-family cells added for coverage (\`mget-seq\`, \`append-getrange\`,
+  \`getdel-getex\`, \`set-options\`, \`exists-type\`, \`expire-persist\`,
+  \`hash-hgetall-hdel\`, \`list-lpush-lpop\`, \`set-algebra\`, \`zset-score-ops\`,
+  \`bitfield-ops\`, \`hll-ops\`, \`sort-ops\`, \`keys-random\`, \`stream-xread\`,
+  \`server-face-ops\`, \`watch-exec\`) keep one command shape per family and reuse
+  \`BENCH_COLL\` for their key/field count. Micro cells repeat \`BENCH_REPEAT\` times
+  inside one timed run so a single sub-millisecond call does not dominate the
+  median, and every \`ops\` value is the real command count sent in a round.
 
 ## Machine-readable summary
 

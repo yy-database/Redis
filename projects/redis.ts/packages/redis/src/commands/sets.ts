@@ -1,11 +1,10 @@
 //! Set-family guards and aggregate plans forwarded to the upstream facade.
 
-import { parseInteger } from '../native.js';
+import { encodeReply, parseInteger } from '../native.js';
 import type { Store } from '../native.js';
 import { error as replyError } from '../reply.js';
-import type { ReplySpec } from '../reply.js';
 import { SUFFIX, text, wrongArity, wrongType } from './kinds.js';
-import type { CommandPlan, Session } from './session.js';
+import type { CommandPlan, CommandRun, Session } from './session.js';
 
 /**
  * Plans one set aggregate: intersection, union or difference, optionally stored.
@@ -33,13 +32,23 @@ export function planSetAggregate(store: Store, session: Session, name: string, a
  * upstream. Without this guard a set write would fork the key into two live
  * representations.
  */
-export function forwardSet(store: Store, session: Session, args: Buffer[], keys: Buffer[]): () => ReplySpec {
-    return () => {
+export function forwardSet(store: Store, session: Session, args: Buffer[], keys: Buffer[]): CommandRun {
+    const run = () => {
         for (const key of keys) {
             if (store.existsKind(session.db, SUFFIX.stream, key)) return wrongType();
         }
         return store.setCommand(session.db, session.protocol ?? 2, args);
     };
+    const forwarded = run as CommandRun;
+    forwarded.frame = () => {
+        for (const key of keys) {
+            if (store.existsKind(session.db, SUFFIX.stream, key)) {
+                return { frame: encodeReply(wrongType(), session.protocol ?? 2), error: true };
+            }
+        }
+        return store.setCommandFrame(session.db, session.protocol ?? 2, args);
+    };
+    return forwarded;
 }
 
 /** Plans `SINTERCARD`, whose keys are counted from a leading length and may carry `LIMIT`. */

@@ -18,6 +18,8 @@ import type { BlockDescriptor, CommandPlan, RunOutcome, ServerOutcome, Session }
 /** The frames one executed command owes the connection. */
 export interface ExecuteResult {
     reply?: RunOutcome;
+    /** Upstream reply bytes written as-is, bypassing the reply specification. */
+    frame?: Buffer;
     close?: boolean;
     killed?: number[];
     frames?: ReplySpec[];
@@ -88,8 +90,15 @@ function credentialError(session: Session, username: string, password: Buffer, l
     return username === 'default' && passwordMatches(password, configured) ? null : wrongPass();
 }
 
-/** Executes one command and returns the reply specification. */
-export function execute(store: Store, session: Session, args: Buffer[]): ExecuteResult {
+/**
+ * Executes one command and returns the reply specification.
+ *
+ * `writeFrames` is set by the socket loop, which writes raw bytes: a forwarding
+ * family command then answers with the frame the facade already built instead of
+ * a specification. Every other caller (transactions, the acceptance harness)
+ * keeps the specification form.
+ */
+export function execute(store: Store, session: Session, args: Buffer[], writeFrames = false): ExecuteResult {
     if (args.length === 0) {
         // An empty multibulk request is a no-op on the real server: no reply,
         // and the connection stays open for the next command.
@@ -230,6 +239,11 @@ export function execute(store: Store, session: Session, args: Buffer[]): Execute
     if (session.queued) {
         session.queued.push(planned.run);
         return { reply: simple('QUEUED') };
+    }
+    // The facade already framed this reply for the connection protocol, so hand
+    // the bytes to the socket loop instead of decoding and re-encoding them.
+    if (writeFrames && planned.run?.frame !== undefined) {
+        return { frame: planned.run.frame().frame };
     }
     if (planned.block !== undefined) {
         // A blocking command tries once before parking. Without a hub (the

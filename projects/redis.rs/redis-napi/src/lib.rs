@@ -70,6 +70,24 @@ pub struct ExpiredKey {
     pub key: Buffer,
 }
 
+/// One reply frame produced upstream, carried to the host without re-encoding.
+///
+/// The facade already frames the reply for the connection protocol, so the host
+/// can write these bytes directly instead of decoding them into a reply
+/// specification and encoding them again.
+#[napi(object)]
+pub struct CommandFrame {
+    pub frame: Buffer,
+    /// Whether the frame starts with the RESP error marker `-`.
+    pub error: bool,
+}
+
+impl From<Vec<u8>> for CommandFrame {
+    fn from(frame: Vec<u8>) -> Self {
+        Self { error: frame.first() == Some(&b'-'), frame: Buffer::from(frame) }
+    }
+}
+
 fn reason(error: impl ToString) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }
@@ -455,6 +473,9 @@ impl KeyValueExecutor for StoreExecutor<'_> {
                 present: node.contains_kind(db, kind, key),
                 expires_at: node.deadline_kind(db, kind, key),
             }),
+            KeyValueAction::GetRevision => Ok(KeyValueResult::Revision(
+                node.get_kind(db, kind, key).map(|record| record.revision),
+            )),
             KeyValueAction::IncrementBy(delta) => {
                 if kind != "" {
                     return Err(ClusterError::Unsupported(
@@ -817,6 +838,22 @@ impl Store {
         self.shard().data_dir().display().to_string()
     }
 
+    /// Runs one family entry against a fresh reply frame.
+    fn reply_frame(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: &[Buffer],
+        run: impl FnOnce(&mut Vec<u8>, &[&[u8]], &Namespace, &StoreExecutor<'_>, u8) -> std::io::Result<()>,
+    ) -> std::result::Result<Vec<u8>, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
+        let namespace = Namespace(redis_wasm::store::namespace(db));
+        let executor = StoreExecutor { node: &self.node };
+        let mut frame = Vec::new();
+        run(&mut frame, &arguments, &namespace, &executor, protocol).map_err(reason)?;
+        Ok(frame)
+    }
+
     /// Executes one hash-family request and returns the reply specification as JSON.
     ///
     /// `protocol` is `2` or `3`, matching the connection that issued the request.
@@ -824,16 +861,34 @@ impl Store {
     /// command semantics stay in the upstream facade.
     #[napi]
     pub fn hash_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_hash_command(&mut frame, &arguments, &executor, &namespace, protocol)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_hash_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("hash command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one hash-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn hash_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_hash_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })
+        .map(CommandFrame::from)
     }
 
     /// Executes one set-family request and returns the reply specification as JSON.
@@ -843,16 +898,34 @@ impl Store {
     /// command semantics stay in the upstream facade.
     #[napi]
     pub fn set_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_set_command(&mut frame, &arguments, &executor, &namespace, protocol)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_set_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("set command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one set-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn set_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_set_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })
+        .map(CommandFrame::from)
     }
 
     /// Executes one list-family request and returns the reply specification as JSON.
@@ -862,16 +935,34 @@ impl Store {
     /// the wait loop while the facade keeps the command semantics.
     #[napi]
     pub fn list_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_list_command(&mut frame, &arguments, &executor, &namespace, protocol)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_list_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("list command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one list-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn list_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_list_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })
+        .map(CommandFrame::from)
     }
 
     /// Executes one string/key-family request and returns the reply specification as JSON.
@@ -879,16 +970,34 @@ impl Store {
     /// `protocol` is `2` or `3`, matching the connection that issued the request.
     #[napi]
     pub fn string_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_string_command(&mut frame, &arguments, &executor, &namespace, protocol)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_string_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("string command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one string/key-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn string_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_string_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })
+        .map(CommandFrame::from)
     }
 
     /// Executes one keyspace-family request and returns the reply specification as JSON.
@@ -902,16 +1011,39 @@ impl Store {
         protocol: u8,
         args: Vec<Buffer>,
     ) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_keyspace_command(&mut frame, &arguments, &executor, &namespace, protocol)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_keyspace_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("keyspace command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one keyspace-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn keyspace_command_frame(
+        &self,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_keyspace_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })
+        .map(CommandFrame::from)
     }
 
     /// Executes one HyperLogLog-family request and returns the reply specification as JSON.
@@ -921,16 +1053,22 @@ impl Store {
     /// serializes the reply, leaving hashing, registers and estimation upstream.
     #[napi]
     pub fn hyperloglog_command(&self, db: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_hyperloglog_command(&mut frame, &arguments, &executor, &namespace)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, 2, &args, |frame, arguments, namespace, executor, _| {
+            database_server::yyds::redis::execute_hyperloglog_command(frame, arguments, executor, namespace)
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("hyperloglog command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one HyperLogLog-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn hyperloglog_command_frame(&self, db: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, 2, &args, |frame, arguments, namespace, executor, _| {
+            database_server::yyds::redis::execute_hyperloglog_command(frame, arguments, executor, namespace)
+        })
+        .map(CommandFrame::from)
     }
 
     /// Executes one server-face request and returns the reply specification as JSON.
@@ -993,16 +1131,34 @@ impl Store {
     /// the wait loop while the facade keeps the command semantics.
     #[napi]
     pub fn zset_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
-        let mut frame = Vec::new();
-        database_server::yyds::redis::execute_zset_command(&mut frame, &arguments, &executor, &namespace, protocol)
-            .map_err(reason)?;
+        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_zset_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("zset command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
+    }
+
+    /// Executes one zset-family request and returns the upstream reply frame verbatim.
+    #[napi]
+    pub fn zset_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
+        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_zset_command(
+                frame,
+                arguments,
+                executor,
+                namespace,
+                protocol,
+            )
+        })
+        .map(CommandFrame::from)
     }
 }
 

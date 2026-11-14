@@ -42,6 +42,12 @@ export interface ServerCommandOutcome {
     killed: number[];
 }
 
+/** One reply frame the binding produced upstream, plus whether it is an error. */
+export interface CommandFrame {
+    frame: Buffer;
+    error: boolean;
+}
+
 /** Result of adding `delta` to an integer value. */
 export interface Increment {
     value: number | null;
@@ -106,12 +112,19 @@ interface NativeStore {
     size(db: number): number;
     dataDir(): string;
     hashCommand(db: number, protocol: number, args: Buffer[]): string;
+    hashCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     setCommand(db: number, protocol: number, args: Buffer[]): string;
+    setCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     listCommand(db: number, protocol: number, args: Buffer[]): string;
+    listCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     zsetCommand(db: number, protocol: number, args: Buffer[]): string;
+    zsetCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     stringCommand(db: number, protocol: number, args: Buffer[]): string;
+    stringCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     keyspaceCommand(db: number, protocol: number, args: Buffer[]): string;
+    keyspaceCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     hyperloglogCommand(db: number, args: Buffer[]): string;
+    hyperloglogCommandFrame(db: number, args: Buffer[]): CommandFrame;
     serverCommand(session: number, db: number, protocol: number, args: Buffer[]): string;
     serverRelease(session: number): void;
 }
@@ -345,6 +358,47 @@ export class Store {
     /** Runs one HyperLogLog-family request in the binding and returns its reply specification. */
     hyperloglogCommand(db: number, args: (string | Buffer)[]): ReplySpec {
         return JSON.parse(this.native.hyperloglogCommand(db, args.map(bytes)));
+    }
+
+    /**
+     * Runs one family request and returns the upstream reply frame verbatim.
+     *
+     * The facade already framed the reply for `protocol`, so the socket loop can
+     * write these bytes directly instead of decoding them into a specification and
+     * encoding them again.
+     */
+    hashCommandFrame(db: number, protocol: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.hashCommandFrame(db, protocol, args.map(bytes));
+    }
+
+    /** Runs one set-family request and returns the upstream reply frame verbatim. */
+    setCommandFrame(db: number, protocol: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.setCommandFrame(db, protocol, args.map(bytes));
+    }
+
+    /** Runs one list-family request and returns the upstream reply frame verbatim. */
+    listCommandFrame(db: number, protocol: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.listCommandFrame(db, protocol, args.map(bytes));
+    }
+
+    /** Runs one zset-family request and returns the upstream reply frame verbatim. */
+    zsetCommandFrame(db: number, protocol: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.zsetCommandFrame(db, protocol, args.map(bytes));
+    }
+
+    /** Runs one string/key-family request and returns the upstream reply frame verbatim. */
+    stringCommandFrame(db: number, protocol: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.stringCommandFrame(db, protocol, args.map(bytes));
+    }
+
+    /** Runs one keyspace-family request and returns the upstream reply frame verbatim. */
+    keyspaceCommandFrame(db: number, protocol: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.keyspaceCommandFrame(db, protocol, args.map(bytes));
+    }
+
+    /** Runs one HyperLogLog-family request and returns the upstream reply frame verbatim. */
+    hyperloglogCommandFrame(db: number, args: (string | Buffer)[]): CommandFrame {
+        return this.native.hyperloglogCommandFrame(db, args.map(bytes));
     }
 
     /** Server-face commands keep their per-connection session state inside the binding. */

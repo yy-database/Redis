@@ -1,12 +1,12 @@
 //! Keyspace, string/key and HyperLogLog forwarding plans.
 
-import { parseInteger } from '../native.js';
+import { encodeReply, parseInteger } from '../native.js';
 import type { Store, ValueKind } from '../native.js';
 import { notifyPush } from './blocking-plan.js';
 import { DATABASES, KINDS, SUFFIX, kindOf, text, wrongArity } from './kinds.js';
 import { error as replyError, array, bulk, integer, simple } from '../reply.js';
 import { globMatch } from './glob.js';
-import type { CommandPlan, Session } from './session.js';
+import type { CommandPlan, CommandRun, Session } from './session.js';
 
 /**
  * Plans `PFADD` / `PFCOUNT` / `PFMERGE`.
@@ -17,7 +17,9 @@ import type { CommandPlan, Session } from './session.js';
  */
 export function planHyperLogLog(store: Store, session: Session, name: string, args: Buffer[]): CommandPlan {
     if (args.length < 2) return { error: wrongArity(name) };
-    return { run: () => store.hyperloglogCommand(session.db, args) };
+    const run = (() => store.hyperloglogCommand(session.db, args)) as CommandRun;
+    run.frame = () => store.hyperloglogCommandFrame(session.db, args);
+    return { run };
 }
 
 /** Queue-time arity of the keyspace family, as `[minimum, maximum]` arguments. */
@@ -93,7 +95,9 @@ export function planKeyspace(store: Store, session: Session, name: string, args:
     if (name === 'keys') return planKeys(store, session, args);
     if (name === 'move') return planMove(store, session, args);
     if (name === 'swapdb') return planSwapDb(store, args);
-    return { run: () => store.keyspaceCommand(session.db, session.protocol ?? 2, args) };
+    const run = (() => store.keyspaceCommand(session.db, session.protocol ?? 2, args)) as CommandRun;
+    run.frame = () => store.keyspaceCommandFrame(session.db, session.protocol ?? 2, args);
+    return { run };
 }
 
 /**
@@ -250,13 +254,17 @@ export function planString(store: Store, session: Session, name: string, args: B
     const written = stringWriteTarget(session, name, args);
     // `UNLINK` shares the `DEL` semantics and reply; the facade knows only `DEL`.
     const forwarded = name === 'unlink' ? [Buffer.from('DEL'), ...args.slice(1)] : args;
-    return {
-        run: () => {
-            const reply = store.stringCommand(session.db, session.protocol ?? 2, forwarded);
-            if (written !== null && reply.type !== 'error') notifyPush(session, written.db, written.key);
-            return reply;
-        },
-    };
+    const run = (() => {
+        const reply = store.stringCommand(session.db, session.protocol ?? 2, forwarded);
+        if (written !== null && reply.type !== 'error') notifyPush(session, written.db, written.key);
+        return reply;
+    }) as CommandRun;
+    // `RENAME` / `COPY` also wake blocked peers, so their spec path stays; every
+    // other string/key command writes the facade frame straight through.
+    if (written === null) {
+        run.frame = () => store.stringCommandFrame(session.db, session.protocol ?? 2, forwarded);
+    }
+    return { run };
 }
 
 /**

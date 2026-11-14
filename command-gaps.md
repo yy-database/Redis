@@ -21,11 +21,14 @@ shared by every embedded session.
 
 ## Hash family
 
+`HSETNX` and `HRANDFIELD` used to be absent from `is_hash_command` and
+`handle_hash`, so the planner served them. They now live in `handle_hash` with
+the rest of the family, which means every hash command except `HINCRBYFLOAT` is
+forwarded to the facade and the planner keeps only queued-time argument checks.
+
 | Command | Upstream coordinate | Real server behavior | Class |
 | ------- | ------------------- | -------------------- | ----- |
-| `HSETNX` | absent from `is_hash_command` (line 264) and `handle_hash` (line 551) | Sets the field only when it is absent and replies `1`/`0`; an existing field keeps its value and the key keeps its deadline | upstream-missing, served by the TypeScript planner |
-| `HRANDFIELD` | absent from `is_hash_command` and `handle_hash` | Replies one random field, or `count` fields when a count is given, repeating fields for a negative count, and interleaves values under `WITHVALUES` | upstream-missing, served by the TypeScript planner |
-| `HINCRBYFLOAT` | present in `handle_hash` (line 751) | Adds the increment as a long double and replies the shortest decimal text: `0.1` then `0.2` replies `0.3` | upstream-present but divergent: the facade formats the sum through Rust `f64::to_string` and would reply `0.30000000000000004`, so the planner keeps its decimal implementation |
+| `HINCRBYFLOAT` | present in `handle_hash` | Adds the increment as a long double and replies the shortest decimal text: `0.1` then `0.2` replies `0.3` | upstream-present but divergent: the facade formats the sum through Rust `f64::to_string` and would reply `0.30000000000000004`, so the planner keeps its decimal implementation |
 
 ## Set family
 

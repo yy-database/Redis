@@ -1,6 +1,6 @@
 //! Host-side hash plans plus the list and set command plans.
 
-import { parseInteger } from '../native.js';
+import { encodeReply, parseInteger } from '../native.js';
 import type { Store } from '../native.js';
 import { bulk, error as replyError, nullArray } from '../reply.js';
 import { blockingPlan, deferredFailure, parseBlockingTimeout } from './blocking-plan.js';
@@ -10,7 +10,7 @@ import { addLongDoubles, longDoubleText, parseLongDouble } from './long-double.j
 import type { LongDouble } from './long-double.js';
 import { forwardBlockingList, forwardList } from './lists.js';
 import { parseScanCursor, parseScanOptions } from './scan.js';
-import type { CommandPlan, Session } from './session.js';
+import type { CommandPlan, CommandRun, Session } from './session.js';
 import { forwardSet } from './sets.js';
 
 /**
@@ -110,11 +110,13 @@ export function planCollection(store: Store, session: Session, name: string, arg
             // and has no stream kind, so a stream key is rejected here until the
             // stream family moves upstream. Without this guard a hash write would
             // fork the key into two live representations.
-            return {
-                run: () => (key !== null && store.existsKind(db, SUFFIX.stream, key)
-                    ? wrongType()
-                    : store.hashCommand(db, session.protocol ?? 2, args)),
-            };
+            const run = (() => (key !== null && store.existsKind(db, SUFFIX.stream, key)
+                ? wrongType()
+                : store.hashCommand(db, session.protocol ?? 2, args))) as CommandRun;
+            run.frame = () => (key !== null && store.existsKind(db, SUFFIX.stream, key)
+                ? { frame: encodeReply(wrongType(), session.protocol ?? 2), error: true }
+                : store.hashCommandFrame(db, session.protocol ?? 2, args));
+            return { run };
         }
 
         case 'linsert': {

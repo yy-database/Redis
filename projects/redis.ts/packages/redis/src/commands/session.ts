@@ -1,6 +1,7 @@
 //! The connection session a command runs against and the planned-command shapes.
 
 import type { BlockingHub } from '../blocking.js';
+import type { CommandFrame } from '../native.js';
 import type { ReplySpec } from '../reply.js';
 
 /** Channel and pattern subscriptions of one connection, keyed by hex name. */
@@ -17,8 +18,15 @@ export interface PubSubTable {
     numpat(): number;
 }
 
-/** One queued command replayed by `EXEC`. */
-export type CommandRun = () => RunOutcome;
+/**
+ * One queued command replayed by `EXEC`.
+ *
+ * `frame` is the direct-execution fast path: the upstream facade already framed
+ * the reply, so the host can write the bytes without a specification round trip.
+ * A queued command replayed inside `EXEC` must use the specification form because
+ * its reply is nested inside the transaction's array reply.
+ */
+export type CommandRun = (() => RunOutcome) & { frame?: () => CommandFrame };
 
 /** A reply plus the connection effects the binding reports for it. */
 export interface ServerOutcome {
