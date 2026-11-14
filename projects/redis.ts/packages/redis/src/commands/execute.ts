@@ -13,7 +13,7 @@ import { planIntrospection } from './introspection.js';
 import { planPersistence } from './persistence.js';
 import { planPubsub, pubsubSubcommand, pubsubSubcommandError, publish, SUBSCRIBER_COMMANDS, subscribed, subscriptionFrames } from './pubsub.js';
 import { planStream, planXRead, planXReadGroup, planXGroup, planXAck, planXPending, planXClaim, planXAutoClaim, planXInfo } from './streams.js';
-import type { BlockDescriptor, CommandPlan, RunOutcome, ServerOutcome, Session } from './session.js';
+import type { BlockDescriptor, CommandPlan, CommandRun, RunOutcome, ServerOutcome, Session } from './session.js';
 
 /** The frames one executed command owes the connection. */
 export interface ExecuteResult {
@@ -243,7 +243,8 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
     // The facade already framed this reply for the connection protocol, so hand
     // the bytes to the socket loop instead of decoding and re-encoding them.
     if (writeFrames && planned.run?.frame !== undefined) {
-        return { frame: planned.run.frame().frame };
+        const framed = planned.run.frame();
+        return { frame: framed.frame, close: framed.close, killed: framed.killed };
     }
     if (planned.block !== undefined) {
         // A blocking command tries once before parking. Without a hub (the
@@ -391,8 +392,13 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'client':
         case 'command':
         case 'info':
-        case 'acl':
-            return { run: () => store.serverCommand(session.id ?? 0, session.db, session.protocol ?? 2, args) };
+        case 'acl': {
+            // The facade already framed the reply, so the socket loop writes it
+            // directly instead of decoding it into a specification and back.
+            const run = (() => store.serverCommand(session.id ?? 0, session.db, session.protocol ?? 2, args)) as CommandRun;
+            run.frame = () => store.serverCommandFrame(session.id ?? 0, session.db, session.protocol ?? 2, args);
+            return { run };
+        }
 
         case 'config':
             return planConfig(store, session, args);

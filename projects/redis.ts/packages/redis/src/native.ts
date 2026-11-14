@@ -42,10 +42,20 @@ export interface ServerCommandOutcome {
     killed: number[];
 }
 
+/** One server-face reply frame plus the connection effects the binding reports. */
+export interface ServerCommandFrameOutcome {
+    frame: Buffer;
+    close: boolean;
+    killed: number[];
+}
+
 /** One reply frame the binding produced upstream, plus whether it is an error. */
 export interface CommandFrame {
     frame: Buffer;
-    error: boolean;
+    /** Whether the frame starts with the RESP error marker; server-face frames omit it. */
+    error?: boolean;
+    close?: boolean;
+    killed?: number[];
 }
 
 /** Result of adding `delta` to an integer value. */
@@ -104,6 +114,7 @@ interface NativeStore {
     sweepExpired(nowUnixMs: number): ExpiredKey[];
     beginBatch(): void;
     endBatch(): void;
+    endBatchDeferred(): void;
     setSyncAlways(always: boolean): void;
     sync(): void;
     watchKey(db: number, key: Buffer): number;
@@ -126,6 +137,7 @@ interface NativeStore {
     hyperloglogCommand(db: number, args: Buffer[]): string;
     hyperloglogCommandFrame(db: number, args: Buffer[]): CommandFrame;
     serverCommand(session: number, db: number, protocol: number, args: Buffer[]): string;
+    serverCommandFrame(session: number, db: number, protocol: number, args: Buffer[]): ServerCommandFrameOutcome;
     serverRelease(session: number): void;
 }
 
@@ -292,6 +304,17 @@ export class Store {
         this.native.endBatch();
     }
 
+    /**
+     * Closes a batch without writing the shard.
+     *
+     * The socket loop uses this so a sequential command does not rewrite the
+     * whole snapshot; the server's flush timer, `SAVE` and shutdown persist the
+     * accumulated mutations. `appendfsync always` writes through instead.
+     */
+    endBatchDeferred(): void {
+        this.native.endBatchDeferred();
+    }
+
     /** Selects `fsync` on every write (`always`) or only on `sync` (`everysec`). */
     setSyncAlways(always: boolean): void {
         this.native.setSyncAlways(always);
@@ -404,6 +427,11 @@ export class Store {
     /** Server-face commands keep their per-connection session state inside the binding. */
     serverCommand(session: number, db: number, protocol: number, args: (string | Buffer)[]): ServerCommandOutcome {
         return JSON.parse(this.native.serverCommand(session, db, protocol, args.map(bytes)));
+    }
+
+    /** Runs one server-face request and returns the facade frame verbatim. */
+    serverCommandFrame(session: number, db: number, protocol: number, args: (string | Buffer)[]): ServerCommandFrameOutcome {
+        return this.native.serverCommandFrame(session, db, protocol, args.map(bytes));
     }
 
     /** Drops the embedded session of one connection that just closed. */

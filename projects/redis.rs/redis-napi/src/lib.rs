@@ -70,6 +70,17 @@ pub struct ExpiredKey {
     pub key: Buffer,
 }
 
+/// One server-face reply plus the connection effects the binding reports.
+#[napi(object)]
+pub struct ServerCommandFrame {
+    /// Reply bytes the facade already framed for the connection protocol.
+    pub frame: Buffer,
+    /// Whether the host must close this connection after writing `frame`.
+    pub close: bool,
+    /// Host connection ids a peer `CLIENT KILL` selected.
+    pub killed: Vec<u32>,
+}
+
 /// One reply frame produced upstream, carried to the host without re-encoding.
 ///
 /// The facade already frames the reply for the connection protocol, so the host
@@ -220,6 +231,44 @@ impl Store {
     /// Locks the shard for one call, recovering the guard when a panic poisoned it.
     fn shard(&self) -> MutexGuard<'_, Node> {
         self.node.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Runs one server-face request and returns its raw frame plus connection effects.
+    ///
+    /// `session` is the host connection id. The embedded face keeps per-connection
+    /// `CLIENT` state, while the shared registry backs peer listing and kills.
+    fn run_server_command(
+        &self,
+        session: u32,
+        db: u8,
+        protocol: u8,
+        args: &[Buffer],
+    ) -> std::result::Result<(Vec<u8>, bool, Vec<u32>), napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
+        let executor = StoreExecutor { node: &self.node };
+        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let registry = Arc::clone(&sessions.registry);
+        let face = sessions
+            .faces
+            .entry(session)
+            .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
+        let mut frame = Vec::new();
+        let close = !database_server::yyds::redis::execute_server_command(
+            face,
+            &mut frame,
+            &arguments,
+            &executor,
+            db,
+            protocol,
+        )
+        .map_err(reason)?;
+        let killed = registry
+            .take_killed()
+            .into_iter()
+            .filter(|id| *id != u64::from(session))
+            .map(|id| id as u32)
+            .collect::<Vec<_>>();
+        Ok((frame, close, killed))
     }
 }
 
@@ -796,6 +845,18 @@ impl Store {
         self.shard().end_batch().map_err(reason)
     }
 
+    /// Closes a batch without writing the shard, leaving the write to `flush`.
+    ///
+    /// A socket server that reads one command per round trip uses this so a
+    /// sequential command does not rewrite the whole snapshot; its flush timer,
+    /// `SAVE` and shutdown still persist every mutation. A batch that mutates and
+    /// also buffered an increment writes through, and under `sync_always` every
+    /// batch writes through, because both are documented durability points.
+    #[napi]
+    pub fn end_batch_deferred(&mut self) -> std::result::Result<(), napi::Error> {
+        self.shard().end_batch_deferred().map_err(reason)
+    }
+
     /// Selects `fsync` on every snapshot write (`always`) or once per sync call.
     #[napi]
     pub fn set_sync_always(&mut self, always: bool) {
@@ -1085,24 +1146,7 @@ impl Store {
         protocol: u8,
         args: Vec<Buffer>,
     ) -> std::result::Result<String, napi::Error> {
-        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let executor = StoreExecutor { node: &self.node };
-        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let registry = Arc::clone(&sessions.registry);
-        let face = sessions
-            .faces
-            .entry(session)
-            .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
-        let mut frame = Vec::new();
-        let close = !database_server::yyds::redis::execute_server_command(
-            face, &mut frame, &arguments, &executor, db, protocol,
-        )
-        .map_err(reason)?;
-        let killed = registry
-            .take_killed()
-            .into_iter()
-            .filter(|id| *id != u64::from(session))
-            .collect::<Vec<_>>();
+        let (frame, close, killed) = self.run_server_command(session, db, protocol, &args)?;
         let (reply, _) = redis_wasm::resp::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("server command produced an empty reply frame"))?;
@@ -1111,6 +1155,27 @@ impl Store {
             "{{\"reply\":{},\"close\":{close},\"killed\":[{killed}]}}",
             reply.to_spec()
         ))
+    }
+
+    /// Executes one server-face request and returns the upstream reply frame verbatim.
+    ///
+    /// The socket loop writes the bytes directly, so `CLIENT` / `COMMAND` / `INFO` /
+    /// `CONFIG` / `ACL` do not cross the binding as a reply specification and back.
+    /// The connection effects still travel with the frame.
+    #[napi]
+    pub fn server_command_frame(
+        &self,
+        session: u32,
+        db: u8,
+        protocol: u8,
+        args: Vec<Buffer>,
+    ) -> std::result::Result<ServerCommandFrame, napi::Error> {
+        let (frame, close, killed) = self.run_server_command(session, db, protocol, &args)?;
+        Ok(ServerCommandFrame {
+            frame: Buffer::from(frame),
+            close,
+            killed,
+        })
     }
 
     /// Drops the embedded session opened for one host connection.

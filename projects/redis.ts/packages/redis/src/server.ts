@@ -409,7 +409,11 @@ export async function startServer(
                 }
             }
             finally {
-                store.endBatch();
+                // The shard is written by the flush timer below, not once per
+                // socket read: a sequential client would otherwise rewrite the
+                // whole snapshot on every command. `appendfsync always` writes
+                // through inside the binding.
+                store.endBatchDeferred();
                 flushOut();
             }
         }
@@ -452,10 +456,11 @@ export async function startServer(
         sweepExpired(store, stats, (db, key) => notifyExpired(pubsub, settings.notifications, db, key));
     }, 100);
     expiryTimer.unref();
-    // The buffered counters reach the shard on a one-second cadence, and the
+    // Every buffered mutation reaches the shard on a one-second cadence, and the
     // `everysec` fsync policy makes the shard stable on the same cadence, so a
-    // power loss loses at most one second of accounting rather than the whole
-    // session. Under `always` both calls are no-ops.
+    // power loss loses at most one second of writes rather than the whole
+    // session. Under `always` the binding already wrote through each command and
+    // both calls are no-ops.
     const flushTimer = setInterval(() => {
         store.flush();
         store.sync();

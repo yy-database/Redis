@@ -45,10 +45,13 @@ pub struct ExpiredKey {
 /// [`Node::begin_batch`] and [`Node::end_batch`] bracket a burst of commands
 /// that share one socket read: every mutation inside the burst is applied to
 /// memory immediately, while the shard is encoded once when the outermost batch
-/// closes. Counter updates are the exception: they stay buffered until a
-/// committed mutation, an explicit [`Node::flush`], or a drop, so a sequential
-/// `INCR` stream does not rewrite the snapshot per command. Reads always observe
-/// the latest state, so ordering inside the burst does not change.
+/// closes. [`Node::end_batch_deferred`] closes the same bracket without that
+/// write, so a host with a flush timer can keep a sequential command stream off
+/// the snapshot path; it writes through under `sync_always`. Counter updates are
+/// the exception either way: they stay buffered until a committed mutation, an
+/// explicit [`Node::flush`], or a drop, so a sequential `INCR` stream does not
+/// rewrite the snapshot per command. Reads always observe the latest state, so
+/// ordering inside the burst does not change.
 #[derive(Debug)]
 pub struct Node {
     data_dir: PathBuf,
@@ -443,6 +446,26 @@ impl Node {
         Ok(())
     }
 
+    /// Closes one batch and leaves the snapshot write to the host's flush cadence.
+    ///
+    /// A socket server reads one command per round trip, so writing the whole
+    /// shard at every batch would rewrite it once per command. The host owns a
+    /// flush timer instead ([`Node::flush`] on its durability cadence, `SAVE`,
+    /// and shutdown), which is the same write-behind boundary the counters
+    /// already use. A batch that both mutates and buffered a counter still writes
+    /// through, because a committed mutation is the documented point where
+    /// buffered increments reach the shard. Under `sync_always` every batch
+    /// writes through, because that policy promises a synced snapshot per commit.
+    pub fn end_batch_deferred(&mut self) -> io::Result<()> {
+        if self.sync_always || (self.dirty && self.pending_increments) {
+            return self.end_batch();
+        }
+        if self.batch_depth > 0 {
+            self.batch_depth -= 1;
+        }
+        Ok(())
+    }
+
     /// Registers one watch on a logical key and returns its current version.
     ///
     /// Repeated watches of the same key share one entry through the reference
@@ -584,7 +607,8 @@ impl Node {
         }
         if self.batch_depth > 0 {
             self.next_revision = next_revision;
-            self.pending_increments = false;
+            // A buffered counter stays flagged so the outer batch knows this
+            // mutation must carry it into the shard; `flush` clears the flag.
             self.dirty = true;
             return Ok(());
         }

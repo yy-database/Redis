@@ -42,18 +42,23 @@ format-bound: at 1e5 records a single isolated write moves about 11 MB.
 
 The high-throughput path is batching, and the server now applies it
 automatically: one socket read, a pipeline, or a `MULTI` queue folds into one
-snapshot write. Library users can do the same with `Store.beginBatch` /
-`Store.endBatch`, or load many keys at once with `setMany`, which folds them into
-a single write. The same 1e5 keys take about 0.2–0.5 s in one `setMany` call,
-against roughly 2.8 h and about 250 GB written when issued as 1e5 separate `SET`
-commands at the historical debug cost.
+in-memory batch, and the server writes the shard on a one-second flush cadence
+instead of once per command. A socket client that issues one command per round
+trip therefore no longer rewrites the whole snapshot per command. Library users
+can batch explicitly with `Store.beginBatch` / `Store.endBatch`, defer the write
+with `Store.endBatchDeferred`, or load many keys at once with `setMany`, which
+folds them into a single write. The same 1e5 keys take about 0.2–0.5 s in one
+`setMany` call, against roughly 2.8 h and about 250 GB written when issued as
+1e5 separate `SET` commands at the historical debug cost.
 
-`INCR` and `INCRBY` are buffered in memory and become durable only at a `flush`
-boundary: an explicit `Store.flush()`, any other mutation, or dropping the
-handle; the server also flushes when it closes. A process crash loses every
-increment applied since the last flush, and reopening returns the value as of
-that flush, never below it. Under the default `everysec` policy a power loss can
-additionally drop writes that were not yet fsynced.
+Every buffered mutation, including `INCR` and `INCRBY`, becomes durable at a
+`flush` boundary: the server's one-second timer, `SAVE`, or shutdown, or an
+explicit `Store.flush()` for library users. A process crash loses the mutations
+applied since the last flush, and reopening returns the value as of that flush,
+never below it. Under the default `everysec` policy a power loss can
+additionally drop writes that were not yet fsynced. Under `appendfsync always`
+each committed command still writes and fsyncs through, so the deferred batch
+degrades to the immediate write.
 
 A directory whose `.yyds` catalog is valid but whose registered `.yykv` shard is
 absent fails to open with the error `catalog.shard-file: <id>.yykv is missing`.
