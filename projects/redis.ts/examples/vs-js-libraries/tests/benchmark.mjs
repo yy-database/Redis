@@ -1,4 +1,4 @@
-// 场景矩阵对照：`@yydb/redis` 仿真服务端 vs `ioredis` / `node-redis`，RESP2。
+// 场景矩阵对照：`@yydb/redis` 仿真服务端 vs `ioredis` / `node-redis`，RESP2 与 RESP3。
 // 统计口径唯一入口是 `src/harness-bench.mjs` 的 `benchSummary`（上游
 // `database.harness::summarize` 的 median/p95/极值），TS 侧不重写公式。
 // 报告 provenance 对齐 harness 的 `BenchProvenance` 线格式（snake_case 键）。
@@ -10,7 +10,9 @@
 //   BENCH_STREAM (200), BENCH_PUBSUB (100), BENCH_TTL (30), BENCH_TXN (100),
 //   BENCH_INCR (500), BENCH_MSET (500), BENCH_DEL (200), BENCH_MOVE (200),
 //   BENCH_BLOCK (100), BENCH_PING_CONC (800), BENCH_CONC (8), BENCH_GROUP (100),
-//   BENCH_REPEAT (10), BENCH_COLL_LARGE (2000), BENCH_WORKLOADS (all)
+//   BENCH_REPEAT (10), BENCH_COLL_LARGE (2000), BENCH_SWEEP (500),
+//   BENCH_SWEEP_TTL_MS (50), BENCH_SWEEP_WAIT_MS (200), BENCH_FANOUT_SUBS (8),
+//   BENCH_FANOUT (50), BENCH_WORKLOADS (all)
 // 真机对照：设 BENCH_ORACLE_HOST / BENCH_ORACLE_PORT 指向真实 redis-server 后，
 //   同一矩阵以 `ioredis` 为固定客户端再跑一轮，作为 oracle 列写进报告。
 
@@ -64,6 +66,11 @@ const PING_CONC = count('BENCH_PING_CONC', 800);
 const CONCURRENCY = count('BENCH_CONC', 8);
 const GROUP_COUNT = count('BENCH_GROUP', 100);
 const LARGE_COLL = count('BENCH_COLL_LARGE', 2_000);
+const SWEEP_COUNT = count('BENCH_SWEEP', 500);
+const SWEEP_TTL_MS = count('BENCH_SWEEP_TTL_MS', 50);
+const SWEEP_WAIT_MS = count('BENCH_SWEEP_WAIT_MS', 200);
+const FANOUT_SUBS = count('BENCH_FANOUT_SUBS', 8);
+const FANOUT_MESSAGES = count('BENCH_FANOUT', 50);
 const ROUNDS = count('BENCH_ROUNDS', 3);
 const WARMUP = count('BENCH_WARMUP', 1);
 const REPEAT = count('BENCH_REPEAT', 10);
@@ -778,6 +785,152 @@ const workloads = [
     },
   },
   {
+    name: 'resp3-hello',
+    scenario: 'redis-resp3-hello-roundtrip',
+    // Every client in this cell negotiates RESP3, so the reply framing itself
+    // (map header for `HELLO`, `~` for `SMEMBERS`) is part of the measurement.
+    protocol: 3,
+    ops: REPEAT * 4,
+    params: { repeat: String(REPEAT), commands: 'HELLO,GET,SMEMBERS,PING', value_bytes: '64' },
+    dataScale: `keys=${COLL},members=${COLL}`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:resp3');
+      const members = Array.from({ length: COLL }, (_, index) => `m${index}`);
+      await ctx.client.call(['DEL', 'bench:resp3:sset']);
+      await ctx.client.call(['SADD', 'bench:resp3:sset', ...members]);
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const hello = await client.call(['HELLO', '3']);
+        // ioredis flattens a RESP3 map to a flat array, node-redis hands back a
+        // Map and the product client a plain object; accept all three shapes.
+        const proto = Array.isArray(hello)
+          ? hello[hello.indexOf('proto') + 1]
+          : (hello?.proto ?? hello?.get?.('proto'));
+        if (Number(proto) !== 3) throw new Error(`HELLO 3 replied proto=${proto}`);
+        const value = await client.get('bench:resp3:0');
+        if (value !== VALUE) throw new Error(`resp3 GET missed the preloaded value`);
+        const members = await client.call(['SMEMBERS', 'bench:resp3:sset']);
+        if (!Array.isArray(members) || members.length !== COLL) {
+          throw new Error(`resp3 SMEMBERS replied ${Array.isArray(members) ? members.length : members}`);
+        }
+        await client.ping();
+      }
+    },
+  },
+  {
+    name: 'expire-sweep',
+    scenario: 'redis-expire-sweep',
+    ops: SWEEP_COUNT * 2 + 2,
+    params: {
+      keys: String(SWEEP_COUNT),
+      ttl_ms: String(SWEEP_TTL_MS),
+      wait_ms: String(SWEEP_WAIT_MS),
+      value_bytes: '64',
+    },
+    dataScale: `keys=${SWEEP_COUNT},value_bytes=64`,
+    async reset(ctx) {
+      // The previous round may leave a key live if its deadline has not been
+      // swept yet, so every round starts from an empty database.
+      await ctx.client.call(['FLUSHDB']);
+    },
+    async run({ client }) {
+      const commands = [];
+      for (let index = 0; index < SWEEP_COUNT; index += 1) {
+        commands.push(['SET', `bench:sweep:${index}`, VALUE, 'PX', String(SWEEP_TTL_MS)]);
+      }
+      for (let start = 0; start < commands.length; start += BATCH) {
+        await client.pipeline(commands.slice(start, start + BATCH));
+      }
+      const live = await client.call(['DBSIZE']);
+      if (live !== SWEEP_COUNT) throw new Error(`DBSIZE replied ${live} before expiry, expected ${SWEEP_COUNT}`);
+      // The server's active sweep runs every 100ms, so a wait comfortably above
+      // one tick is enough to drop the whole expired set.
+      await new Promise(resolve => setTimeout(resolve, SWEEP_WAIT_MS));
+      const remaining = await client.call(['DBSIZE']);
+      if (remaining !== 0) throw new Error(`DBSIZE replied ${remaining} after expiry, expected 0`);
+      for (let index = 0; index < SWEEP_COUNT; index += 1) {
+        const value = await client.get(`bench:sweep:${index}`);
+        if (value !== null) throw new Error(`expired key ${index} is still live`);
+      }
+    },
+  },
+  {
+    name: 'multi-exec-mixed',
+    scenario: 'redis-txn-multi-exec-families',
+    ops: TXN_COUNT + 2,
+    params: {
+      commands: String(TXN_COUNT),
+      families: 'SET,GET,INCR,HSET,LPUSH,SADD',
+      value_bytes: '64',
+    },
+    dataScale: `keys=${TXN_COUNT},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, TXN_COUNT, 'bench:txnmix');
+    },
+    async reset(ctx) {
+      const keys = [];
+      for (let index = 0; index < TXN_COUNT; index += 6) keys.push(`bench:txnmix:w:${index}`);
+      await ctx.client.call([
+        'DEL',
+        ...keys,
+        'bench:txnmix:hash',
+        'bench:txnmix:list',
+        'bench:txnmix:set',
+        'bench:txnmix:counter',
+      ]);
+    },
+    async run({ client }) {
+      await client.call(['MULTI']);
+      for (let index = 0; index < TXN_COUNT; index += 1) {
+        let queued;
+        switch (index % 6) {
+          case 0: queued = await client.call(['SET', `bench:txnmix:w:${index}`, VALUE]); break;
+          case 1: queued = await client.call(['GET', `bench:txnmix:${index}`]); break;
+          case 2: queued = await client.call(['INCR', 'bench:txnmix:counter']); break;
+          case 3: queued = await client.call(['HSET', 'bench:txnmix:hash', `f${index}`, `v${index}`]); break;
+          case 4: queued = await client.call(['LPUSH', 'bench:txnmix:list', `e${index}`]); break;
+          default: queued = await client.call(['SADD', 'bench:txnmix:set', `m${index}`]); break;
+        }
+        if (queued !== 'QUEUED') throw new Error(`multi queue failed at ${index}: ${queued}`);
+      }
+      const replies = await client.call(['EXEC']);
+      if (!Array.isArray(replies) || replies.length !== TXN_COUNT) {
+        throw new Error(`exec replies ${Array.isArray(replies) ? replies.length : replies}, expected ${TXN_COUNT}`);
+      }
+      if (replies[1] !== VALUE) throw new Error(`exec GET replied ${replies[1]}`);
+    },
+  },
+  {
+    name: 'pubsub-fanout',
+    scenario: 'redis-pubsub-fanout',
+    ops: FANOUT_MESSAGES * FANOUT_SUBS,
+    params: { messages: String(FANOUT_MESSAGES), subscribers: String(FANOUT_SUBS), channels: '1' },
+    dataScale: `keys=0,channel=bench:fanout,subscribers=${FANOUT_SUBS}`,
+    async prepare(ctx) {
+      ctx.fanout = await Promise.all(Array.from({ length: FANOUT_SUBS }, () => (
+        createClient(ctx.clientName, { host: ctx.host, port: ctx.port, protocol: ctx.protocol })
+      )));
+      await Promise.all(ctx.fanout.map(subscriber => subscriber.subscribe('bench:fanout')));
+    },
+    async cleanup(ctx) {
+      await Promise.all((ctx.fanout ?? []).map(subscriber => subscriber.close()));
+    },
+    async run({ client, fanout }) {
+      for (let index = 0; index < FANOUT_MESSAGES; index += 1) {
+        const payload = `f${index}`;
+        const receivers = await client.call(['PUBLISH', 'bench:fanout', payload]);
+        if (receivers !== FANOUT_SUBS) {
+          throw new Error(`publish reported ${receivers} receivers, expected ${FANOUT_SUBS}`);
+        }
+        const delivered = await Promise.all(fanout.map(subscriber => subscriber.nextMessage()));
+        for (const message of delivered) {
+          if (message !== payload) throw new Error(`fanout mismatch at ${index}: ${message}`);
+        }
+      }
+    },
+  },
+  {
     name: 'zset-score-ops',
     scenario: 'redis-zset-increment-rank',
     ops: COLL * 3,
@@ -1067,7 +1220,7 @@ async function preload(ctx, total, prefix, value = VALUE) {
 }
 
 async function measure(clientName, workload, target) {
-  const context = { clientName, host: target.host, port: target.port };
+  const context = { clientName, host: target.host, port: target.port, protocol: workload.protocol };
   let server = null;
   let client = null;
   if (!target.oracle) {
@@ -1077,7 +1230,7 @@ async function measure(clientName, workload, target) {
     context.port = server.port;
   }
   try {
-    client = await createClient(clientName, { host: context.host, port: context.port });
+    client = await createClient(clientName, { host: context.host, port: context.port, protocol: workload.protocol });
     context.client = client;
     await workload.prepare?.(context);
     for (let round = 0; round < WARMUP; round += 1) {
@@ -1135,8 +1288,8 @@ const names = workloads.map(workload => workload.name);
 const results = {};
 const oracle = await oracleTarget();
 
-console.log(`Redis RESP2 scenario matrix (${WARMUP} warmup + ${ROUNDS} measured rounds per cell)`);
-console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_REPEAT=${REPEAT}, BENCH_COLL_LARGE=${LARGE_COLL}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
+console.log(`Redis RESP2/RESP3 scenario matrix (${WARMUP} warmup + ${ROUNDS} measured rounds per cell)`);
+console.log(`Defaults: BENCH_SET=${SET_COUNT}, BENCH_GET=${GET_COUNT}, BENCH_PIPE=${PIPE_COUNT}, BENCH_PING=${PING_COUNT}, BENCH_BATCH=${BATCH}, BENCH_COLL=${COLL}, BENCH_BIG=${BIG_COUNT}, BENCH_BIG_GET=${BIG_GET}, BENCH_BIG_BYTES=${BIG_BYTES}, BENCH_CONNECT=${CONNECT_COUNT}, BENCH_STREAM=${STREAM_COUNT}, BENCH_PUBSUB=${PUBSUB_COUNT}, BENCH_TTL=${TTL_COUNT}, BENCH_TXN=${TXN_COUNT}, BENCH_INCR=${INCR_COUNT}, BENCH_MSET=${MSET_COUNT}, BENCH_DEL=${DEL_COUNT}, BENCH_MOVE=${MOVE_COUNT}, BENCH_BLOCK=${BLOCK_COUNT}, BENCH_PING_CONC=${PING_CONC}, BENCH_CONC=${CONCURRENCY}, BENCH_GROUP=${GROUP_COUNT}, BENCH_REPEAT=${REPEAT}, BENCH_COLL_LARGE=${LARGE_COLL}, BENCH_SWEEP=${SWEEP_COUNT}, BENCH_SWEEP_TTL_MS=${SWEEP_TTL_MS}, BENCH_SWEEP_WAIT_MS=${SWEEP_WAIT_MS}, BENCH_FANOUT_SUBS=${FANOUT_SUBS}, BENCH_FANOUT=${FANOUT_MESSAGES}, BENCH_ROUNDS=${ROUNDS}, BENCH_WARMUP=${WARMUP}`);
 console.log(`Stats: benchSummary via ${benchSummarySource}`);
 console.log('Server: fresh emulated server and dataDir per (workload, client); rounds share one server and one connection');
 console.log('');
@@ -1214,6 +1367,8 @@ const runProvenance = {
     incr: String(INCR_COUNT), mset: String(MSET_COUNT), del: String(DEL_COUNT), move: String(MOVE_COUNT),
     block: String(BLOCK_COUNT), ping_conc: String(PING_CONC), conc: String(CONCURRENCY),
     group: String(GROUP_COUNT), repeat: String(REPEAT), coll_large: String(LARGE_COLL),
+    sweep: String(SWEEP_COUNT), sweep_ttl_ms: String(SWEEP_TTL_MS), sweep_wait_ms: String(SWEEP_WAIT_MS),
+    fanout_subs: String(FANOUT_SUBS), fanout_messages: String(FANOUT_MESSAGES),
   },
   data_scale: `matrix=${workloads.length}x${reportClients.length}`,
   rustc_version: rustcVersion,
@@ -1283,7 +1438,7 @@ const report = `# Benchmark report
 
 Command: \`pnpm --dir projects/redis.ts/examples/vs-js-libraries benchmark\`
 Binding: \`${process.env.BENCH_BINDING_PROFILE ?? 'debug'}\` — build with \`pnpm build:release\` and set \`BENCH_BINDING_PROFILE=release\` for product numbers
-Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_REPEAT=${REPEAT}\`, \`BENCH_COLL_LARGE=${LARGE_COLL}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
+Defaults: \`BENCH_SET=${SET_COUNT}\`, \`BENCH_GET=${GET_COUNT}\`, \`BENCH_PIPE=${PIPE_COUNT}\`, \`BENCH_PING=${PING_COUNT}\`, \`BENCH_BATCH=${BATCH}\`, \`BENCH_COLL=${COLL}\`, \`BENCH_BIG=${BIG_COUNT}\`, \`BENCH_BIG_GET=${BIG_GET}\`, \`BENCH_BIG_BYTES=${BIG_BYTES}\`, \`BENCH_CONNECT=${CONNECT_COUNT}\`, \`BENCH_STREAM=${STREAM_COUNT}\`, \`BENCH_PUBSUB=${PUBSUB_COUNT}\`, \`BENCH_TTL=${TTL_COUNT}\`, \`BENCH_TXN=${TXN_COUNT}\`, \`BENCH_INCR=${INCR_COUNT}\`, \`BENCH_MSET=${MSET_COUNT}\`, \`BENCH_DEL=${DEL_COUNT}\`, \`BENCH_MOVE=${MOVE_COUNT}\`, \`BENCH_BLOCK=${BLOCK_COUNT}\`, \`BENCH_PING_CONC=${PING_CONC}\`, \`BENCH_CONC=${CONCURRENCY}\`, \`BENCH_GROUP=${GROUP_COUNT}\`, \`BENCH_REPEAT=${REPEAT}\`, \`BENCH_COLL_LARGE=${LARGE_COLL}\`, \`BENCH_SWEEP=${SWEEP_COUNT}\`, \`BENCH_SWEEP_TTL_MS=${SWEEP_TTL_MS}\`, \`BENCH_SWEEP_WAIT_MS=${SWEEP_WAIT_MS}\`, \`BENCH_FANOUT_SUBS=${FANOUT_SUBS}\`, \`BENCH_FANOUT=${FANOUT_MESSAGES}\`, \`BENCH_ROUNDS=${ROUNDS}\`, \`BENCH_WARMUP=${WARMUP}\`
 Baseline: \`ioredis\` against the emulated server = \`1.00x\`
 Ratio: subject_time / baseline_time (smaller is faster). Fastest cell in each row is bold.
 Stats: median/p95/min/max/rounds come from \`database.harness::summarize\` via \`benchSummary\` (${benchSummarySource}); nearest-rank p95, even-length median averages the middle pair. Per-op milliseconds come from \`database.harness::per_op_ms\` via \`benchPerOpMs\`, the same DTO the summary returns. No median, p95 or per-op formula lives in this example.
@@ -1342,11 +1497,20 @@ ${oracleSection}
   error fails the in-flight command, while ioredis and node-redis carry their own
   machinery (offline queue disabled).
 - No pooling and no auto-pipelining anywhere; pipelined cells send explicit
-  equal-size batches of ${BATCH}. All clients use RESP2 on one TCP connection.
+  equal-size batches of ${BATCH} on one TCP connection. The protocol column is
+  not uniform: ioredis 6 negotiates RESP3 by default, while node-redis and
+  \`@yydb/redis\` run RESP2 unless a workload sets \`protocol: 3\`.
 - The product harness encodes one pipeline with the batch \`encodeCommands\`
   primitive and the emulated server decodes and encodes each socket burst with the
   batch \`decodeCommands\` / \`encodeReplies\` primitives, so a pipeline crosses the
   binding twice regardless of its length.
+- The product adapter's RESP parser reads length headers straight from the frame
+  bytes and decodes bulk elements inside an array in place, so a full-collection
+  reply does not allocate a string header or a temporary element object per
+  member. It also parses RESP3 \`%\` / \`~\` / \`_\` / \`,\` / \`>\` frames, which is
+  what lets \`resp3-hello\` run on the same adapter. All three columns share the
+  emulated server, so a server-side reply improvement moves every client down
+  together and only the client-side parser changes the ratio.
 - The socket server applies mutations in memory and writes the whole \`.yykv\`
   snapshot on its one-second flush cadence, so sequential \`SET\` and collection
   writes no longer pay a full-shard rewrite per command. A pipeline still folds
@@ -1394,7 +1558,28 @@ ${oracleSection}
 - \`large-collection-read\` builds one \`BENCH_COLL_LARGE\`-member set and zset in
   \`prepare\` and reads them whole with \`SMEMBERS\` and \`ZRANGE 0 -1\` per
   \`BENCH_REPEAT\` round, isolating full-collection reply encoding and allocation
-  from the per-command round trip the \`BENCH_COLL\` cells measure.
+  from the per-command round trip the \`BENCH_COLL\` cells measure. The facade
+  writes both replies straight from the stored member blob: \`SMEMBERS\` counts
+  and validates the length-framed chunks without decoding them, and a full
+  \`ZRANGE\` sorts a borrowed view instead of copying every member.
+- \`resp3-hello\` sets \`protocol: 3\` for the whole cell, so all three clients
+  negotiate RESP3 and the measured round trip covers the map reply of
+  \`HELLO 3\`, a bulk \`GET\`, the \`~\` set header of \`SMEMBERS\` and a \`PING\`.
+  It is the only cell that forces RESP3 on \`node-redis\` and \`@yydb/redis\`.
+- \`expire-sweep\` writes \`BENCH_SWEEP\` keys with \`SET ... PX\`, asserts
+  \`DBSIZE\`, waits \`BENCH_SWEEP_WAIT_MS\` (above the server's 100ms sweep tick)
+  and then asserts \`DBSIZE\` is zero and every \`GET\` answers nil. The fixed wait
+  is shared by all clients, so the cell verifies the cleanup path rather than
+  comparing raw command latency.
+- \`multi-exec-mixed\` queues \`BENCH_TXN\` commands cycling
+  SET / GET / INCR / HSET / LPUSH / SADD behind one \`MULTI\` and commits with
+  one \`EXEC\`, so a transaction crosses every forwarded family. The growing
+  collections and counter are dropped in \`reset\` outside the timed region; the
+  preloaded \`GET\` keys stay outside it too.
+- \`pubsub-fanout\` opens \`BENCH_FANOUT_SUBS\` dedicated subscriber connections in
+  \`prepare\` and publishes \`BENCH_FANOUT\` messages to the shared channel, awaiting
+  every delivery on every subscriber before the next publish. One \`ops\` unit is
+  one delivery, so the cell measures fan-out rather than a single round trip.
 
 ## Machine-readable summary
 

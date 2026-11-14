@@ -30,13 +30,16 @@ function createMessageQueue() {
   };
 }
 
-async function makeIoredis({ host, port }) {
+async function makeIoredis({ host, port, protocol }) {
   const client = new Redis({
     host,
     port,
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
     lazyConnect: false,
+    // ioredis 6 negotiates RESP3 by default; an explicit protocol keeps a
+    // focused cell on the version it declares.
+    ...(protocol === undefined ? {} : { protocol }),
   });
   await waitForReady(client);
   const messages = createMessageQueue();
@@ -65,8 +68,8 @@ async function makeIoredis({ host, port }) {
   };
 }
 
-async function makeNodeRedis({ host, port }) {
-  const client = createNodeRedisClient({ socket: { host, port }, RESP: 2 });
+async function makeNodeRedis({ host, port, protocol }) {
+  const client = createNodeRedisClient({ socket: { host, port }, RESP: protocol ?? 2 });
   client.on('error', () => {});
   await client.connect();
   const messages = createMessageQueue();
@@ -89,11 +92,12 @@ async function makeNodeRedis({ host, port }) {
   };
 }
 
-async function makeProduct({ host, port }) {
+async function makeProduct({ host, port, protocol }) {
   const messages = createMessageQueue();
   const client = createRespClient({
     host,
     port,
+    protocol: protocol ?? 2,
     onPush: frame => {
       if (Array.isArray(frame) && frame[0] === 'message') messages.push(frame[2]);
     },
