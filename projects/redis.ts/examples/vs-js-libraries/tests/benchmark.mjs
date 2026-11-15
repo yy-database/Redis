@@ -33,6 +33,8 @@ const repoRoot = join(exampleRoot, '..', '..', '..', '..');
 
 const HOST = '127.0.0.1';
 const VALUE = 'v'.repeat(64);
+// `flushdb-scratch` 先写入固定条数再断言 `DBSIZE`，条数是断言夹具而非吞吐旋钮。
+const SCRATCH_KEYS = 8;
 
 function count(name, fallback) {
   const raw = process.env[name];
@@ -1912,6 +1914,143 @@ const workloads = [
         await client.ping();
         await client.close();
       }
+    },
+  },
+  {
+    name: 'list-linsert-ltrim',
+    scenario: 'redis-list-linsert-ltrim',
+    ops: 5,
+    params: { elements: '3', commands: 'LINSERT BEFORE,LINSERT miss,LTRIM,LLEN' },
+    dataScale: 'key=1,elements=3',
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:linsert']);
+      await ctx.client.call(['RPUSH', 'bench:linsert', 'a', 'b', 'c']);
+    },
+    async run({ client }) {
+      const inserted = await client.call(['LINSERT', 'bench:linsert', 'BEFORE', 'b', 'x']);
+      if (inserted !== 4) throw new Error(`list-linsert-ltrim LINSERT BEFORE replied ${inserted}`);
+      // 枢轴不存在时真机同样回 -1，且不改变列表。
+      const missing = await client.call(['LINSERT', 'bench:linsert', 'AFTER', 'nope', 'x']);
+      if (missing !== -1) throw new Error(`list-linsert-ltrim LINSERT miss replied ${missing}`);
+      const rows = await client.call(['LRANGE', 'bench:linsert', '0', '-1']);
+      if (JSON.stringify(rows) !== JSON.stringify(['a', 'x', 'b', 'c'])) {
+        throw new Error(`list-linsert-ltrim LRANGE replied ${JSON.stringify(rows)}`);
+      }
+      const trimmed = await client.call(['LTRIM', 'bench:linsert', '0', '2']);
+      if (trimmed !== 'OK') throw new Error(`list-linsert-ltrim LTRIM replied ${trimmed}`);
+      const length = await client.call(['LLEN', 'bench:linsert']);
+      if (length !== 3) throw new Error(`list-linsert-ltrim LLEN replied ${length}`);
+    },
+  },
+  {
+    name: 'list-rpoplpush-lmove',
+    scenario: 'redis-list-rpoplpush-lmove',
+    ops: 5,
+    params: { elements: '3', commands: 'RPOPLPUSH,LMOVE LEFT RIGHT' },
+    dataScale: 'keys=3,elements=3',
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:lsrc', 'bench:ldst', 'bench:ldst2']);
+      await ctx.client.call(['RPUSH', 'bench:lsrc', 'a', 'b', 'c']);
+    },
+    async run({ client }) {
+      const popped = await client.call(['RPOPLPUSH', 'bench:lsrc', 'bench:ldst']);
+      if (popped !== 'c') throw new Error(`list-rpoplpush-lmove RPOPLPUSH replied ${popped}`);
+      const moved = await client.call(['LMOVE', 'bench:lsrc', 'bench:ldst2', 'LEFT', 'RIGHT']);
+      if (moved !== 'a') throw new Error(`list-rpoplpush-lmove LMOVE replied ${moved}`);
+      const source = await client.call(['LRANGE', 'bench:lsrc', '0', '-1']);
+      if (JSON.stringify(source) !== JSON.stringify(['b'])) {
+        throw new Error(`list-rpoplpush-lmove source ${JSON.stringify(source)}`);
+      }
+      const destination = await client.call(['LRANGE', 'bench:ldst', '0', '-1']);
+      if (JSON.stringify(destination) !== JSON.stringify(['c'])) {
+        throw new Error(`list-rpoplpush-lmove destination ${JSON.stringify(destination)}`);
+      }
+      const destination2 = await client.call(['LRANGE', 'bench:ldst2', '0', '-1']);
+      if (JSON.stringify(destination2) !== JSON.stringify(['a'])) {
+        throw new Error(`list-rpoplpush-lmove second destination ${JSON.stringify(destination2)}`);
+      }
+    },
+  },
+  {
+    name: 'hll-merge-count',
+    scenario: 'redis-hyperloglog-merge-count',
+    ops: 3,
+    params: { elements_per_key: String(COLL), commands: 'PFMERGE,PFCOUNT merged,PFCOUNT multi-key' },
+    dataScale: `keys=2,elements=${COLL * 2}`,
+    async reset(ctx) {
+      const left = [];
+      const right = [];
+      for (let index = 0; index < COLL; index += 1) {
+        left.push(`a${index}`);
+        right.push(`b${index}`);
+      }
+      await ctx.client.call(['DEL', 'bench:hlla', 'bench:hllb', 'bench:hllm']);
+      await ctx.client.call(['PFADD', 'bench:hlla', ...left]);
+      await ctx.client.call(['PFADD', 'bench:hllb', ...right]);
+    },
+    async run({ client }) {
+      const merged = await client.call(['PFMERGE', 'bench:hllm', 'bench:hlla', 'bench:hllb']);
+      if (merged !== 'OK') throw new Error(`hll-merge-count PFMERGE replied ${merged}`);
+      // HyperLogLog 是估算器，合并后的并集仍按 2% 带宽断言。
+      const expected = COLL * 2;
+      const band = Math.ceil(expected * 0.02);
+      const stored = await client.call(['PFCOUNT', 'bench:hllm']);
+      if (!(Math.abs(stored - expected) <= band)) {
+        throw new Error(`hll-merge-count PFCOUNT merged replied ${stored}, expected ${expected} +/-${band}`);
+      }
+      const multi = await client.call(['PFCOUNT', 'bench:hlla', 'bench:hllb']);
+      if (!(Math.abs(multi - expected) <= band)) {
+        throw new Error(`hll-merge-count PFCOUNT multi-key replied ${multi}, expected ${expected} +/-${band}`);
+      }
+    },
+  },
+  {
+    name: 'client-info',
+    scenario: 'redis-client-info',
+    ops: REPEAT,
+    params: { repeat: String(REPEAT), commands: 'CLIENT INFO' },
+    dataScale: 'keys=0',
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const info = await client.call(['CLIENT', 'INFO']);
+        if (typeof info !== 'string') throw new Error(`client-info replied ${typeof info}`);
+        const fields = Object.fromEntries(info.trim().split(/\s+/)
+          .map(pair => pair.split('='))
+          .filter(pair => pair.length === 2));
+        if (!/^\d+$/.test(fields.id ?? '')) throw new Error(`client-info id=${fields.id}`);
+        if (fields.db !== '0') throw new Error(`client-info db=${fields.db}`);
+        if (fields.flags !== 'N') throw new Error(`client-info flags=${fields.flags}`);
+        if (fields.cmd !== 'client|info') throw new Error(`client-info cmd=${fields.cmd}`);
+        // ioredis 默认 RESP3，其余两个适配器走 RESP2，两者都是合法连接态。
+        if (fields.resp !== '2' && fields.resp !== '3') throw new Error(`client-info resp=${fields.resp}`);
+      }
+    },
+  },
+  {
+    name: 'flushdb-scratch',
+    scenario: 'redis-key-flushdb-scratch-db',
+    ops: SCRATCH_KEYS + 6,
+    params: { keys: String(SCRATCH_KEYS), db: '3', commands: 'SELECT,FLUSHDB,DBSIZE' },
+    dataScale: `keys=${SCRATCH_KEYS},database=3`,
+    async run({ client }) {
+      // 只在 3 号库上冲刷，避免动到 0 号库的其它 workload 数据。
+      const selected = await client.call(['SELECT', '3']);
+      if (selected !== 'OK') throw new Error(`flushdb-scratch SELECT replied ${selected}`);
+      const cleared = await client.call(['FLUSHDB']);
+      if (cleared !== 'OK') throw new Error(`flushdb-scratch FLUSHDB replied ${cleared}`);
+      for (let index = 0; index < SCRATCH_KEYS; index += 1) {
+        await client.call(['SET', `bench:flush:${index}`, VALUE]);
+      }
+      const seeded = await client.call(['DBSIZE']);
+      if (seeded !== SCRATCH_KEYS) {
+        throw new Error(`flushdb-scratch DBSIZE seeded replied ${seeded}, expected ${SCRATCH_KEYS}`);
+      }
+      const wiped = await client.call(['FLUSHDB']);
+      if (wiped !== 'OK') throw new Error(`flushdb-scratch FLUSHDB wipe replied ${wiped}`);
+      const empty = await client.call(['DBSIZE']);
+      if (empty !== 0) throw new Error(`flushdb-scratch DBSIZE after wipe replied ${empty}`);
+      const restored = await client.call(['SELECT', '0']);
+      if (restored !== 'OK') throw new Error(`flushdb-scratch SELECT 0 replied ${restored}`);
     },
   },
 ];
