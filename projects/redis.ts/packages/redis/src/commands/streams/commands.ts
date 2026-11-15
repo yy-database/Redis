@@ -6,9 +6,9 @@ import { array, bulk, error as replyError, integer, nullArray, nullReply } from 
 import type { ReplySpec } from '../../reply.js';
 import { blockingPlan, notifyPush } from '../blocking-plan.js';
 import { rewriteKind } from '../chunks.js';
-import { integerError, kindOf, text, wrongArity, wrongType } from '../kinds.js';
+import { integerError, kindOf, SUFFIX, text, wrongArity, wrongType } from '../kinds.js';
 import type { CommandPlan, Session } from '../session.js';
-import { STREAM_ID_ERROR, U64_MAX, ZERO_ID, encodeStream, readStream } from './body.js';
+import { appendStreamBody, STREAM_ID_ERROR, streamTop, U64_MAX, ZERO_ID, encodeStream, readStream } from './body.js';
 import { compareStreamIds, ensureConsumer, entryReply, findConsumer, findEntry, findGroup, parseExplicitStreamId, parseStreamBound, parseTrimOptions, resolveStreamId, streamMeta, trimStream } from './state.js';
 import type { StreamEntry, StreamId, StreamPending } from './types.js';
 
@@ -400,6 +400,26 @@ export function planStream(store: Store, session: Session, name: string, args: B
             const kind = kindOf(store, db, key);
             if (kind !== null && kind !== 'stream') return wrongType();
             if (kind === null && parsed.nomkstream) return nullReply();
+            const fields: [Buffer, Buffer][] = [];
+            for (let pair = 0; pair < pairs.length; pair += 2) fields.push([pairs[pair], pairs[pair + 1]]);
+            // Appending to an existing compact stream only needs the new entry:
+            // the stored body already holds every earlier one, so it is copied
+            // byte for byte instead of being decoded to objects and re-encoded.
+            if (kind === 'stream' && parsed.maxlen === null && parsed.minid === null) {
+                const body = store.getKind(db, SUFFIX.stream, key);
+                const top = body === null ? null : streamTop(body);
+                if (body !== null && top !== null) {
+                    const id = resolveStreamId(text(idToken), top);
+                    if (id === null) return replyError(STREAM_ID_ERROR);
+                    if (id.error !== undefined) return replyError(id.error);
+                    const appended = appendStreamBody(body, id as StreamId, fields);
+                    if (appended !== null) {
+                        rewriteKind(store, db, 'stream', key, appended);
+                        notifyPush(session, db, key);
+                        return bulk(`${id.ms}-${id.seq}`);
+                    }
+                }
+            }
             const stream = readStream(store, db, key);
             if (stream !== null && stream.error === true) return wrongType();
             const entries: StreamEntry[] = stream === null ? [] : stream.entries;
@@ -407,8 +427,6 @@ export function planStream(store: Store, session: Session, name: string, args: B
             const id = resolveStreamId(text(idToken), last);
             if (id === null) return replyError(STREAM_ID_ERROR);
             if (id.error !== undefined) return replyError(id.error);
-            const fields: [Buffer, Buffer][] = [];
-            for (let pair = 0; pair < pairs.length; pair += 2) fields.push([pairs[pair], pairs[pair + 1]]);
             entries.push({ ms: id.ms, seq: id.seq, fields });
             const kept = trimStream(entries, parsed.maxlen, parsed.minid).kept;
             rewriteKind(store, db, 'stream', key, encodeStream(kept, id as StreamId, {

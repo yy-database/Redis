@@ -46,6 +46,13 @@ function readDouble(buffer, start, end) {
   return Number.isNaN(value) ? NaN : value;
 }
 
+/**
+ * Parses one array/set/push frame in place.
+ *
+ * The length digits of each `$` bulk element are read directly instead of
+ * scanning for CRLF, which removes one native `indexOf` call per member — the
+ * second-largest cost of a large full-collection read after the member strings.
+ */
 function parseArray(buffer, offset, lineEnd, headerBytes) {
   const count = readLength(buffer, offset + 1, lineEnd);
   if (count === -1) return { value: null, consumed: headerBytes };
@@ -55,15 +62,24 @@ function parseArray(buffer, offset, lineEnd, headerBytes) {
     // The common collection reply is a flat array of bulk strings; decode that
     // element in place instead of allocating a `{ value, consumed }` per member.
     if (buffer.length > cursor && buffer[cursor] === BULK) {
-      const bulkEnd = buffer.indexOf(CRLF, cursor + 1);
-      if (bulkEnd === -1) return null;
-      const length = readLength(buffer, cursor + 1, bulkEnd);
-      if (length === -1) {
+      let position = cursor + 1;
+      let negative = false;
+      if (buffer[position] === 0x2d) {
+        negative = true;
+        position += 1;
+      }
+      let length = 0;
+      while (buffer[position] >= 0x30 && buffer[position] <= 0x39) {
+        length = length * 10 + (buffer[position] - 0x30);
+        position += 1;
+      }
+      if (buffer[position] !== 0x0d || buffer[position + 1] !== 0x0a) return null;
+      const start = position + 2;
+      if (negative) {
         items[index] = null;
-        cursor = bulkEnd + 2;
+        cursor = start;
         continue;
       }
-      const start = bulkEnd + 2;
       const end = start + length;
       if (buffer.length < end + 2) return null;
       items[index] = buffer.toString('utf8', start, end);

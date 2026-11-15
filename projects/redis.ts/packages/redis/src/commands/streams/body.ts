@@ -146,6 +146,75 @@ export function encodeStream(entries: StreamEntry[], last: StreamId, meta: Strea
     return body;
 }
 
+/** Last id the stream ever appended, `null` when the body is too short. */
+export function streamTop(body: Buffer): StreamId | null {
+    if (body.length < 20) return null;
+    return { ms: body.readBigUInt64LE(0), seq: body.readBigUInt64LE(8) };
+}
+
+/**
+ * Appends one entry to a trailerless stream body without decoding it.
+ *
+ * A stream body is `last id + count + entries`, so an append only needs the new
+ * last id, the bumped count and the entry bytes: every existing entry is copied
+ * verbatim instead of being decoded into objects and encoded again. Returns
+ * `null` when the body carries a trailer (counters or consumer groups), when it
+ * is malformed, or when a length no longer fits the on-disk framing; the caller
+ * then falls back to the full decode/encode path.
+ */
+export function appendStreamBody(body: Buffer, id: StreamId, fields: [Buffer, Buffer][]): Buffer | null {
+    if (body.length < 20) return null;
+    const count = body.readUInt32LE(16);
+    if (count === 0xffffffff) return null;
+    let offset = 20;
+    for (let index = 0; index < count; index += 1) {
+        if (offset + 20 > body.length) return null;
+        offset += 16;
+        const fieldCount = body.readUInt32LE(offset);
+        offset += 4;
+        for (let pair = 0; pair < fieldCount; pair += 1) {
+            if (offset + 4 > body.length) return null;
+            const fieldLength = body.readUInt32LE(offset);
+            offset += 4;
+            if (offset + fieldLength + 4 > body.length) return null;
+            offset += fieldLength;
+            const valueLength = body.readUInt32LE(offset);
+            offset += 4;
+            if (offset + valueLength > body.length) return null;
+            offset += valueLength;
+        }
+    }
+    if (offset !== body.length) return null;
+    let entrySize = 16 + 4;
+    for (const [field, value] of fields) {
+        if (field.length > MAX_CHUNK || value.length > MAX_CHUNK) return null;
+        entrySize += 4 + field.length + 4 + value.length;
+    }
+    const next = Buffer.allocUnsafe(body.length + entrySize);
+    body.copy(next, 0);
+    next.writeBigUInt64LE(id.ms, 0);
+    next.writeBigUInt64LE(id.seq, 8);
+    next.writeUInt32LE(count + 1, 16);
+    let cursor = body.length;
+    next.writeBigUInt64LE(id.ms, cursor);
+    cursor += 8;
+    next.writeBigUInt64LE(id.seq, cursor);
+    cursor += 8;
+    next.writeUInt32LE(fields.length, cursor);
+    cursor += 4;
+    for (const [field, value] of fields) {
+        next.writeUInt32LE(field.length, cursor);
+        cursor += 4;
+        field.copy(next, cursor);
+        cursor += field.length;
+        next.writeUInt32LE(value.length, cursor);
+        cursor += 4;
+        value.copy(next, cursor);
+        cursor += value.length;
+    }
+    return next;
+}
+
 function decodeStream(body: Buffer): StreamState | null {
     if (body.length < 20) return null;
     const last = { ms: body.readBigUInt64LE(0), seq: body.readBigUInt64LE(8) };
