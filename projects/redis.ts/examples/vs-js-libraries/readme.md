@@ -102,6 +102,7 @@ stable scenario id, so runs can be compared across revisions:
 | `set-options` | `redis-string-set-options` | `SET ... NX` then `SET ... XX GET` |
 | `exists-type` | `redis-key-exists-type` | `EXISTS` + `TYPE` on every key |
 | `expire-persist` | `redis-key-expire-persist` | `EXPIRE` + `TTL` + `PERSIST` on every key |
+| `expire-metadata` | `redis-key-expire-metadata` | `EXPIRETIME` + `PEXPIRETIME` + `TTL` on every expiring key |
 | `hash-hgetall-hdel` | `redis-hash-hgetall-hdel` | multi-field `HSET`, `HGETALL`, `HDEL` |
 | `list-lpush-lpop` | `redis-list-lpush-lpop` | `LPUSH` growth + `LPOP` drain |
 | `set-algebra` | `redis-set-sinter-sunion-sdiff` | repeated `SINTER` / `SUNION` / `SDIFF` |
@@ -125,6 +126,8 @@ stable scenario id, so runs can be compared across revisions:
 | `setnx-getset` | `redis-string-setnx-getset` | `SETNX` then `GETSET` per key |
 | `smove-spop` | `redis-set-smove-spop` | `SMOVE` between two sets then `SPOP` |
 | `zrangestore-zdiff` | `redis-zset-zrangestore-zdiff` | `ZRANGESTORE` a range then `ZDIFF` two sets |
+| `hash-hincrbyfloat` | `redis-hash-hincrbyfloat` | two decimal `HINCRBYFLOAT` passes over every field, `0.1 + 0.2` must reply `0.3` |
+| `list-lset-lrem` | `redis-list-lset-lrem` | `LSET` every index, then `LREM` one member and assert `LLEN` |
 | `ping` | `redis-ping-rtt` | awaited `PING` round-trips |
 | `connect` | `redis-connect-open-close` | establish + readiness `PING` + close |
 

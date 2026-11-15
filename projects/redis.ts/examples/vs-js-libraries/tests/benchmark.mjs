@@ -1686,6 +1686,221 @@ const workloads = [
     },
   },
   {
+    name: 'zset-add-options',
+    scenario: 'redis-zset-add-options',
+    ops: COLL * 4,
+    params: { members: String(COLL), commands: 'ZADD NX,ZADD XX CH,ZADD GT CH,ZADD INCR' },
+    dataScale: `key=1,members=${COLL}`,
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:zopt']);
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const member = `m${index}`;
+        const added = await client.call(['ZADD', 'bench:zopt', 'NX', String(index), member]);
+        if (added !== 1) throw new Error(`zset-add-options NX replied ${added} at ${index}`);
+        const changed = await client.call(['ZADD', 'bench:zopt', 'XX', 'CH', String(index + 1), member]);
+        if (changed !== 1) throw new Error(`zset-add-options XX CH replied ${changed} at ${index}`);
+        // `GT` 只在分数升高时写入，回填更小的分数必须报 0 次变更。
+        const lowered = await client.call(['ZADD', 'bench:zopt', 'GT', 'CH', String(index), member]);
+        if (lowered !== 0) throw new Error(`zset-add-options GT CH replied ${lowered} at ${index}`);
+        const incremented = await client.call(['ZADD', 'bench:zopt', 'INCR', '1', member]);
+        if (Number(incremented) !== index + 2) {
+          throw new Error(`zset-add-options INCR replied ${incremented} at ${index}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'expire-options',
+    scenario: 'redis-key-expire-options',
+    ops: COLL * 6,
+    params: { keys: String(COLL), commands: 'EXPIRE NX,EXPIRE XX,EXPIRE LT,EXPIRE GT,TTL' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:expopt');
+    },
+    async reset(ctx) {
+      // 上一轮可能已经挂上 TTL，重置回无过期状态，让每条命令都走同一分支。
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['SET', `bench:expopt:${index}`, VALUE]);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:expopt:${index}`;
+        const attached = await client.call(['EXPIRE', key, '100', 'NX']);
+        if (attached !== 1) throw new Error(`expire-options NX replied ${attached} at ${index}`);
+        const skipped = await client.call(['EXPIRE', key, '200', 'NX']);
+        if (skipped !== 0) throw new Error(`expire-options NX re-attach replied ${skipped} at ${index}`);
+        const replaced = await client.call(['EXPIRE', key, '200', 'XX']);
+        if (replaced !== 1) throw new Error(`expire-options XX replied ${replaced} at ${index}`);
+        const shortened = await client.call(['EXPIRE', key, '50', 'LT']);
+        if (shortened !== 1) throw new Error(`expire-options LT replied ${shortened} at ${index}`);
+        const extended = await client.call(['EXPIRE', key, '300', 'GT']);
+        if (extended !== 1) throw new Error(`expire-options GT replied ${extended} at ${index}`);
+        const remaining = await client.call(['TTL', key]);
+        if (remaining !== 300) throw new Error(`expire-options TTL replied ${remaining} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'expire-metadata',
+    scenario: 'redis-key-expire-metadata',
+    ops: COLL * 3,
+    params: { keys: String(COLL), commands: 'EXPIRETIME,PEXPIRETIME,TTL' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:expmeta');
+    },
+    async reset(ctx) {
+      // 每条命令都要求键带过期：上一轮可能已经过期，重新写入并挂 100 秒。
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['SET', `bench:expmeta:${index}`, VALUE, 'EX', '100']);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:expmeta:${index}`;
+        const seconds = await client.call(['EXPIRETIME', key]);
+        if (!Number.isInteger(seconds) || seconds <= 0) {
+          throw new Error(`expire-metadata EXPIRETIME replied ${seconds} at ${index}`);
+        }
+        const millis = await client.call(['PEXPIRETIME', key]);
+        if (!Number.isInteger(millis) || millis <= 0) {
+          throw new Error(`expire-metadata PEXPIRETIME replied ${millis} at ${index}`);
+        }
+        // 秒级预期值按毫秒余数四舍五入，两者允许相差不到一秒。
+        if (Math.abs(millis - seconds * 1000) >= 1000) {
+          throw new Error(`expire-metadata EXPIRETIME/PEXPIRETIME disagree ${seconds}/${millis} at ${index}`);
+        }
+        const ttl = await client.call(['TTL', key]);
+        if (!Number.isInteger(ttl) || ttl <= 0 || ttl > 100) {
+          throw new Error(`expire-metadata TTL replied ${ttl} at ${index}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'list-lpos',
+    scenario: 'redis-list-lpos',
+    ops: COLL * 4,
+    params: { elements: String(COLL), commands: 'LPOS,LPOS RANK -1,LPOS COUNT 2,LPOS miss' },
+    dataScale: `key=1,elements=${COLL}`,
+    async reset(ctx) {
+      const members = Array.from({ length: COLL }, (_, index) => `e${index}`);
+      await ctx.client.call(['DEL', 'bench:lpos']);
+      await ctx.client.call(['RPUSH', 'bench:lpos', ...members]);
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const member = `e${index}`;
+        const head = await client.call(['LPOS', 'bench:lpos', member]);
+        if (head !== index) throw new Error(`list-lpos head replied ${head} at ${index}`);
+        const tail = await client.call(['LPOS', 'bench:lpos', member, 'RANK', '-1']);
+        if (tail !== index) throw new Error(`list-lpos RANK -1 replied ${tail} at ${index}`);
+        const counted = await client.call(['LPOS', 'bench:lpos', member, 'COUNT', '2']);
+        if (!Array.isArray(counted) || counted.length !== 1 || counted[0] !== index) {
+          throw new Error(`list-lpos COUNT replied ${JSON.stringify(counted)} at ${index}`);
+        }
+        const miss = await client.call(['LPOS', 'bench:lpos', 'missing-member']);
+        if (miss !== null) throw new Error(`list-lpos miss replied ${miss} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'copy-renamenx',
+    scenario: 'redis-key-copy-renamenx',
+    ops: COLL * 2,
+    params: { keys: String(COLL), commands: 'COPY,RENAMENX' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:csrc');
+    },
+    async reset(ctx) {
+      const stale = [];
+      for (let index = 0; index < COLL; index += 1) {
+        stale.push(`bench:ccopy:${index}`, `bench:cmove:${index}`);
+      }
+      await ctx.client.call(['DEL', ...stale]);
+      await preload(ctx, COLL, 'bench:csrc');
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const copied = await client.call(['COPY', `bench:csrc:${index}`, `bench:ccopy:${index}`]);
+        if (copied !== 1) throw new Error(`copy-renamenx COPY replied ${copied} at ${index}`);
+        const moved = await client.call(['RENAMENX', `bench:csrc:${index}`, `bench:cmove:${index}`]);
+        if (moved !== 1) throw new Error(`copy-renamenx RENAMENX replied ${moved} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'object-encoding',
+    scenario: 'redis-object-inspect',
+    ops: COLL * 3,
+    params: { keys: String(COLL), commands: 'OBJECT ENCODING,OBJECT REFCOUNT,OBJECT IDLETIME' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      await preload(ctx, COLL, 'bench:object');
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:object:${index}`;
+        const encoding = await client.call(['OBJECT', 'ENCODING', key]);
+        // 键名加 64 字节值超过 41 字节阈值，真机同样报告 `raw`。
+        if (encoding !== 'raw') throw new Error(`object-encoding replied ${encoding} at ${index}`);
+        const references = await client.call(['OBJECT', 'REFCOUNT', key]);
+        if (references !== 1) throw new Error(`object-encoding REFCOUNT replied ${references} at ${index}`);
+        const idle = await client.call(['OBJECT', 'IDLETIME', key]);
+        if (!(typeof idle === 'number' && idle >= 0)) {
+          throw new Error(`object-encoding IDLETIME replied ${idle} at ${index}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'hash-hincrbyfloat',
+    scenario: 'redis-hash-hincrbyfloat',
+    ops: COLL * 2,
+    params: { fields: String(COLL), commands: 'HINCRBYFLOAT 0.1,HINCRBYFLOAT 0.2' },
+    dataScale: `key=1,fields=${COLL}`,
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:hfloat']);
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        await client.call(['HINCRBYFLOAT', 'bench:hfloat', `f${index}`, '0.1']);
+      }
+      let last = null;
+      for (let index = 0; index < COLL; index += 1) {
+        last = await client.call(['HINCRBYFLOAT', 'bench:hfloat', `f${index}`, '0.2']);
+      }
+      // 十进制语义：0.1 + 0.2 必须回 `0.3`，不是二进制浮点的尾数。
+      if (last !== '0.3') throw new Error(`hash-hincrbyfloat replied ${last}, expected 0.3`);
+    },
+  },
+  {
+    name: 'list-lset-lrem',
+    scenario: 'redis-list-lset-lrem',
+    ops: COLL + 2,
+    params: { members: String(COLL), commands: 'LSET,LREM,LLEN' },
+    dataScale: `key=1,members=${COLL}`,
+    async reset(ctx) {
+      const members = Array.from({ length: COLL }, (_, index) => `m${index}`);
+      await ctx.client.call(['DEL', 'bench:lset']);
+      await ctx.client.call(['RPUSH', 'bench:lset', ...members]);
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        await client.call(['LSET', 'bench:lset', String(index), `s${index}`]);
+      }
+      const removed = await client.call(['LREM', 'bench:lset', '0', 's0']);
+      if (removed !== 1) throw new Error(`list-lset-lrem LREM replied ${removed}`);
+      const length = await client.call(['LLEN', 'bench:lset']);
+      if (length !== COLL - 1) throw new Error(`list-lset-lrem LLEN replied ${length}, expected ${COLL - 1}`);
+    },
+  },
+  {
     name: 'connect',
     scenario: 'redis-connect-open-close',
     ops: CONNECT_COUNT,
