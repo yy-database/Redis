@@ -1617,6 +1617,75 @@ const workloads = [
     },
   },
   {
+    name: 'setnx-getset',
+    scenario: 'redis-string-setnx-getset',
+    ops: COLL * 2,
+    params: { keys: String(COLL), commands: 'SETNX,GETSET', value_bytes: '64' },
+    dataScale: `keys=${COLL}`,
+    async reset(ctx) {
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['DEL', `bench:setnx:${index}`]);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:setnx:${index}`;
+        const created = await client.call(['SETNX', key, VALUE]);
+        if (created !== 1) throw new Error(`setnx-getset SETNX replied ${created} at ${index}`);
+        const previous = await client.call(['GETSET', key, VALUE]);
+        if (previous !== VALUE) throw new Error(`setnx-getset GETSET lost the value at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'smove-spop',
+    scenario: 'redis-set-smove-spop',
+    ops: COLL * 2,
+    params: { members: String(COLL), commands: 'SMOVE,SPOP' },
+    dataScale: `keys=2,members=${COLL}`,
+    async reset(ctx) {
+      const members = Array.from({ length: COLL }, (_, index) => `m${index}`);
+      await ctx.client.call(['DEL', 'bench:smovesrc', 'bench:smovedst']);
+      await ctx.client.call(['SADD', 'bench:smovesrc', ...members]);
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const moved = await client.call(['SMOVE', 'bench:smovesrc', 'bench:smovedst', `m${index}`]);
+        if (moved !== 1) throw new Error(`smove-spop SMOVE replied ${moved} at ${index}`);
+        const popped = await client.call(['SPOP', 'bench:smovedst']);
+        if (popped !== `m${index}`) throw new Error(`smove-spop SPOP replied ${popped} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'zrangestore-zdiff',
+    scenario: 'redis-zset-zrangestore-zdiff',
+    ops: COLL * 2,
+    params: { members: String(COLL), commands: 'ZRANGESTORE,ZDIFF' },
+    dataScale: `keys=3,members=${COLL}`,
+    async reset(ctx) {
+      const left = [];
+      const right = [];
+      for (let index = 0; index < COLL; index += 1) {
+        left.push(String(index), `m${index}`);
+        if (index % 2 === 0) right.push(String(index), `m${index}`);
+      }
+      await ctx.client.call(['DEL', 'bench:zsrc', 'bench:zother', 'bench:zdst']);
+      await ctx.client.call(['ZADD', 'bench:zsrc', ...left]);
+      await ctx.client.call(['ZADD', 'bench:zother', ...right]);
+    },
+    async run({ client }) {
+      const stored = await client.call(['ZRANGESTORE', 'bench:zdst', 'bench:zsrc', '0', '-1']);
+      if (stored !== COLL) throw new Error(`zrangestore-zdiff ZRANGESTORE replied ${stored}`);
+      // `WITHSCORES` is not served by the zset facade yet, so the row counts
+      // members only; the difference itself must still drop every even member.
+      const diff = await client.call(['ZDIFF', '2', 'bench:zsrc', 'bench:zother']);
+      if (!Array.isArray(diff) || diff.length !== Math.floor(COLL / 2)) {
+        throw new Error(`zrangestore-zdiff ZDIFF replied ${Array.isArray(diff) ? diff.length : diff} items`);
+      }
+    },
+  },
+  {
     name: 'connect',
     scenario: 'redis-connect-open-close',
     ops: CONNECT_COUNT,

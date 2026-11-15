@@ -122,6 +122,9 @@ stable scenario id, so runs can be compared across revisions:
 | `bit-ops` | `redis-string-bitfield-ops` | `SETBIT` + `GETBIT` + `BITCOUNT` + `BITPOS` per key |
 | `setrange-getrange` | `redis-string-setrange-getrange` | `SETRANGE` + `GETRANGE` per key |
 | `rename-unlink` | `redis-key-rename-unlink` | `RENAME` then `UNLINK` per key |
+| `setnx-getset` | `redis-string-setnx-getset` | `SETNX` then `GETSET` per key |
+| `smove-spop` | `redis-set-smove-spop` | `SMOVE` between two sets then `SPOP` |
+| `zrangestore-zdiff` | `redis-zset-zrangestore-zdiff` | `ZRANGESTORE` a range then `ZDIFF` two sets |
 | `ping` | `redis-ping-rtt` | awaited `PING` round-trips |
 | `connect` | `redis-connect-open-close` | establish + readiness `PING` + close |
 

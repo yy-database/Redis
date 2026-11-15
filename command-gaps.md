@@ -60,6 +60,11 @@ non-blocking form, with the wait loop staying in the planner.
 `ZADD` owns its option grammar upstream: `NX` / `XX` / `GT` / `LT` / `CH` /
 `INCR` and their mutual exclusions, including the single-pair rule for `INCR`.
 
+`ZDIFF ... WITHSCORES` is the one open divergence: the planner forwards the flag
+unchanged, but the pinned `database-server` revision replies members only. The
+benchmark row therefore counts members without `WITHSCORES`. Closing this needs
+only a pin refresh, not a code change here.
+
 ## Storage revision drift
 
 `.yykv` records carry a per-record revision counter taken from `next_revision`.

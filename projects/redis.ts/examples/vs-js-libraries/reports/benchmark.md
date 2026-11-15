@@ -12,7 +12,7 @@ Stats: median/p95/min/max/rounds come from `database.harness::summarize` via `be
 - `node_version`: `v24.18.0`
 - `rustc_version`: `rustc 1.101.0-nightly (1c3a65069 2026-11-02)`
 - `target_triple`: `x86_64-pc-windows-msvc`
-- `rev`: `eff6e2d5a8e965c1d6b80ac6d20ce50eae35eb5b`
+- `rev`: `753c2d3d64f1e193bb5074339d04960a2773e396`
 - `plan`: `rounds=1, warmup=1`
 - host: `win32-x64`
 - oracle: unavailable on this host (see limitation below)
@@ -83,211 +83,223 @@ Stats: median/p95/min/max/rounds come from `database.harness::summarize` via `be
 | `bit-ops` | `redis-string-bitfield-ops` | 800 | {"keys":"200","commands":"SETBIT,GETBIT,BITCOUNT,BITPOS"} |
 | `setrange-getrange` | `redis-string-setrange-getrange` | 400 | {"keys":"200","chunk_bytes":"8"} |
 | `rename-unlink` | `redis-key-rename-unlink` | 400 | {"keys":"200","commands":"RENAME,UNLINK"} |
+| `setnx-getset` | `redis-string-setnx-getset` | 400 | {"keys":"200","commands":"SETNX,GETSET","value_bytes":"64"} |
+| `smove-spop` | `redis-set-smove-spop` | 400 | {"members":"200","commands":"SMOVE,SPOP"} |
+| `zrangestore-zdiff` | `redis-zset-zrangestore-zdiff` | 400 | {"members":"200","commands":"ZRANGESTORE,ZDIFF"} |
 | `connect` | `redis-connect-open-close` | 50 | {"opens":"50","probe":"PING"} |
 
 ## Relative to `ioredis`
 
 | Workload | ioredis | @yydb/redis | node-redis |
 |---------:|-------:|-------:|-------:|
-| get-seq | 1.00x | **0.98x** | 1.18x |
-| set-seq | 1.00x | **0.88x** | 1.08x |
-| mset-seq | 1.00x | 1.11x | **0.97x** |
-| incr-seq | **1.00x** | 1.02x | 1.09x |
-| set-pipeline | **1.00x** | 1.01x | 1.84x |
-| get-pipeline | 1.00x | **0.96x** | 4.09x |
-| pipeline-mixed | 1.00x | **0.99x** | 1.39x |
-| hash-hset-hget | 1.00x | **0.97x** | 1.07x |
-| hash-setnx-hrandfield | **1.00x** | 1.03x | 1.36x |
-| list-rpush-lrange | 1.00x | **0.84x** | 0.94x |
-| set-sadd-smembers | **1.00x** | 1.08x | 1.18x |
-| zset-zadd-zrange | 1.00x | 1.40x | **0.83x** |
-| streams-xadd-xrange | **1.00x** | 1.00x | 1.05x |
-| pubsub-roundtrip | 1.00x | **0.90x** | 1.02x |
-| blpop-roundtrip | 1.00x | 1.03x | **1.00x** |
-| scan-full | 1.00x | **0.98x** | 1.13x |
-| ping-concurrent | **1.00x** | 1.06x | 1.66x |
-| stream-group | 1.00x | **0.96x** | 1.12x |
-| ttl-setex-expire | **1.00x** | 1.01x | 1.00x |
-| multi-exec | **1.00x** | 1.14x | 1.18x |
-| mget-seq | **1.00x** | 1.26x | 1.49x |
-| append-getrange | **1.00x** | 1.05x | 1.24x |
-| getdel-getex | 1.00x | **0.78x** | 0.92x |
-| set-options | 1.00x | 1.09x | **0.97x** |
-| exists-type | **1.00x** | 1.06x | 1.20x |
-| expire-persist | 1.00x | **0.97x** | 1.06x |
-| hash-hgetall-hdel | **1.00x** | 1.10x | 1.08x |
-| hash-keys-values | **1.00x** | 1.10x | 1.13x |
-| list-lpush-lpop | 1.00x | **0.99x** | 1.11x |
-| set-algebra | 1.00x | **0.80x** | 0.94x |
-| set-membership-ops | **1.00x** | 1.13x | 1.01x |
-| zset-pop-ops | 1.00x | **0.75x** | 2.89x |
-| zset-range-queries | 1.00x | 2.15x | **0.97x** |
-| large-collection-read | 1.00x | **0.81x** | 0.93x |
-| large-hash-list-read | 1.00x | **0.64x** | 0.70x |
-| resp3-hello | 1.00x | **0.61x** | 0.72x |
-| expire-sweep | **1.00x** | 1.04x | 1.14x |
-| multi-exec-mixed | 1.00x | 0.97x | **0.92x** |
-| pubsub-fanout | 1.00x | **0.93x** | 1.03x |
-| zset-score-ops | **1.00x** | 1.17x | 1.25x |
-| bitfield-ops | **1.00x** | 1.09x | 1.17x |
-| hll-ops | 1.00x | **0.98x** | 2.28x |
-| sort-ops | 1.00x | **0.63x** | 0.71x |
-| keys-random | **1.00x** | 1.03x | 1.11x |
-| stream-xread | **1.00x** | 1.02x | 1.20x |
-| stream-xadd-xread | **1.00x** | 1.05x | 1.04x |
-| hscan-cursor | 1.00x | **0.57x** | 1.04x |
-| sscan-zscan-cursor | **1.00x** | 1.30x | 1.20x |
-| set-ops-large | 1.00x | **0.96x** | 0.98x |
-| lmpop-blocking | **1.00x** | 1.07x | 1.01x |
-| key-space-notify | 1.00x | **0.98x** | 1.00x |
-| resp3-collections | 1.00x | 0.92x | **0.88x** |
-| server-face-ops | 1.00x | 0.96x | **0.85x** |
-| watch-exec | **1.00x** | 1.15x | 1.13x |
-| set-big | **1.00x** | 1.13x | 1.60x |
-| get-big | 1.00x | **0.55x** | 0.68x |
-| del-seq | **1.00x** | 1.14x | 1.03x |
-| move-seq | **1.00x** | 1.10x | 1.07x |
-| ping | **1.00x** | 1.11x | 1.22x |
-| bit-ops | **1.00x** | 1.01x | 1.29x |
-| setrange-getrange | **1.00x** | 1.14x | 1.15x |
-| rename-unlink | 1.00x | 1.14x | **0.93x** |
-| connect | 1.00x | **0.29x** | 0.64x |
+| get-seq | 1.00x | **0.79x** | 1.35x |
+| set-seq | 1.00x | **0.70x** | 1.91x |
+| mset-seq | 1.00x | 1.10x | **0.99x** |
+| incr-seq | 1.00x | 0.63x | **0.40x** |
+| set-pipeline | 1.00x | 1.26x | **0.97x** |
+| get-pipeline | 1.00x | **0.76x** | 1.58x |
+| pipeline-mixed | 1.00x | **0.71x** | 0.84x |
+| hash-hset-hget | **1.00x** | 2.67x | 2.48x |
+| hash-setnx-hrandfield | 1.00x | **0.98x** | 2.95x |
+| list-rpush-lrange | 1.00x | **0.53x** | 0.76x |
+| set-sadd-smembers | 1.00x | **0.87x** | 1.04x |
+| zset-zadd-zrange | **1.00x** | 3.25x | 2.75x |
+| streams-xadd-xrange | **1.00x** | 1.34x | 1.57x |
+| pubsub-roundtrip | 1.00x | 0.62x | **0.61x** |
+| blpop-roundtrip | 1.00x | 0.54x | **0.51x** |
+| scan-full | 1.00x | 0.53x | **0.52x** |
+| ping-concurrent | 1.00x | **0.95x** | 1.46x |
+| stream-group | 1.00x | **0.81x** | 0.88x |
+| ttl-setex-expire | **1.00x** | 1.02x | 1.00x |
+| multi-exec | **1.00x** | 1.02x | 1.10x |
+| mget-seq | **1.00x** | 1.50x | 1.41x |
+| append-getrange | 1.00x | 1.05x | **0.94x** |
+| getdel-getex | **1.00x** | 1.03x | 1.40x |
+| set-options | 1.00x | **0.86x** | 1.07x |
+| exists-type | 1.00x | **0.82x** | 1.17x |
+| expire-persist | 1.00x | **0.95x** | 1.28x |
+| hash-hgetall-hdel | 1.00x | 0.89x | **0.82x** |
+| hash-keys-values | 1.00x | **0.83x** | 1.23x |
+| list-lpush-lpop | 1.00x | **0.84x** | 1.15x |
+| set-algebra | 1.00x | **0.77x** | 1.00x |
+| set-membership-ops | 1.00x | 1.65x | **0.88x** |
+| zset-pop-ops | 1.00x | **0.55x** | 0.66x |
+| zset-range-queries | 1.00x | **0.71x** | 0.80x |
+| large-collection-read | 1.00x | **0.50x** | 1.18x |
+| large-hash-list-read | 1.00x | **0.49x** | 0.54x |
+| resp3-hello | 1.00x | **0.88x** | 1.23x |
+| expire-sweep | 1.00x | **0.90x** | 0.93x |
+| multi-exec-mixed | **1.00x** | 1.16x | 1.04x |
+| pubsub-fanout | 1.00x | **0.67x** | 0.84x |
+| zset-score-ops | **1.00x** | 1.06x | 1.20x |
+| bitfield-ops | 1.00x | **0.75x** | 0.99x |
+| hll-ops | 1.00x | **0.93x** | 1.07x |
+| sort-ops | 1.00x | 1.10x | **0.96x** |
+| keys-random | 1.00x | **0.98x** | 0.99x |
+| stream-xread | **1.00x** | 1.02x | 1.32x |
+| stream-xadd-xread | **1.00x** | 1.11x | 1.12x |
+| hscan-cursor | 1.00x | **0.67x** | 1.58x |
+| sscan-zscan-cursor | 1.00x | **0.73x** | 0.97x |
+| set-ops-large | 1.00x | **0.94x** | 0.95x |
+| lmpop-blocking | 1.00x | 1.04x | **0.99x** |
+| key-space-notify | 1.00x | **1.00x** | 1.02x |
+| resp3-collections | 1.00x | **0.73x** | 0.78x |
+| server-face-ops | **1.00x** | 1.10x | 1.51x |
+| watch-exec | 1.00x | 0.90x | **0.84x** |
+| set-big | **1.00x** | 1.68x | 2.87x |
+| get-big | 1.00x | **0.54x** | 1.33x |
+| del-seq | 1.00x | **0.78x** | 1.17x |
+| move-seq | 1.00x | **0.85x** | 0.99x |
+| ping | 1.00x | **0.98x** | 1.19x |
+| bit-ops | **1.00x** | 1.27x | 1.13x |
+| setrange-getrange | 1.00x | **0.71x** | 0.95x |
+| rename-unlink | 1.00x | **0.94x** | 1.14x |
+| setnx-getset | 1.00x | **0.93x** | 1.02x |
+| smove-spop | 1.00x | **0.75x** | 0.85x |
+| zrangestore-zdiff | 1.00x | 0.60x | **0.56x** |
+| connect | 1.00x | **0.35x** | 0.92x |
 
 ## Median and p95 (ms)
 
 | Workload | ops | ioredis med | ioredis p95 | @yydb/redis med | @yydb/redis p95 | node-redis med | node-redis p95 |
 |---------:|----:|-------:|-------:|-------:|-------:|-------:|-------:|
-| get-seq | 500 | 43.91 | 43.91 | 42.91 | 42.91 | 51.83 | 51.83 |
-| set-seq | 100 | 11.44 | 11.44 | 10.01 | 10.01 | 12.29 | 12.29 |
-| mset-seq | 500 | 6.54 | 6.54 | 7.26 | 7.26 | 6.38 | 6.38 |
-| incr-seq | 500 | 45.33 | 45.33 | 46.36 | 46.36 | 49.49 | 49.49 |
-| set-pipeline | 500 | 14.35 | 14.35 | 14.51 | 14.51 | 26.45 | 26.45 |
-| get-pipeline | 500 | 9.64 | 9.64 | 9.21 | 9.21 | 39.37 | 39.37 |
-| pipeline-mixed | 500 | 20.78 | 20.78 | 20.55 | 20.55 | 28.96 | 28.96 |
-| hash-hset-hget | 401 | 70.46 | 70.46 | 68.17 | 68.17 | 75.33 | 75.33 |
-| hash-setnx-hrandfield | 402 | 32.13 | 32.13 | 33.16 | 33.16 | 43.65 | 43.65 |
-| list-rpush-lrange | 202 | 33.63 | 33.63 | 28.30 | 28.30 | 31.68 | 31.68 |
-| set-sadd-smembers | 202 | 26.76 | 26.76 | 28.91 | 28.91 | 31.64 | 31.64 |
-| zset-zadd-zrange | 202 | 35.27 | 35.27 | 49.52 | 49.52 | 29.23 | 29.23 |
-| streams-xadd-xrange | 202 | 42.29 | 42.29 | 42.31 | 42.31 | 44.24 | 44.24 |
-| pubsub-roundtrip | 100 | 14.69 | 14.69 | 13.23 | 13.23 | 15.01 | 15.01 |
-| blpop-roundtrip | 100 | 32.62 | 32.62 | 33.74 | 33.74 | 32.51 | 32.51 |
-| scan-full | 200 | 5.39 | 5.39 | 5.30 | 5.30 | 6.09 | 6.09 |
-| ping-concurrent | 800 | 40.45 | 40.45 | 42.87 | 42.87 | 66.98 | 66.98 |
-| stream-group | 300 | 65.24 | 65.24 | 62.95 | 62.95 | 72.97 | 72.97 |
-| ttl-setex-expire | 90 | 1114.70 | 1114.70 | 1124.20 | 1124.20 | 1116.12 | 1116.12 |
-| multi-exec | 102 | 18.26 | 18.26 | 20.74 | 20.74 | 21.59 | 21.59 |
-| mget-seq | 200 | 1.30 | 1.30 | 1.65 | 1.65 | 1.95 | 1.95 |
-| append-getrange | 201 | 26.99 | 26.99 | 28.21 | 28.21 | 33.44 | 33.44 |
-| getdel-getex | 400 | 79.03 | 79.03 | 61.79 | 61.79 | 72.47 | 72.47 |
-| set-options | 400 | 75.04 | 75.04 | 81.77 | 81.77 | 73.14 | 73.14 |
-| exists-type | 400 | 46.89 | 46.89 | 49.82 | 49.82 | 56.27 | 56.27 |
-| expire-persist | 600 | 79.66 | 79.66 | 77.15 | 77.15 | 84.41 | 84.41 |
-| hash-hgetall-hdel | 202 | 3.75 | 3.75 | 4.13 | 4.13 | 4.03 | 4.03 |
-| hash-keys-values | 40 | 15.43 | 15.43 | 16.92 | 16.92 | 17.45 | 17.45 |
-| list-lpush-lpop | 400 | 87.07 | 87.07 | 85.94 | 85.94 | 96.22 | 96.22 |
-| set-algebra | 30 | 32.56 | 32.56 | 26.16 | 26.16 | 30.68 | 30.68 |
-| set-membership-ops | 30 | 24.69 | 24.69 | 27.99 | 27.99 | 24.86 | 24.86 |
-| zset-pop-ops | 4 | 3.31 | 3.31 | 2.47 | 2.47 | 9.55 | 9.55 |
-| zset-range-queries | 40 | 14.15 | 14.15 | 30.46 | 30.46 | 13.70 | 13.70 |
-| large-collection-read | 20 | 56.76 | 56.76 | 46.09 | 46.09 | 53.01 | 53.01 |
-| large-hash-list-read | 20 | 76.67 | 76.67 | 49.01 | 49.01 | 53.99 | 53.99 |
-| resp3-hello | 40 | 13.46 | 13.46 | 8.26 | 8.26 | 9.68 | 9.68 |
-| expire-sweep | 1002 | 311.34 | 311.34 | 324.71 | 324.71 | 355.35 | 355.35 |
-| multi-exec-mixed | 102 | 24.84 | 24.84 | 24.11 | 24.11 | 22.91 | 22.91 |
-| pubsub-fanout | 400 | 38.97 | 38.97 | 36.20 | 36.20 | 39.95 | 39.95 |
-| zset-score-ops | 600 | 126.39 | 126.39 | 147.94 | 147.94 | 158.51 | 158.51 |
-| bitfield-ops | 201 | 32.79 | 32.79 | 35.78 | 35.78 | 38.40 | 38.40 |
-| hll-ops | 201 | 29.38 | 29.38 | 28.82 | 28.82 | 67.12 | 67.12 |
-| sort-ops | 10 | 8.70 | 8.70 | 5.51 | 5.51 | 6.18 | 6.18 |
-| keys-random | 30 | 83.07 | 83.07 | 85.22 | 85.22 | 91.93 | 91.93 |
-| stream-xread | 10 | 51.94 | 51.94 | 53.13 | 53.13 | 62.34 | 62.34 |
-| stream-xadd-xread | 202 | 62.43 | 62.43 | 65.61 | 65.61 | 64.67 | 64.67 |
-| hscan-cursor | 200 | 3.65 | 3.65 | 2.09 | 2.09 | 3.82 | 3.82 |
-| sscan-zscan-cursor | 400 | 4.32 | 4.32 | 5.63 | 5.63 | 5.19 | 5.19 |
-| set-ops-large | 30 | 1002.36 | 1002.36 | 962.31 | 962.31 | 985.81 | 985.81 |
-| lmpop-blocking | 100 | 35.33 | 35.33 | 37.74 | 37.74 | 35.85 | 35.85 |
-| key-space-notify | 30 | 108.96 | 108.96 | 107.14 | 107.14 | 108.45 | 108.45 |
-| resp3-collections | 40 | 29.95 | 29.95 | 27.43 | 27.43 | 26.41 | 26.41 |
-| server-face-ops | 40 | 9.10 | 9.10 | 8.72 | 8.72 | 7.73 | 7.73 |
-| watch-exec | 40 | 6.51 | 6.51 | 7.46 | 7.46 | 7.33 | 7.33 |
-| set-big | 20 | 10.71 | 10.71 | 12.11 | 12.11 | 17.18 | 17.18 |
-| get-big | 50 | 44.67 | 44.67 | 24.60 | 24.60 | 30.45 | 30.45 |
-| del-seq | 200 | 27.96 | 27.96 | 31.92 | 31.92 | 28.68 | 28.68 |
-| move-seq | 200 | 57.37 | 57.37 | 63.37 | 63.37 | 61.62 | 61.62 |
-| ping | 1000 | 113.46 | 113.46 | 125.57 | 125.57 | 138.97 | 138.97 |
-| bit-ops | 800 | 107.19 | 107.19 | 108.72 | 108.72 | 137.82 | 137.82 |
-| setrange-getrange | 400 | 63.55 | 63.55 | 72.28 | 72.28 | 73.32 | 73.32 |
-| rename-unlink | 400 | 87.29 | 87.29 | 99.14 | 99.14 | 80.76 | 80.76 |
-| connect | 50 | 106.71 | 106.71 | 31.37 | 31.37 | 68.67 | 68.67 |
+| get-seq | 500 | 23.53 | 23.53 | 18.66 | 18.66 | 31.75 | 31.75 |
+| set-seq | 100 | 7.75 | 7.75 | 5.43 | 5.43 | 14.83 | 14.83 |
+| mset-seq | 500 | 6.58 | 6.58 | 7.25 | 7.25 | 6.50 | 6.50 |
+| incr-seq | 500 | 80.56 | 80.56 | 51.09 | 51.09 | 32.03 | 32.03 |
+| set-pipeline | 500 | 8.47 | 8.47 | 10.68 | 10.68 | 8.24 | 8.24 |
+| get-pipeline | 500 | 6.03 | 6.03 | 4.60 | 4.60 | 9.54 | 9.54 |
+| pipeline-mixed | 500 | 11.20 | 11.20 | 7.94 | 7.94 | 9.42 | 9.42 |
+| hash-hset-hget | 401 | 27.49 | 27.49 | 73.35 | 73.35 | 68.10 | 68.10 |
+| hash-setnx-hrandfield | 402 | 13.23 | 13.23 | 12.95 | 12.95 | 38.99 | 38.99 |
+| list-rpush-lrange | 202 | 20.46 | 20.46 | 10.95 | 10.95 | 15.50 | 15.50 |
+| set-sadd-smembers | 202 | 10.37 | 10.37 | 9.00 | 9.00 | 10.75 | 10.75 |
+| zset-zadd-zrange | 202 | 11.71 | 11.71 | 38.01 | 38.01 | 32.16 | 32.16 |
+| streams-xadd-xrange | 202 | 56.72 | 56.72 | 75.93 | 75.93 | 88.90 | 88.90 |
+| pubsub-roundtrip | 100 | 22.20 | 22.20 | 13.68 | 13.68 | 13.44 | 13.44 |
+| blpop-roundtrip | 100 | 27.79 | 27.79 | 15.09 | 15.09 | 14.30 | 14.30 |
+| scan-full | 200 | 3.62 | 3.62 | 1.93 | 1.93 | 1.87 | 1.87 |
+| ping-concurrent | 800 | 22.13 | 22.13 | 20.96 | 20.96 | 32.22 | 32.22 |
+| stream-group | 300 | 44.32 | 44.32 | 35.97 | 35.97 | 39.05 | 39.05 |
+| ttl-setex-expire | 90 | 1112.48 | 1112.48 | 1132.29 | 1132.29 | 1117.34 | 1117.34 |
+| multi-exec | 102 | 9.23 | 9.23 | 9.43 | 9.43 | 10.18 | 10.18 |
+| mget-seq | 200 | 0.72 | 0.72 | 1.08 | 1.08 | 1.02 | 1.02 |
+| append-getrange | 201 | 19.69 | 19.69 | 20.73 | 20.73 | 18.58 | 18.58 |
+| getdel-getex | 400 | 30.43 | 30.43 | 31.27 | 31.27 | 42.72 | 42.72 |
+| set-options | 400 | 53.59 | 53.59 | 46.29 | 46.29 | 57.60 | 57.60 |
+| exists-type | 400 | 34.47 | 34.47 | 28.38 | 28.38 | 40.34 | 40.34 |
+| expire-persist | 600 | 46.71 | 46.71 | 44.26 | 44.26 | 59.69 | 59.69 |
+| hash-hgetall-hdel | 202 | 2.98 | 2.98 | 2.65 | 2.65 | 2.46 | 2.46 |
+| hash-keys-values | 40 | 8.95 | 8.95 | 7.45 | 7.45 | 11.03 | 11.03 |
+| list-lpush-lpop | 400 | 48.04 | 48.04 | 40.40 | 40.40 | 55.42 | 55.42 |
+| set-algebra | 30 | 13.88 | 13.88 | 10.64 | 10.64 | 13.91 | 13.91 |
+| set-membership-ops | 30 | 17.29 | 17.29 | 28.54 | 28.54 | 15.23 | 15.23 |
+| zset-pop-ops | 4 | 2.96 | 2.96 | 1.62 | 1.62 | 1.95 | 1.95 |
+| zset-range-queries | 40 | 9.22 | 9.22 | 6.54 | 6.54 | 7.33 | 7.33 |
+| large-collection-read | 20 | 37.05 | 37.05 | 18.47 | 18.47 | 43.58 | 43.58 |
+| large-hash-list-read | 20 | 46.08 | 46.08 | 22.80 | 22.80 | 24.96 | 24.96 |
+| resp3-hello | 40 | 5.63 | 5.63 | 4.98 | 4.98 | 6.91 | 6.91 |
+| expire-sweep | 1002 | 290.49 | 290.49 | 262.34 | 262.34 | 268.91 | 268.91 |
+| multi-exec-mixed | 102 | 9.98 | 9.98 | 11.53 | 11.53 | 10.35 | 10.35 |
+| pubsub-fanout | 400 | 26.45 | 26.45 | 17.63 | 17.63 | 22.09 | 22.09 |
+| zset-score-ops | 600 | 60.98 | 60.98 | 64.74 | 64.74 | 73.46 | 73.46 |
+| bitfield-ops | 201 | 21.06 | 21.06 | 15.81 | 15.81 | 20.81 | 20.81 |
+| hll-ops | 201 | 18.89 | 18.89 | 17.65 | 17.65 | 20.17 | 20.17 |
+| sort-ops | 10 | 2.27 | 2.27 | 2.50 | 2.50 | 2.18 | 2.18 |
+| keys-random | 30 | 36.04 | 36.04 | 35.46 | 35.46 | 35.78 | 35.78 |
+| stream-xread | 10 | 18.57 | 18.57 | 18.92 | 18.92 | 24.43 | 24.43 |
+| stream-xadd-xread | 202 | 29.34 | 29.34 | 32.50 | 32.50 | 32.72 | 32.72 |
+| hscan-cursor | 200 | 0.98 | 0.98 | 0.66 | 0.66 | 1.54 | 1.54 |
+| sscan-zscan-cursor | 400 | 1.76 | 1.76 | 1.29 | 1.29 | 1.71 | 1.71 |
+| set-ops-large | 30 | 267.03 | 267.03 | 249.84 | 249.84 | 253.27 | 253.27 |
+| lmpop-blocking | 100 | 14.76 | 14.76 | 15.41 | 15.41 | 14.63 | 14.63 |
+| key-space-notify | 30 | 107.03 | 107.03 | 106.76 | 106.76 | 109.54 | 109.54 |
+| resp3-collections | 40 | 12.53 | 12.53 | 9.15 | 9.15 | 9.73 | 9.73 |
+| server-face-ops | 40 | 3.62 | 3.62 | 3.97 | 3.97 | 5.45 | 5.45 |
+| watch-exec | 40 | 4.16 | 4.16 | 3.76 | 3.76 | 3.51 | 3.51 |
+| set-big | 20 | 6.53 | 6.53 | 10.95 | 10.95 | 18.77 | 18.77 |
+| get-big | 50 | 30.43 | 30.43 | 16.51 | 16.51 | 40.35 | 40.35 |
+| del-seq | 200 | 17.26 | 17.26 | 13.39 | 13.39 | 20.21 | 20.21 |
+| move-seq | 200 | 27.04 | 27.04 | 22.88 | 22.88 | 26.66 | 26.66 |
+| ping | 1000 | 60.44 | 60.44 | 59.35 | 59.35 | 71.95 | 71.95 |
+| bit-ops | 800 | 63.86 | 63.86 | 80.96 | 80.96 | 72.20 | 72.20 |
+| setrange-getrange | 400 | 39.99 | 39.99 | 28.21 | 28.21 | 37.97 | 37.97 |
+| rename-unlink | 400 | 41.85 | 41.85 | 39.21 | 39.21 | 47.80 | 47.80 |
+| setnx-getset | 400 | 35.69 | 35.69 | 33.20 | 33.20 | 36.55 | 36.55 |
+| smove-spop | 400 | 48.39 | 48.39 | 36.44 | 36.44 | 41.27 | 41.27 |
+| zrangestore-zdiff | 400 | 0.84 | 0.84 | 0.50 | 0.50 | 0.47 | 0.47 |
+| connect | 50 | 69.49 | 69.49 | 24.27 | 24.27 | 63.80 | 63.80 |
 
 ## Per-op and throughput (median)
 
 | Workload | ioredis | @yydb/redis | node-redis |
 |---------:|--------:|--------:|--------:|
-| get-seq | 0.088 ms/op, 11,387/s | 0.086 ms/op, 11,652/s | 0.104 ms/op, 9,647/s |
-| set-seq | 0.114 ms/op, 8,744/s | 0.100 ms/op, 9,993/s | 0.123 ms/op, 8,134/s |
-| mset-seq | 0.013 ms/op, 76,405/s | 0.015 ms/op, 68,843/s | 0.013 ms/op, 78,408/s |
-| incr-seq | 0.091 ms/op, 11,031/s | 0.093 ms/op, 10,786/s | 0.099 ms/op, 10,103/s |
-| set-pipeline | 0.029 ms/op, 34,834/s | 0.029 ms/op, 34,457/s | 0.053 ms/op, 18,901/s |
-| get-pipeline | 0.019 ms/op, 51,886/s | 0.018 ms/op, 54,273/s | 0.079 ms/op, 12,701/s |
-| pipeline-mixed | 0.042 ms/op, 24,063/s | 0.041 ms/op, 24,334/s | 0.058 ms/op, 17,262/s |
-| hash-hset-hget | 0.176 ms/op, 5,691/s | 0.170 ms/op, 5,882/s | 0.188 ms/op, 5,323/s |
-| hash-setnx-hrandfield | 0.080 ms/op, 12,511/s | 0.082 ms/op, 12,123/s | 0.109 ms/op, 9,210/s |
-| list-rpush-lrange | 0.167 ms/op, 6,006/s | 0.140 ms/op, 7,138/s | 0.157 ms/op, 6,375/s |
-| set-sadd-smembers | 0.132 ms/op, 7,548/s | 0.143 ms/op, 6,986/s | 0.157 ms/op, 6,384/s |
-| zset-zadd-zrange | 0.175 ms/op, 5,727/s | 0.245 ms/op, 4,079/s | 0.145 ms/op, 6,911/s |
-| streams-xadd-xrange | 0.209 ms/op, 4,776/s | 0.209 ms/op, 4,774/s | 0.219 ms/op, 4,566/s |
-| pubsub-roundtrip | 0.147 ms/op, 6,810/s | 0.132 ms/op, 7,561/s | 0.150 ms/op, 6,663/s |
-| blpop-roundtrip | 0.326 ms/op, 3,065/s | 0.337 ms/op, 2,964/s | 0.325 ms/op, 3,076/s |
-| scan-full | 0.027 ms/op, 37,094/s | 0.027 ms/op, 37,720/s | 0.030 ms/op, 32,860/s |
-| ping-concurrent | 0.051 ms/op, 19,780/s | 0.054 ms/op, 18,659/s | 0.084 ms/op, 11,944/s |
-| stream-group | 0.217 ms/op, 4,598/s | 0.210 ms/op, 4,766/s | 0.243 ms/op, 4,111/s |
-| ttl-setex-expire | 12.386 ms/op, 81/s | 12.491 ms/op, 80/s | 12.401 ms/op, 81/s |
-| multi-exec | 0.179 ms/op, 5,586/s | 0.203 ms/op, 4,918/s | 0.212 ms/op, 4,724/s |
-| mget-seq | 0.007 ms/op, 153,304/s | 0.008 ms/op, 121,293/s | 0.010 ms/op, 102,596/s |
-| append-getrange | 0.134 ms/op, 7,446/s | 0.140 ms/op, 7,125/s | 0.166 ms/op, 6,010/s |
-| getdel-getex | 0.198 ms/op, 5,061/s | 0.154 ms/op, 6,473/s | 0.181 ms/op, 5,520/s |
-| set-options | 0.188 ms/op, 5,331/s | 0.204 ms/op, 4,892/s | 0.183 ms/op, 5,469/s |
-| exists-type | 0.117 ms/op, 8,531/s | 0.125 ms/op, 8,029/s | 0.141 ms/op, 7,108/s |
-| expire-persist | 0.133 ms/op, 7,532/s | 0.129 ms/op, 7,777/s | 0.141 ms/op, 7,109/s |
-| hash-hgetall-hdel | 0.019 ms/op, 53,885/s | 0.020 ms/op, 48,868/s | 0.020 ms/op, 50,125/s |
-| hash-keys-values | 0.386 ms/op, 2,593/s | 0.423 ms/op, 2,365/s | 0.436 ms/op, 2,292/s |
-| list-lpush-lpop | 0.218 ms/op, 4,594/s | 0.215 ms/op, 4,654/s | 0.241 ms/op, 4,157/s |
-| set-algebra | 1.085 ms/op, 921/s | 0.872 ms/op, 1,147/s | 1.023 ms/op, 978/s |
-| set-membership-ops | 0.823 ms/op, 1,215/s | 0.933 ms/op, 1,072/s | 0.829 ms/op, 1,207/s |
-| zset-pop-ops | 0.827 ms/op, 1,210/s | 0.619 ms/op, 1,616/s | 2.387 ms/op, 419/s |
-| zset-range-queries | 0.354 ms/op, 2,827/s | 0.761 ms/op, 1,313/s | 0.342 ms/op, 2,921/s |
-| large-collection-read | 2.838 ms/op, 352/s | 2.305 ms/op, 434/s | 2.650 ms/op, 377/s |
-| large-hash-list-read | 3.834 ms/op, 261/s | 2.451 ms/op, 408/s | 2.700 ms/op, 370/s |
-| resp3-hello | 0.336 ms/op, 2,972/s | 0.206 ms/op, 4,845/s | 0.242 ms/op, 4,131/s |
-| expire-sweep | 0.311 ms/op, 3,218/s | 0.324 ms/op, 3,086/s | 0.355 ms/op, 2,820/s |
-| multi-exec-mixed | 0.243 ms/op, 4,107/s | 0.236 ms/op, 4,230/s | 0.225 ms/op, 4,452/s |
-| pubsub-fanout | 0.097 ms/op, 10,263/s | 0.091 ms/op, 11,050/s | 0.100 ms/op, 10,011/s |
-| zset-score-ops | 0.211 ms/op, 4,747/s | 0.247 ms/op, 4,056/s | 0.264 ms/op, 3,785/s |
-| bitfield-ops | 0.163 ms/op, 6,131/s | 0.178 ms/op, 5,618/s | 0.191 ms/op, 5,234/s |
-| hll-ops | 0.146 ms/op, 6,840/s | 0.143 ms/op, 6,975/s | 0.334 ms/op, 2,995/s |
-| sort-ops | 0.870 ms/op, 1,150/s | 0.551 ms/op, 1,815/s | 0.618 ms/op, 1,619/s |
-| keys-random | 2.769 ms/op, 361/s | 2.841 ms/op, 352/s | 3.064 ms/op, 326/s |
-| stream-xread | 5.194 ms/op, 193/s | 5.313 ms/op, 188/s | 6.234 ms/op, 160/s |
-| stream-xadd-xread | 0.309 ms/op, 3,236/s | 0.325 ms/op, 3,079/s | 0.320 ms/op, 3,124/s |
-| hscan-cursor | 0.018 ms/op, 54,744/s | 0.010 ms/op, 95,675/s | 0.019 ms/op, 52,408/s |
-| sscan-zscan-cursor | 0.011 ms/op, 92,599/s | 0.014 ms/op, 70,992/s | 0.013 ms/op, 77,144/s |
-| set-ops-large | 33.412 ms/op, 30/s | 32.077 ms/op, 31/s | 32.860 ms/op, 30/s |
-| lmpop-blocking | 0.353 ms/op, 2,830/s | 0.377 ms/op, 2,650/s | 0.358 ms/op, 2,790/s |
-| key-space-notify | 3.632 ms/op, 275/s | 3.571 ms/op, 280/s | 3.615 ms/op, 277/s |
-| resp3-collections | 0.749 ms/op, 1,336/s | 0.686 ms/op, 1,458/s | 0.660 ms/op, 1,515/s |
-| server-face-ops | 0.228 ms/op, 4,396/s | 0.218 ms/op, 4,586/s | 0.193 ms/op, 5,174/s |
-| watch-exec | 0.163 ms/op, 6,145/s | 0.186 ms/op, 5,364/s | 0.183 ms/op, 5,455/s |
-| set-big | 0.536 ms/op, 1,867/s | 0.606 ms/op, 1,651/s | 0.859 ms/op, 1,164/s |
-| get-big | 0.893 ms/op, 1,119/s | 0.492 ms/op, 2,032/s | 0.609 ms/op, 1,642/s |
-| del-seq | 0.140 ms/op, 7,154/s | 0.160 ms/op, 6,265/s | 0.143 ms/op, 6,974/s |
-| move-seq | 0.287 ms/op, 3,486/s | 0.317 ms/op, 3,156/s | 0.308 ms/op, 3,246/s |
-| ping | 0.113 ms/op, 8,814/s | 0.126 ms/op, 7,964/s | 0.139 ms/op, 7,196/s |
-| bit-ops | 0.134 ms/op, 7,463/s | 0.136 ms/op, 7,358/s | 0.172 ms/op, 5,804/s |
-| setrange-getrange | 0.159 ms/op, 6,294/s | 0.181 ms/op, 5,534/s | 0.183 ms/op, 5,456/s |
-| rename-unlink | 0.218 ms/op, 4,583/s | 0.248 ms/op, 4,035/s | 0.202 ms/op, 4,953/s |
-| connect | 2.134 ms/op, 469/s | 0.627 ms/op, 1,594/s | 1.373 ms/op, 728/s |
+| get-seq | 0.047 ms/op, 21,249/s | 0.037 ms/op, 26,798/s | 0.063 ms/op, 15,750/s |
+| set-seq | 0.077 ms/op, 12,910/s | 0.054 ms/op, 18,422/s | 0.148 ms/op, 6,742/s |
+| mset-seq | 0.013 ms/op, 75,968/s | 0.014 ms/op, 68,983/s | 0.013 ms/op, 76,896/s |
+| incr-seq | 0.161 ms/op, 6,207/s | 0.102 ms/op, 9,786/s | 0.064 ms/op, 15,609/s |
+| set-pipeline | 0.017 ms/op, 59,063/s | 0.021 ms/op, 46,799/s | 0.016 ms/op, 60,686/s |
+| get-pipeline | 0.012 ms/op, 82,985/s | 0.009 ms/op, 108,703/s | 0.019 ms/op, 52,418/s |
+| pipeline-mixed | 0.022 ms/op, 44,636/s | 0.016 ms/op, 62,949/s | 0.019 ms/op, 53,106/s |
+| hash-hset-hget | 0.069 ms/op, 14,586/s | 0.183 ms/op, 5,467/s | 0.170 ms/op, 5,888/s |
+| hash-setnx-hrandfield | 0.033 ms/op, 30,380/s | 0.032 ms/op, 31,052/s | 0.097 ms/op, 10,310/s |
+| list-rpush-lrange | 0.101 ms/op, 9,871/s | 0.054 ms/op, 18,451/s | 0.077 ms/op, 13,032/s |
+| set-sadd-smembers | 0.051 ms/op, 19,480/s | 0.045 ms/op, 22,448/s | 0.053 ms/op, 18,783/s |
+| zset-zadd-zrange | 0.058 ms/op, 17,256/s | 0.188 ms/op, 5,314/s | 0.159 ms/op, 6,280/s |
+| streams-xadd-xrange | 0.281 ms/op, 3,562/s | 0.376 ms/op, 2,660/s | 0.440 ms/op, 2,272/s |
+| pubsub-roundtrip | 0.222 ms/op, 4,504/s | 0.137 ms/op, 7,310/s | 0.134 ms/op, 7,441/s |
+| blpop-roundtrip | 0.278 ms/op, 3,599/s | 0.151 ms/op, 6,626/s | 0.143 ms/op, 6,991/s |
+| scan-full | 0.018 ms/op, 55,218/s | 0.010 ms/op, 103,381/s | 0.009 ms/op, 106,826/s |
+| ping-concurrent | 0.028 ms/op, 36,156/s | 0.026 ms/op, 38,161/s | 0.040 ms/op, 24,832/s |
+| stream-group | 0.148 ms/op, 6,769/s | 0.120 ms/op, 8,340/s | 0.130 ms/op, 7,682/s |
+| ttl-setex-expire | 12.361 ms/op, 81/s | 12.581 ms/op, 79/s | 12.415 ms/op, 81/s |
+| multi-exec | 0.090 ms/op, 11,054/s | 0.092 ms/op, 10,818/s | 0.100 ms/op, 10,024/s |
+| mget-seq | 0.004 ms/op, 277,085/s | 0.005 ms/op, 184,758/s | 0.005 ms/op, 196,290/s |
+| append-getrange | 0.098 ms/op, 10,208/s | 0.103 ms/op, 9,698/s | 0.092 ms/op, 10,818/s |
+| getdel-getex | 0.076 ms/op, 13,144/s | 0.078 ms/op, 12,793/s | 0.107 ms/op, 9,363/s |
+| set-options | 0.134 ms/op, 7,464/s | 0.116 ms/op, 8,640/s | 0.144 ms/op, 6,944/s |
+| exists-type | 0.086 ms/op, 11,606/s | 0.071 ms/op, 14,097/s | 0.101 ms/op, 9,916/s |
+| expire-persist | 0.078 ms/op, 12,844/s | 0.074 ms/op, 13,557/s | 0.099 ms/op, 10,051/s |
+| hash-hgetall-hdel | 0.015 ms/op, 67,685/s | 0.013 ms/op, 76,169/s | 0.012 ms/op, 82,097/s |
+| hash-keys-values | 0.224 ms/op, 4,469/s | 0.186 ms/op, 5,371/s | 0.276 ms/op, 3,628/s |
+| list-lpush-lpop | 0.120 ms/op, 8,327/s | 0.101 ms/op, 9,900/s | 0.139 ms/op, 7,217/s |
+| set-algebra | 0.463 ms/op, 2,162/s | 0.355 ms/op, 2,819/s | 0.464 ms/op, 2,157/s |
+| set-membership-ops | 0.576 ms/op, 1,736/s | 0.951 ms/op, 1,051/s | 0.508 ms/op, 1,969/s |
+| zset-pop-ops | 0.740 ms/op, 1,351/s | 0.406 ms/op, 2,464/s | 0.486 ms/op, 2,056/s |
+| zset-range-queries | 0.230 ms/op, 4,340/s | 0.164 ms/op, 6,113/s | 0.183 ms/op, 5,458/s |
+| large-collection-read | 1.852 ms/op, 540/s | 0.924 ms/op, 1,083/s | 2.179 ms/op, 459/s |
+| large-hash-list-read | 2.304 ms/op, 434/s | 1.140 ms/op, 877/s | 1.248 ms/op, 801/s |
+| resp3-hello | 0.141 ms/op, 7,104/s | 0.124 ms/op, 8,040/s | 0.173 ms/op, 5,792/s |
+| expire-sweep | 0.290 ms/op, 3,449/s | 0.262 ms/op, 3,820/s | 0.268 ms/op, 3,726/s |
+| multi-exec-mixed | 0.098 ms/op, 10,221/s | 0.113 ms/op, 8,844/s | 0.101 ms/op, 9,857/s |
+| pubsub-fanout | 0.066 ms/op, 15,126/s | 0.044 ms/op, 22,683/s | 0.055 ms/op, 18,110/s |
+| zset-score-ops | 0.102 ms/op, 9,839/s | 0.108 ms/op, 9,267/s | 0.122 ms/op, 8,167/s |
+| bitfield-ops | 0.105 ms/op, 9,546/s | 0.079 ms/op, 12,716/s | 0.104 ms/op, 9,658/s |
+| hll-ops | 0.094 ms/op, 10,639/s | 0.088 ms/op, 11,385/s | 0.100 ms/op, 9,964/s |
+| sort-ops | 0.227 ms/op, 4,398/s | 0.250 ms/op, 4,008/s | 0.218 ms/op, 4,595/s |
+| keys-random | 1.201 ms/op, 832/s | 1.182 ms/op, 846/s | 1.193 ms/op, 838/s |
+| stream-xread | 1.857 ms/op, 539/s | 1.892 ms/op, 529/s | 2.443 ms/op, 409/s |
+| stream-xadd-xread | 0.145 ms/op, 6,884/s | 0.161 ms/op, 6,216/s | 0.162 ms/op, 6,174/s |
+| hscan-cursor | 0.005 ms/op, 204,374/s | 0.003 ms/op, 302,801/s | 0.008 ms/op, 129,685/s |
+| sscan-zscan-cursor | 0.004 ms/op, 227,622/s | 0.003 ms/op, 310,752/s | 0.004 ms/op, 233,795/s |
+| set-ops-large | 8.901 ms/op, 112/s | 8.328 ms/op, 120/s | 8.442 ms/op, 118/s |
+| lmpop-blocking | 0.148 ms/op, 6,774/s | 0.154 ms/op, 6,489/s | 0.146 ms/op, 6,834/s |
+| key-space-notify | 3.568 ms/op, 280/s | 3.559 ms/op, 281/s | 3.651 ms/op, 274/s |
+| resp3-collections | 0.313 ms/op, 3,193/s | 0.229 ms/op, 4,371/s | 0.243 ms/op, 4,112/s |
+| server-face-ops | 0.091 ms/op, 11,047/s | 0.099 ms/op, 10,064/s | 0.136 ms/op, 7,334/s |
+| watch-exec | 0.104 ms/op, 9,607/s | 0.094 ms/op, 10,646/s | 0.088 ms/op, 11,397/s |
+| set-big | 0.327 ms/op, 3,061/s | 0.547 ms/op, 1,827/s | 0.938 ms/op, 1,066/s |
+| get-big | 0.609 ms/op, 1,643/s | 0.330 ms/op, 3,028/s | 0.807 ms/op, 1,239/s |
+| del-seq | 0.086 ms/op, 11,586/s | 0.067 ms/op, 14,936/s | 0.101 ms/op, 9,894/s |
+| move-seq | 0.135 ms/op, 7,398/s | 0.114 ms/op, 8,741/s | 0.133 ms/op, 7,503/s |
+| ping | 0.060 ms/op, 16,546/s | 0.059 ms/op, 16,850/s | 0.072 ms/op, 13,898/s |
+| bit-ops | 0.080 ms/op, 12,527/s | 0.101 ms/op, 9,881/s | 0.090 ms/op, 11,080/s |
+| setrange-getrange | 0.100 ms/op, 10,004/s | 0.071 ms/op, 14,180/s | 0.095 ms/op, 10,535/s |
+| rename-unlink | 0.105 ms/op, 9,558/s | 0.098 ms/op, 10,201/s | 0.120 ms/op, 8,367/s |
+| setnx-getset | 0.089 ms/op, 11,206/s | 0.083 ms/op, 12,048/s | 0.091 ms/op, 10,942/s |
+| smove-spop | 0.121 ms/op, 8,266/s | 0.091 ms/op, 10,976/s | 0.103 ms/op, 9,692/s |
+| zrangestore-zdiff | 0.002 ms/op, 474,215/s | 0.001 ms/op, 794,281/s | 0.001 ms/op, 845,309/s |
+| connect | 1.390 ms/op, 720/s | 0.485 ms/op, 2,060/s | 1.276 ms/op, 784/s |
 
 ## Oracle comparison — limitation
 
@@ -502,11 +514,11 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "fanout_subs": "8",
       "fanout_messages": "50"
     },
-    "data_scale": "matrix=63x3",
+    "data_scale": "matrix=66x3",
     "rustc_version": "rustc 1.101.0-nightly (1c3a65069 2026-11-02)",
     "node_version": "v24.18.0",
     "target_triple": "x86_64-pc-windows-msvc",
-    "rev": "eff6e2d5a8e965c1d6b80ac6d20ce50eae35eb5b",
+    "rev": "753c2d3d64f1e193bb5074339d04960a2773e396",
     "plan": {
       "rounds": 1,
       "warmup": 1
@@ -517,10 +529,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 43.9102,
-        "p95_ms": 43.9102,
-        "min_ms": 43.9102,
-        "max_ms": 43.9102,
+        "median_ms": 23.5308,
+        "p95_ms": 23.5308,
+        "min_ms": 23.5308,
+        "max_ms": 23.5308,
         "rounds": 1
       },
       "reference": null,
@@ -538,17 +550,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 42.9102,
-        "p95_ms": 42.9102,
-        "min_ms": 42.9102,
-        "max_ms": 42.9102,
+        "median_ms": 18.658,
+        "p95_ms": 18.658,
+        "min_ms": 18.658,
+        "max_ms": 18.658,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 43.9102,
-        "p95_ms": 43.9102,
-        "min_ms": 43.9102,
-        "max_ms": 43.9102,
+        "median_ms": 23.5308,
+        "p95_ms": 23.5308,
+        "min_ms": 23.5308,
+        "max_ms": 23.5308,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -565,17 +577,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 51.8285,
-        "p95_ms": 51.8285,
-        "min_ms": 51.8285,
-        "max_ms": 51.8285,
+        "median_ms": 31.7463,
+        "p95_ms": 31.7463,
+        "min_ms": 31.7463,
+        "max_ms": 31.7463,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 43.9102,
-        "p95_ms": 43.9102,
-        "min_ms": 43.9102,
-        "max_ms": 43.9102,
+        "median_ms": 23.5308,
+        "p95_ms": 23.5308,
+        "min_ms": 23.5308,
+        "max_ms": 23.5308,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -592,10 +604,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 11.4363,
-        "p95_ms": 11.4363,
-        "min_ms": 11.4363,
-        "max_ms": 11.4363,
+        "median_ms": 7.7461,
+        "p95_ms": 7.7461,
+        "min_ms": 7.7461,
+        "max_ms": 7.7461,
         "rounds": 1
       },
       "reference": null,
@@ -613,17 +625,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 10.0069,
-        "p95_ms": 10.0069,
-        "min_ms": 10.0069,
-        "max_ms": 10.0069,
+        "median_ms": 5.4282,
+        "p95_ms": 5.4282,
+        "min_ms": 5.4282,
+        "max_ms": 5.4282,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 11.4363,
-        "p95_ms": 11.4363,
-        "min_ms": 11.4363,
-        "max_ms": 11.4363,
+        "median_ms": 7.7461,
+        "p95_ms": 7.7461,
+        "min_ms": 7.7461,
+        "max_ms": 7.7461,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -640,17 +652,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 12.2948,
-        "p95_ms": 12.2948,
-        "min_ms": 12.2948,
-        "max_ms": 12.2948,
+        "median_ms": 14.8319,
+        "p95_ms": 14.8319,
+        "min_ms": 14.8319,
+        "max_ms": 14.8319,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 11.4363,
-        "p95_ms": 11.4363,
-        "min_ms": 11.4363,
-        "max_ms": 11.4363,
+        "median_ms": 7.7461,
+        "p95_ms": 7.7461,
+        "min_ms": 7.7461,
+        "max_ms": 7.7461,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -667,10 +679,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "mset-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 6.5441,
-        "p95_ms": 6.5441,
-        "min_ms": 6.5441,
-        "max_ms": 6.5441,
+        "median_ms": 6.5817,
+        "p95_ms": 6.5817,
+        "min_ms": 6.5817,
+        "max_ms": 6.5817,
         "rounds": 1
       },
       "reference": null,
@@ -688,17 +700,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "mset-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 7.2629,
-        "p95_ms": 7.2629,
-        "min_ms": 7.2629,
-        "max_ms": 7.2629,
+        "median_ms": 7.2482,
+        "p95_ms": 7.2482,
+        "min_ms": 7.2482,
+        "max_ms": 7.2482,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 6.5441,
-        "p95_ms": 6.5441,
-        "min_ms": 6.5441,
-        "max_ms": 6.5441,
+        "median_ms": 6.5817,
+        "p95_ms": 6.5817,
+        "min_ms": 6.5817,
+        "max_ms": 6.5817,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -715,17 +727,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "mset-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 6.3769,
-        "p95_ms": 6.3769,
-        "min_ms": 6.3769,
-        "max_ms": 6.3769,
+        "median_ms": 6.5023,
+        "p95_ms": 6.5023,
+        "min_ms": 6.5023,
+        "max_ms": 6.5023,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 6.5441,
-        "p95_ms": 6.5441,
-        "min_ms": 6.5441,
-        "max_ms": 6.5441,
+        "median_ms": 6.5817,
+        "p95_ms": 6.5817,
+        "min_ms": 6.5817,
+        "max_ms": 6.5817,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -742,10 +754,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "incr-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 45.3262,
-        "p95_ms": 45.3262,
-        "min_ms": 45.3262,
-        "max_ms": 45.3262,
+        "median_ms": 80.5578,
+        "p95_ms": 80.5578,
+        "min_ms": 80.5578,
+        "max_ms": 80.5578,
         "rounds": 1
       },
       "reference": null,
@@ -762,17 +774,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "incr-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 46.3551,
-        "p95_ms": 46.3551,
-        "min_ms": 46.3551,
-        "max_ms": 46.3551,
+        "median_ms": 51.0928,
+        "p95_ms": 51.0928,
+        "min_ms": 51.0928,
+        "max_ms": 51.0928,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 45.3262,
-        "p95_ms": 45.3262,
-        "min_ms": 45.3262,
-        "max_ms": 45.3262,
+        "median_ms": 80.5578,
+        "p95_ms": 80.5578,
+        "min_ms": 80.5578,
+        "max_ms": 80.5578,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -788,17 +800,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "incr-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 49.4922,
-        "p95_ms": 49.4922,
-        "min_ms": 49.4922,
-        "max_ms": 49.4922,
+        "median_ms": 32.0327,
+        "p95_ms": 32.0327,
+        "min_ms": 32.0327,
+        "max_ms": 32.0327,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 45.3262,
-        "p95_ms": 45.3262,
-        "min_ms": 45.3262,
-        "max_ms": 45.3262,
+        "median_ms": 80.5578,
+        "p95_ms": 80.5578,
+        "min_ms": 80.5578,
+        "max_ms": 80.5578,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -814,10 +826,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-pipeline@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 14.3538,
-        "p95_ms": 14.3538,
-        "min_ms": 14.3538,
-        "max_ms": 14.3538,
+        "median_ms": 8.4655,
+        "p95_ms": 8.4655,
+        "min_ms": 8.4655,
+        "max_ms": 8.4655,
         "rounds": 1
       },
       "reference": null,
@@ -836,17 +848,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-pipeline@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 14.5108,
-        "p95_ms": 14.5108,
-        "min_ms": 14.5108,
-        "max_ms": 14.5108,
+        "median_ms": 10.6841,
+        "p95_ms": 10.6841,
+        "min_ms": 10.6841,
+        "max_ms": 10.6841,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 14.3538,
-        "p95_ms": 14.3538,
-        "min_ms": 14.3538,
-        "max_ms": 14.3538,
+        "median_ms": 8.4655,
+        "p95_ms": 8.4655,
+        "min_ms": 8.4655,
+        "max_ms": 8.4655,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -864,17 +876,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-pipeline@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 26.454,
-        "p95_ms": 26.454,
-        "min_ms": 26.454,
-        "max_ms": 26.454,
+        "median_ms": 8.2391,
+        "p95_ms": 8.2391,
+        "min_ms": 8.2391,
+        "max_ms": 8.2391,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 14.3538,
-        "p95_ms": 14.3538,
-        "min_ms": 14.3538,
-        "max_ms": 14.3538,
+        "median_ms": 8.4655,
+        "p95_ms": 8.4655,
+        "min_ms": 8.4655,
+        "max_ms": 8.4655,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -892,10 +904,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-pipeline@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 9.6366,
-        "p95_ms": 9.6366,
-        "min_ms": 9.6366,
-        "max_ms": 9.6366,
+        "median_ms": 6.0252,
+        "p95_ms": 6.0252,
+        "min_ms": 6.0252,
+        "max_ms": 6.0252,
         "rounds": 1
       },
       "reference": null,
@@ -914,17 +926,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-pipeline@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 9.2126,
-        "p95_ms": 9.2126,
-        "min_ms": 9.2126,
-        "max_ms": 9.2126,
+        "median_ms": 4.5997,
+        "p95_ms": 4.5997,
+        "min_ms": 4.5997,
+        "max_ms": 4.5997,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 9.6366,
-        "p95_ms": 9.6366,
-        "min_ms": 9.6366,
-        "max_ms": 9.6366,
+        "median_ms": 6.0252,
+        "p95_ms": 6.0252,
+        "min_ms": 6.0252,
+        "max_ms": 6.0252,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -942,17 +954,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-pipeline@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 39.3676,
-        "p95_ms": 39.3676,
-        "min_ms": 39.3676,
-        "max_ms": 39.3676,
+        "median_ms": 9.5387,
+        "p95_ms": 9.5387,
+        "min_ms": 9.5387,
+        "max_ms": 9.5387,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 9.6366,
-        "p95_ms": 9.6366,
-        "min_ms": 9.6366,
-        "max_ms": 9.6366,
+        "median_ms": 6.0252,
+        "p95_ms": 6.0252,
+        "min_ms": 6.0252,
+        "max_ms": 6.0252,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -970,10 +982,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pipeline-mixed@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 20.7788,
-        "p95_ms": 20.7788,
-        "min_ms": 20.7788,
-        "max_ms": 20.7788,
+        "median_ms": 11.2017,
+        "p95_ms": 11.2017,
+        "min_ms": 11.2017,
+        "max_ms": 11.2017,
         "rounds": 1
       },
       "reference": null,
@@ -993,17 +1005,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pipeline-mixed@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 20.5475,
-        "p95_ms": 20.5475,
-        "min_ms": 20.5475,
-        "max_ms": 20.5475,
+        "median_ms": 7.9429,
+        "p95_ms": 7.9429,
+        "min_ms": 7.9429,
+        "max_ms": 7.9429,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 20.7788,
-        "p95_ms": 20.7788,
-        "min_ms": 20.7788,
-        "max_ms": 20.7788,
+        "median_ms": 11.2017,
+        "p95_ms": 11.2017,
+        "min_ms": 11.2017,
+        "max_ms": 11.2017,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1022,17 +1034,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pipeline-mixed@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 28.9646,
-        "p95_ms": 28.9646,
-        "min_ms": 28.9646,
-        "max_ms": 28.9646,
+        "median_ms": 9.4151,
+        "p95_ms": 9.4151,
+        "min_ms": 9.4151,
+        "max_ms": 9.4151,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 20.7788,
-        "p95_ms": 20.7788,
-        "min_ms": 20.7788,
-        "max_ms": 20.7788,
+        "median_ms": 11.2017,
+        "p95_ms": 11.2017,
+        "min_ms": 11.2017,
+        "max_ms": 11.2017,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1051,10 +1063,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-hset-hget@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 70.4605,
-        "p95_ms": 70.4605,
-        "min_ms": 70.4605,
-        "max_ms": 70.4605,
+        "median_ms": 27.4926,
+        "p95_ms": 27.4926,
+        "min_ms": 27.4926,
+        "max_ms": 27.4926,
         "rounds": 1
       },
       "reference": null,
@@ -1071,17 +1083,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-hset-hget@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 68.1719,
-        "p95_ms": 68.1719,
-        "min_ms": 68.1719,
-        "max_ms": 68.1719,
+        "median_ms": 73.3521,
+        "p95_ms": 73.3521,
+        "min_ms": 73.3521,
+        "max_ms": 73.3521,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 70.4605,
-        "p95_ms": 70.4605,
-        "min_ms": 70.4605,
-        "max_ms": 70.4605,
+        "median_ms": 27.4926,
+        "p95_ms": 27.4926,
+        "min_ms": 27.4926,
+        "max_ms": 27.4926,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1097,17 +1109,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-hset-hget@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 75.334,
-        "p95_ms": 75.334,
-        "min_ms": 75.334,
-        "max_ms": 75.334,
+        "median_ms": 68.1032,
+        "p95_ms": 68.1032,
+        "min_ms": 68.1032,
+        "max_ms": 68.1032,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 70.4605,
-        "p95_ms": 70.4605,
-        "min_ms": 70.4605,
-        "max_ms": 70.4605,
+        "median_ms": 27.4926,
+        "p95_ms": 27.4926,
+        "min_ms": 27.4926,
+        "max_ms": 27.4926,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1123,10 +1135,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-setnx-hrandfield@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 32.1322,
-        "p95_ms": 32.1322,
-        "min_ms": 32.1322,
-        "max_ms": 32.1322,
+        "median_ms": 13.2322,
+        "p95_ms": 13.2322,
+        "min_ms": 13.2322,
+        "max_ms": 13.2322,
         "rounds": 1
       },
       "reference": null,
@@ -1143,17 +1155,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-setnx-hrandfield@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 33.1594,
-        "p95_ms": 33.1594,
-        "min_ms": 33.1594,
-        "max_ms": 33.1594,
+        "median_ms": 12.9462,
+        "p95_ms": 12.9462,
+        "min_ms": 12.9462,
+        "max_ms": 12.9462,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.1322,
-        "p95_ms": 32.1322,
-        "min_ms": 32.1322,
-        "max_ms": 32.1322,
+        "median_ms": 13.2322,
+        "p95_ms": 13.2322,
+        "min_ms": 13.2322,
+        "max_ms": 13.2322,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1169,17 +1181,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-setnx-hrandfield@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 43.6487,
-        "p95_ms": 43.6487,
-        "min_ms": 43.6487,
-        "max_ms": 43.6487,
+        "median_ms": 38.9928,
+        "p95_ms": 38.9928,
+        "min_ms": 38.9928,
+        "max_ms": 38.9928,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.1322,
-        "p95_ms": 32.1322,
-        "min_ms": 32.1322,
-        "max_ms": 32.1322,
+        "median_ms": 13.2322,
+        "p95_ms": 13.2322,
+        "min_ms": 13.2322,
+        "max_ms": 13.2322,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1195,10 +1207,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "list-rpush-lrange@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 33.6337,
-        "p95_ms": 33.6337,
-        "min_ms": 33.6337,
-        "max_ms": 33.6337,
+        "median_ms": 20.4642,
+        "p95_ms": 20.4642,
+        "min_ms": 20.4642,
+        "max_ms": 20.4642,
         "rounds": 1
       },
       "reference": null,
@@ -1215,17 +1227,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "list-rpush-lrange@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 28.2997,
-        "p95_ms": 28.2997,
-        "min_ms": 28.2997,
-        "max_ms": 28.2997,
+        "median_ms": 10.948,
+        "p95_ms": 10.948,
+        "min_ms": 10.948,
+        "max_ms": 10.948,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 33.6337,
-        "p95_ms": 33.6337,
-        "min_ms": 33.6337,
-        "max_ms": 33.6337,
+        "median_ms": 20.4642,
+        "p95_ms": 20.4642,
+        "min_ms": 20.4642,
+        "max_ms": 20.4642,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1241,17 +1253,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "list-rpush-lrange@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 31.6848,
-        "p95_ms": 31.6848,
-        "min_ms": 31.6848,
-        "max_ms": 31.6848,
+        "median_ms": 15.5002,
+        "p95_ms": 15.5002,
+        "min_ms": 15.5002,
+        "max_ms": 15.5002,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 33.6337,
-        "p95_ms": 33.6337,
-        "min_ms": 33.6337,
-        "max_ms": 33.6337,
+        "median_ms": 20.4642,
+        "p95_ms": 20.4642,
+        "min_ms": 20.4642,
+        "max_ms": 20.4642,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1267,10 +1279,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-sadd-smembers@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 26.7635,
-        "p95_ms": 26.7635,
-        "min_ms": 26.7635,
-        "max_ms": 26.7635,
+        "median_ms": 10.3695,
+        "p95_ms": 10.3695,
+        "min_ms": 10.3695,
+        "max_ms": 10.3695,
         "rounds": 1
       },
       "reference": null,
@@ -1287,17 +1299,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-sadd-smembers@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 28.9131,
-        "p95_ms": 28.9131,
-        "min_ms": 28.9131,
-        "max_ms": 28.9131,
+        "median_ms": 8.9986,
+        "p95_ms": 8.9986,
+        "min_ms": 8.9986,
+        "max_ms": 8.9986,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 26.7635,
-        "p95_ms": 26.7635,
-        "min_ms": 26.7635,
-        "max_ms": 26.7635,
+        "median_ms": 10.3695,
+        "p95_ms": 10.3695,
+        "min_ms": 10.3695,
+        "max_ms": 10.3695,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1313,17 +1325,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-sadd-smembers@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 31.6418,
-        "p95_ms": 31.6418,
-        "min_ms": 31.6418,
-        "max_ms": 31.6418,
+        "median_ms": 10.7543,
+        "p95_ms": 10.7543,
+        "min_ms": 10.7543,
+        "max_ms": 10.7543,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 26.7635,
-        "p95_ms": 26.7635,
-        "min_ms": 26.7635,
-        "max_ms": 26.7635,
+        "median_ms": 10.3695,
+        "p95_ms": 10.3695,
+        "min_ms": 10.3695,
+        "max_ms": 10.3695,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1339,10 +1351,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-zadd-zrange@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 35.2718,
-        "p95_ms": 35.2718,
-        "min_ms": 35.2718,
-        "max_ms": 35.2718,
+        "median_ms": 11.706,
+        "p95_ms": 11.706,
+        "min_ms": 11.706,
+        "max_ms": 11.706,
         "rounds": 1
       },
       "reference": null,
@@ -1360,17 +1372,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-zadd-zrange@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 49.5168,
-        "p95_ms": 49.5168,
-        "min_ms": 49.5168,
-        "max_ms": 49.5168,
+        "median_ms": 38.0141,
+        "p95_ms": 38.0141,
+        "min_ms": 38.0141,
+        "max_ms": 38.0141,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 35.2718,
-        "p95_ms": 35.2718,
-        "min_ms": 35.2718,
-        "max_ms": 35.2718,
+        "median_ms": 11.706,
+        "p95_ms": 11.706,
+        "min_ms": 11.706,
+        "max_ms": 11.706,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1387,17 +1399,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-zadd-zrange@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 29.2269,
-        "p95_ms": 29.2269,
-        "min_ms": 29.2269,
-        "max_ms": 29.2269,
+        "median_ms": 32.1632,
+        "p95_ms": 32.1632,
+        "min_ms": 32.1632,
+        "max_ms": 32.1632,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 35.2718,
-        "p95_ms": 35.2718,
-        "min_ms": 35.2718,
-        "max_ms": 35.2718,
+        "median_ms": 11.706,
+        "p95_ms": 11.706,
+        "min_ms": 11.706,
+        "max_ms": 11.706,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1414,10 +1426,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "streams-xadd-xrange@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 42.2938,
-        "p95_ms": 42.2938,
-        "min_ms": 42.2938,
-        "max_ms": 42.2938,
+        "median_ms": 56.7172,
+        "p95_ms": 56.7172,
+        "min_ms": 56.7172,
+        "max_ms": 56.7172,
         "rounds": 1
       },
       "reference": null,
@@ -1435,17 +1447,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "streams-xadd-xrange@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 42.3132,
-        "p95_ms": 42.3132,
-        "min_ms": 42.3132,
-        "max_ms": 42.3132,
+        "median_ms": 75.9292,
+        "p95_ms": 75.9292,
+        "min_ms": 75.9292,
+        "max_ms": 75.9292,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 42.2938,
-        "p95_ms": 42.2938,
-        "min_ms": 42.2938,
-        "max_ms": 42.2938,
+        "median_ms": 56.7172,
+        "p95_ms": 56.7172,
+        "min_ms": 56.7172,
+        "max_ms": 56.7172,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1462,17 +1474,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "streams-xadd-xrange@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 44.2398,
-        "p95_ms": 44.2398,
-        "min_ms": 44.2398,
-        "max_ms": 44.2398,
+        "median_ms": 88.9048,
+        "p95_ms": 88.9048,
+        "min_ms": 88.9048,
+        "max_ms": 88.9048,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 42.2938,
-        "p95_ms": 42.2938,
-        "min_ms": 42.2938,
-        "max_ms": 42.2938,
+        "median_ms": 56.7172,
+        "p95_ms": 56.7172,
+        "min_ms": 56.7172,
+        "max_ms": 56.7172,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1489,10 +1501,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pubsub-roundtrip@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 14.685,
-        "p95_ms": 14.685,
-        "min_ms": 14.685,
-        "max_ms": 14.685,
+        "median_ms": 22.2008,
+        "p95_ms": 22.2008,
+        "min_ms": 22.2008,
+        "max_ms": 22.2008,
         "rounds": 1
       },
       "reference": null,
@@ -1510,17 +1522,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pubsub-roundtrip@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 13.2262,
-        "p95_ms": 13.2262,
-        "min_ms": 13.2262,
-        "max_ms": 13.2262,
+        "median_ms": 13.6806,
+        "p95_ms": 13.6806,
+        "min_ms": 13.6806,
+        "max_ms": 13.6806,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 14.685,
-        "p95_ms": 14.685,
-        "min_ms": 14.685,
-        "max_ms": 14.685,
+        "median_ms": 22.2008,
+        "p95_ms": 22.2008,
+        "min_ms": 22.2008,
+        "max_ms": 22.2008,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1537,17 +1549,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pubsub-roundtrip@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 15.0087,
-        "p95_ms": 15.0087,
-        "min_ms": 15.0087,
-        "max_ms": 15.0087,
+        "median_ms": 13.4388,
+        "p95_ms": 13.4388,
+        "min_ms": 13.4388,
+        "max_ms": 13.4388,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 14.685,
-        "p95_ms": 14.685,
-        "min_ms": 14.685,
-        "max_ms": 14.685,
+        "median_ms": 22.2008,
+        "p95_ms": 22.2008,
+        "min_ms": 22.2008,
+        "max_ms": 22.2008,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1564,10 +1576,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "blpop-roundtrip@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 32.6236,
-        "p95_ms": 32.6236,
-        "min_ms": 32.6236,
-        "max_ms": 32.6236,
+        "median_ms": 27.7892,
+        "p95_ms": 27.7892,
+        "min_ms": 27.7892,
+        "max_ms": 27.7892,
         "rounds": 1
       },
       "reference": null,
@@ -1585,17 +1597,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "blpop-roundtrip@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 33.7383,
-        "p95_ms": 33.7383,
-        "min_ms": 33.7383,
-        "max_ms": 33.7383,
+        "median_ms": 15.0912,
+        "p95_ms": 15.0912,
+        "min_ms": 15.0912,
+        "max_ms": 15.0912,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.6236,
-        "p95_ms": 32.6236,
-        "min_ms": 32.6236,
-        "max_ms": 32.6236,
+        "median_ms": 27.7892,
+        "p95_ms": 27.7892,
+        "min_ms": 27.7892,
+        "max_ms": 27.7892,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1612,17 +1624,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "blpop-roundtrip@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 32.5069,
-        "p95_ms": 32.5069,
-        "min_ms": 32.5069,
-        "max_ms": 32.5069,
+        "median_ms": 14.3041,
+        "p95_ms": 14.3041,
+        "min_ms": 14.3041,
+        "max_ms": 14.3041,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.6236,
-        "p95_ms": 32.6236,
-        "min_ms": 32.6236,
-        "max_ms": 32.6236,
+        "median_ms": 27.7892,
+        "p95_ms": 27.7892,
+        "min_ms": 27.7892,
+        "max_ms": 27.7892,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1639,10 +1651,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "scan-full@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 5.3917,
-        "p95_ms": 5.3917,
-        "min_ms": 5.3917,
-        "max_ms": 5.3917,
+        "median_ms": 3.622,
+        "p95_ms": 3.622,
+        "min_ms": 3.622,
+        "max_ms": 3.622,
         "rounds": 1
       },
       "reference": null,
@@ -1660,17 +1672,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "scan-full@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 5.3022,
-        "p95_ms": 5.3022,
-        "min_ms": 5.3022,
-        "max_ms": 5.3022,
+        "median_ms": 1.9346,
+        "p95_ms": 1.9346,
+        "min_ms": 1.9346,
+        "max_ms": 1.9346,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 5.3917,
-        "p95_ms": 5.3917,
-        "min_ms": 5.3917,
-        "max_ms": 5.3917,
+        "median_ms": 3.622,
+        "p95_ms": 3.622,
+        "min_ms": 3.622,
+        "max_ms": 3.622,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1687,17 +1699,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "scan-full@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 6.0864,
-        "p95_ms": 6.0864,
-        "min_ms": 6.0864,
-        "max_ms": 6.0864,
+        "median_ms": 1.8722,
+        "p95_ms": 1.8722,
+        "min_ms": 1.8722,
+        "max_ms": 1.8722,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 5.3917,
-        "p95_ms": 5.3917,
-        "min_ms": 5.3917,
-        "max_ms": 5.3917,
+        "median_ms": 3.622,
+        "p95_ms": 3.622,
+        "min_ms": 3.622,
+        "max_ms": 3.622,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1714,10 +1726,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ping-concurrent@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 40.4456,
-        "p95_ms": 40.4456,
-        "min_ms": 40.4456,
-        "max_ms": 40.4456,
+        "median_ms": 22.1265,
+        "p95_ms": 22.1265,
+        "min_ms": 22.1265,
+        "max_ms": 22.1265,
         "rounds": 1
       },
       "reference": null,
@@ -1735,17 +1747,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ping-concurrent@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 42.8739,
-        "p95_ms": 42.8739,
-        "min_ms": 42.8739,
-        "max_ms": 42.8739,
+        "median_ms": 20.9637,
+        "p95_ms": 20.9637,
+        "min_ms": 20.9637,
+        "max_ms": 20.9637,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 40.4456,
-        "p95_ms": 40.4456,
-        "min_ms": 40.4456,
-        "max_ms": 40.4456,
+        "median_ms": 22.1265,
+        "p95_ms": 22.1265,
+        "min_ms": 22.1265,
+        "max_ms": 22.1265,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1762,17 +1774,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ping-concurrent@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 66.9794,
-        "p95_ms": 66.9794,
-        "min_ms": 66.9794,
-        "max_ms": 66.9794,
+        "median_ms": 32.2165,
+        "p95_ms": 32.2165,
+        "min_ms": 32.2165,
+        "max_ms": 32.2165,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 40.4456,
-        "p95_ms": 40.4456,
-        "min_ms": 40.4456,
-        "max_ms": 40.4456,
+        "median_ms": 22.1265,
+        "p95_ms": 22.1265,
+        "min_ms": 22.1265,
+        "max_ms": 22.1265,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1789,10 +1801,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-group@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 65.2393,
-        "p95_ms": 65.2393,
-        "min_ms": 65.2393,
-        "max_ms": 65.2393,
+        "median_ms": 44.3206,
+        "p95_ms": 44.3206,
+        "min_ms": 44.3206,
+        "max_ms": 44.3206,
         "rounds": 1
       },
       "reference": null,
@@ -1811,17 +1823,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-group@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 62.9481,
-        "p95_ms": 62.9481,
-        "min_ms": 62.9481,
-        "max_ms": 62.9481,
+        "median_ms": 35.9706,
+        "p95_ms": 35.9706,
+        "min_ms": 35.9706,
+        "max_ms": 35.9706,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 65.2393,
-        "p95_ms": 65.2393,
-        "min_ms": 65.2393,
-        "max_ms": 65.2393,
+        "median_ms": 44.3206,
+        "p95_ms": 44.3206,
+        "min_ms": 44.3206,
+        "max_ms": 44.3206,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1839,17 +1851,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-group@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 72.9741,
-        "p95_ms": 72.9741,
-        "min_ms": 72.9741,
-        "max_ms": 72.9741,
+        "median_ms": 39.0518,
+        "p95_ms": 39.0518,
+        "min_ms": 39.0518,
+        "max_ms": 39.0518,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 65.2393,
-        "p95_ms": 65.2393,
-        "min_ms": 65.2393,
-        "max_ms": 65.2393,
+        "median_ms": 44.3206,
+        "p95_ms": 44.3206,
+        "min_ms": 44.3206,
+        "max_ms": 44.3206,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1867,10 +1879,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ttl-setex-expire@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1114.6994,
-        "p95_ms": 1114.6994,
-        "min_ms": 1114.6994,
-        "max_ms": 1114.6994,
+        "median_ms": 1112.4786,
+        "p95_ms": 1112.4786,
+        "min_ms": 1112.4786,
+        "max_ms": 1112.4786,
         "rounds": 1
       },
       "reference": null,
@@ -1889,17 +1901,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ttl-setex-expire@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1124.1973,
-        "p95_ms": 1124.1973,
-        "min_ms": 1124.1973,
-        "max_ms": 1124.1973,
+        "median_ms": 1132.2865,
+        "p95_ms": 1132.2865,
+        "min_ms": 1132.2865,
+        "max_ms": 1132.2865,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 1114.6994,
-        "p95_ms": 1114.6994,
-        "min_ms": 1114.6994,
-        "max_ms": 1114.6994,
+        "median_ms": 1112.4786,
+        "p95_ms": 1112.4786,
+        "min_ms": 1112.4786,
+        "max_ms": 1112.4786,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1917,17 +1929,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ttl-setex-expire@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1116.1167,
-        "p95_ms": 1116.1167,
-        "min_ms": 1116.1167,
-        "max_ms": 1116.1167,
+        "median_ms": 1117.3388,
+        "p95_ms": 1117.3388,
+        "min_ms": 1117.3388,
+        "max_ms": 1117.3388,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 1114.6994,
-        "p95_ms": 1114.6994,
-        "min_ms": 1114.6994,
-        "max_ms": 1114.6994,
+        "median_ms": 1112.4786,
+        "p95_ms": 1112.4786,
+        "min_ms": 1112.4786,
+        "max_ms": 1112.4786,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1945,10 +1957,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "multi-exec@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 18.2607,
-        "p95_ms": 18.2607,
-        "min_ms": 18.2607,
-        "max_ms": 18.2607,
+        "median_ms": 9.2277,
+        "p95_ms": 9.2277,
+        "min_ms": 9.2277,
+        "max_ms": 9.2277,
         "rounds": 1
       },
       "reference": null,
@@ -1966,17 +1978,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "multi-exec@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 20.7402,
-        "p95_ms": 20.7402,
-        "min_ms": 20.7402,
-        "max_ms": 20.7402,
+        "median_ms": 9.4288,
+        "p95_ms": 9.4288,
+        "min_ms": 9.4288,
+        "max_ms": 9.4288,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 18.2607,
-        "p95_ms": 18.2607,
-        "min_ms": 18.2607,
-        "max_ms": 18.2607,
+        "median_ms": 9.2277,
+        "p95_ms": 9.2277,
+        "min_ms": 9.2277,
+        "max_ms": 9.2277,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -1993,17 +2005,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "multi-exec@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 21.5927,
-        "p95_ms": 21.5927,
-        "min_ms": 21.5927,
-        "max_ms": 21.5927,
+        "median_ms": 10.1757,
+        "p95_ms": 10.1757,
+        "min_ms": 10.1757,
+        "max_ms": 10.1757,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 18.2607,
-        "p95_ms": 18.2607,
-        "min_ms": 18.2607,
-        "max_ms": 18.2607,
+        "median_ms": 9.2277,
+        "p95_ms": 9.2277,
+        "min_ms": 9.2277,
+        "max_ms": 9.2277,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2020,10 +2032,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "mget-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1.3046,
-        "p95_ms": 1.3046,
-        "min_ms": 1.3046,
-        "max_ms": 1.3046,
+        "median_ms": 0.7218,
+        "p95_ms": 0.7218,
+        "min_ms": 0.7218,
+        "max_ms": 0.7218,
         "rounds": 1
       },
       "reference": null,
@@ -2041,17 +2053,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "mget-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1.6489,
-        "p95_ms": 1.6489,
-        "min_ms": 1.6489,
-        "max_ms": 1.6489,
+        "median_ms": 1.0825,
+        "p95_ms": 1.0825,
+        "min_ms": 1.0825,
+        "max_ms": 1.0825,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 1.3046,
-        "p95_ms": 1.3046,
-        "min_ms": 1.3046,
-        "max_ms": 1.3046,
+        "median_ms": 0.7218,
+        "p95_ms": 0.7218,
+        "min_ms": 0.7218,
+        "max_ms": 0.7218,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2068,17 +2080,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "mget-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1.9494,
-        "p95_ms": 1.9494,
-        "min_ms": 1.9494,
-        "max_ms": 1.9494,
+        "median_ms": 1.0189,
+        "p95_ms": 1.0189,
+        "min_ms": 1.0189,
+        "max_ms": 1.0189,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 1.3046,
-        "p95_ms": 1.3046,
-        "min_ms": 1.3046,
-        "max_ms": 1.3046,
+        "median_ms": 0.7218,
+        "p95_ms": 0.7218,
+        "min_ms": 0.7218,
+        "max_ms": 0.7218,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2095,10 +2107,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "append-getrange@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 26.9946,
-        "p95_ms": 26.9946,
-        "min_ms": 26.9946,
-        "max_ms": 26.9946,
+        "median_ms": 19.6897,
+        "p95_ms": 19.6897,
+        "min_ms": 19.6897,
+        "max_ms": 19.6897,
         "rounds": 1
       },
       "reference": null,
@@ -2116,17 +2128,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "append-getrange@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 28.2103,
-        "p95_ms": 28.2103,
-        "min_ms": 28.2103,
-        "max_ms": 28.2103,
+        "median_ms": 20.7252,
+        "p95_ms": 20.7252,
+        "min_ms": 20.7252,
+        "max_ms": 20.7252,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 26.9946,
-        "p95_ms": 26.9946,
-        "min_ms": 26.9946,
-        "max_ms": 26.9946,
+        "median_ms": 19.6897,
+        "p95_ms": 19.6897,
+        "min_ms": 19.6897,
+        "max_ms": 19.6897,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2143,17 +2155,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "append-getrange@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 33.4427,
-        "p95_ms": 33.4427,
-        "min_ms": 33.4427,
-        "max_ms": 33.4427,
+        "median_ms": 18.5807,
+        "p95_ms": 18.5807,
+        "min_ms": 18.5807,
+        "max_ms": 18.5807,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 26.9946,
-        "p95_ms": 26.9946,
-        "min_ms": 26.9946,
-        "max_ms": 26.9946,
+        "median_ms": 19.6897,
+        "p95_ms": 19.6897,
+        "min_ms": 19.6897,
+        "max_ms": 19.6897,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2170,10 +2182,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "getdel-getex@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 79.0319,
-        "p95_ms": 79.0319,
-        "min_ms": 79.0319,
-        "max_ms": 79.0319,
+        "median_ms": 30.4332,
+        "p95_ms": 30.4332,
+        "min_ms": 30.4332,
+        "max_ms": 30.4332,
         "rounds": 1
       },
       "reference": null,
@@ -2191,17 +2203,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "getdel-getex@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 61.7916,
-        "p95_ms": 61.7916,
-        "min_ms": 61.7916,
-        "max_ms": 61.7916,
+        "median_ms": 31.2683,
+        "p95_ms": 31.2683,
+        "min_ms": 31.2683,
+        "max_ms": 31.2683,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 79.0319,
-        "p95_ms": 79.0319,
-        "min_ms": 79.0319,
-        "max_ms": 79.0319,
+        "median_ms": 30.4332,
+        "p95_ms": 30.4332,
+        "min_ms": 30.4332,
+        "max_ms": 30.4332,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2218,17 +2230,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "getdel-getex@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 72.4664,
-        "p95_ms": 72.4664,
-        "min_ms": 72.4664,
-        "max_ms": 72.4664,
+        "median_ms": 42.7236,
+        "p95_ms": 42.7236,
+        "min_ms": 42.7236,
+        "max_ms": 42.7236,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 79.0319,
-        "p95_ms": 79.0319,
-        "min_ms": 79.0319,
-        "max_ms": 79.0319,
+        "median_ms": 30.4332,
+        "p95_ms": 30.4332,
+        "min_ms": 30.4332,
+        "max_ms": 30.4332,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2245,10 +2257,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-options@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 75.0393,
-        "p95_ms": 75.0393,
-        "min_ms": 75.0393,
-        "max_ms": 75.0393,
+        "median_ms": 53.5925,
+        "p95_ms": 53.5925,
+        "min_ms": 53.5925,
+        "max_ms": 53.5925,
         "rounds": 1
       },
       "reference": null,
@@ -2266,17 +2278,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-options@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 81.7738,
-        "p95_ms": 81.7738,
-        "min_ms": 81.7738,
-        "max_ms": 81.7738,
+        "median_ms": 46.2946,
+        "p95_ms": 46.2946,
+        "min_ms": 46.2946,
+        "max_ms": 46.2946,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 75.0393,
-        "p95_ms": 75.0393,
-        "min_ms": 75.0393,
-        "max_ms": 75.0393,
+        "median_ms": 53.5925,
+        "p95_ms": 53.5925,
+        "min_ms": 53.5925,
+        "max_ms": 53.5925,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2293,17 +2305,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-options@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 73.141,
-        "p95_ms": 73.141,
-        "min_ms": 73.141,
-        "max_ms": 73.141,
+        "median_ms": 57.6026,
+        "p95_ms": 57.6026,
+        "min_ms": 57.6026,
+        "max_ms": 57.6026,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 75.0393,
-        "p95_ms": 75.0393,
-        "min_ms": 75.0393,
-        "max_ms": 75.0393,
+        "median_ms": 53.5925,
+        "p95_ms": 53.5925,
+        "min_ms": 53.5925,
+        "max_ms": 53.5925,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2320,10 +2332,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "exists-type@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 46.8866,
-        "p95_ms": 46.8866,
-        "min_ms": 46.8866,
-        "max_ms": 46.8866,
+        "median_ms": 34.4659,
+        "p95_ms": 34.4659,
+        "min_ms": 34.4659,
+        "max_ms": 34.4659,
         "rounds": 1
       },
       "reference": null,
@@ -2340,17 +2352,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "exists-type@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 49.8187,
-        "p95_ms": 49.8187,
-        "min_ms": 49.8187,
-        "max_ms": 49.8187,
+        "median_ms": 28.3751,
+        "p95_ms": 28.3751,
+        "min_ms": 28.3751,
+        "max_ms": 28.3751,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 46.8866,
-        "p95_ms": 46.8866,
-        "min_ms": 46.8866,
-        "max_ms": 46.8866,
+        "median_ms": 34.4659,
+        "p95_ms": 34.4659,
+        "min_ms": 34.4659,
+        "max_ms": 34.4659,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2366,17 +2378,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "exists-type@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 56.2748,
-        "p95_ms": 56.2748,
-        "min_ms": 56.2748,
-        "max_ms": 56.2748,
+        "median_ms": 40.3396,
+        "p95_ms": 40.3396,
+        "min_ms": 40.3396,
+        "max_ms": 40.3396,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 46.8866,
-        "p95_ms": 46.8866,
-        "min_ms": 46.8866,
-        "max_ms": 46.8866,
+        "median_ms": 34.4659,
+        "p95_ms": 34.4659,
+        "min_ms": 34.4659,
+        "max_ms": 34.4659,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2392,10 +2404,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "expire-persist@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 79.6614,
-        "p95_ms": 79.6614,
-        "min_ms": 79.6614,
-        "max_ms": 79.6614,
+        "median_ms": 46.7143,
+        "p95_ms": 46.7143,
+        "min_ms": 46.7143,
+        "max_ms": 46.7143,
         "rounds": 1
       },
       "reference": null,
@@ -2413,17 +2425,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "expire-persist@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 77.1483,
-        "p95_ms": 77.1483,
-        "min_ms": 77.1483,
-        "max_ms": 77.1483,
+        "median_ms": 44.2578,
+        "p95_ms": 44.2578,
+        "min_ms": 44.2578,
+        "max_ms": 44.2578,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 79.6614,
-        "p95_ms": 79.6614,
-        "min_ms": 79.6614,
-        "max_ms": 79.6614,
+        "median_ms": 46.7143,
+        "p95_ms": 46.7143,
+        "min_ms": 46.7143,
+        "max_ms": 46.7143,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2440,17 +2452,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "expire-persist@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 84.4056,
-        "p95_ms": 84.4056,
-        "min_ms": 84.4056,
-        "max_ms": 84.4056,
+        "median_ms": 59.6931,
+        "p95_ms": 59.6931,
+        "min_ms": 59.6931,
+        "max_ms": 59.6931,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 79.6614,
-        "p95_ms": 79.6614,
-        "min_ms": 79.6614,
-        "max_ms": 79.6614,
+        "median_ms": 46.7143,
+        "p95_ms": 46.7143,
+        "min_ms": 46.7143,
+        "max_ms": 46.7143,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2467,10 +2479,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-hgetall-hdel@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 3.7487,
-        "p95_ms": 3.7487,
-        "min_ms": 3.7487,
-        "max_ms": 3.7487,
+        "median_ms": 2.9844,
+        "p95_ms": 2.9844,
+        "min_ms": 2.9844,
+        "max_ms": 2.9844,
         "rounds": 1
       },
       "reference": null,
@@ -2487,17 +2499,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-hgetall-hdel@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 4.1336,
-        "p95_ms": 4.1336,
-        "min_ms": 4.1336,
-        "max_ms": 4.1336,
+        "median_ms": 2.652,
+        "p95_ms": 2.652,
+        "min_ms": 2.652,
+        "max_ms": 2.652,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 3.7487,
-        "p95_ms": 3.7487,
-        "min_ms": 3.7487,
-        "max_ms": 3.7487,
+        "median_ms": 2.9844,
+        "p95_ms": 2.9844,
+        "min_ms": 2.9844,
+        "max_ms": 2.9844,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2513,17 +2525,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-hgetall-hdel@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 4.0299,
-        "p95_ms": 4.0299,
-        "min_ms": 4.0299,
-        "max_ms": 4.0299,
+        "median_ms": 2.4605,
+        "p95_ms": 2.4605,
+        "min_ms": 2.4605,
+        "max_ms": 2.4605,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 3.7487,
-        "p95_ms": 3.7487,
-        "min_ms": 3.7487,
-        "max_ms": 3.7487,
+        "median_ms": 2.9844,
+        "p95_ms": 2.9844,
+        "min_ms": 2.9844,
+        "max_ms": 2.9844,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2539,10 +2551,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-keys-values@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 15.4276,
-        "p95_ms": 15.4276,
-        "min_ms": 15.4276,
-        "max_ms": 15.4276,
+        "median_ms": 8.9496,
+        "p95_ms": 8.9496,
+        "min_ms": 8.9496,
+        "max_ms": 8.9496,
         "rounds": 1
       },
       "reference": null,
@@ -2561,17 +2573,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-keys-values@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 16.9156,
-        "p95_ms": 16.9156,
-        "min_ms": 16.9156,
-        "max_ms": 16.9156,
+        "median_ms": 7.4476,
+        "p95_ms": 7.4476,
+        "min_ms": 7.4476,
+        "max_ms": 7.4476,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 15.4276,
-        "p95_ms": 15.4276,
-        "min_ms": 15.4276,
-        "max_ms": 15.4276,
+        "median_ms": 8.9496,
+        "p95_ms": 8.9496,
+        "min_ms": 8.9496,
+        "max_ms": 8.9496,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2589,17 +2601,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hash-keys-values@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 17.4487,
-        "p95_ms": 17.4487,
-        "min_ms": 17.4487,
-        "max_ms": 17.4487,
+        "median_ms": 11.0268,
+        "p95_ms": 11.0268,
+        "min_ms": 11.0268,
+        "max_ms": 11.0268,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 15.4276,
-        "p95_ms": 15.4276,
-        "min_ms": 15.4276,
-        "max_ms": 15.4276,
+        "median_ms": 8.9496,
+        "p95_ms": 8.9496,
+        "min_ms": 8.9496,
+        "max_ms": 8.9496,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2617,10 +2629,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "list-lpush-lpop@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 87.0727,
-        "p95_ms": 87.0727,
-        "min_ms": 87.0727,
-        "max_ms": 87.0727,
+        "median_ms": 48.0385,
+        "p95_ms": 48.0385,
+        "min_ms": 48.0385,
+        "max_ms": 48.0385,
         "rounds": 1
       },
       "reference": null,
@@ -2637,17 +2649,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "list-lpush-lpop@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 85.9435,
-        "p95_ms": 85.9435,
-        "min_ms": 85.9435,
-        "max_ms": 85.9435,
+        "median_ms": 40.4034,
+        "p95_ms": 40.4034,
+        "min_ms": 40.4034,
+        "max_ms": 40.4034,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 87.0727,
-        "p95_ms": 87.0727,
-        "min_ms": 87.0727,
-        "max_ms": 87.0727,
+        "median_ms": 48.0385,
+        "p95_ms": 48.0385,
+        "min_ms": 48.0385,
+        "max_ms": 48.0385,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2663,17 +2675,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "list-lpush-lpop@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 96.2215,
-        "p95_ms": 96.2215,
-        "min_ms": 96.2215,
-        "max_ms": 96.2215,
+        "median_ms": 55.4226,
+        "p95_ms": 55.4226,
+        "min_ms": 55.4226,
+        "max_ms": 55.4226,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 87.0727,
-        "p95_ms": 87.0727,
-        "min_ms": 87.0727,
-        "max_ms": 87.0727,
+        "median_ms": 48.0385,
+        "p95_ms": 48.0385,
+        "min_ms": 48.0385,
+        "max_ms": 48.0385,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2689,10 +2701,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-algebra@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 32.5646,
-        "p95_ms": 32.5646,
-        "min_ms": 32.5646,
-        "max_ms": 32.5646,
+        "median_ms": 13.8768,
+        "p95_ms": 13.8768,
+        "min_ms": 13.8768,
+        "max_ms": 13.8768,
         "rounds": 1
       },
       "reference": null,
@@ -2710,17 +2722,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-algebra@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 26.1592,
-        "p95_ms": 26.1592,
-        "min_ms": 26.1592,
-        "max_ms": 26.1592,
+        "median_ms": 10.6416,
+        "p95_ms": 10.6416,
+        "min_ms": 10.6416,
+        "max_ms": 10.6416,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.5646,
-        "p95_ms": 32.5646,
-        "min_ms": 32.5646,
-        "max_ms": 32.5646,
+        "median_ms": 13.8768,
+        "p95_ms": 13.8768,
+        "min_ms": 13.8768,
+        "max_ms": 13.8768,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2737,17 +2749,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-algebra@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 30.6798,
-        "p95_ms": 30.6798,
-        "min_ms": 30.6798,
-        "max_ms": 30.6798,
+        "median_ms": 13.9096,
+        "p95_ms": 13.9096,
+        "min_ms": 13.9096,
+        "max_ms": 13.9096,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.5646,
-        "p95_ms": 32.5646,
-        "min_ms": 32.5646,
-        "max_ms": 32.5646,
+        "median_ms": 13.8768,
+        "p95_ms": 13.8768,
+        "min_ms": 13.8768,
+        "max_ms": 13.8768,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2764,10 +2776,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-membership-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 24.6933,
-        "p95_ms": 24.6933,
-        "min_ms": 24.6933,
-        "max_ms": 24.6933,
+        "median_ms": 17.2851,
+        "p95_ms": 17.2851,
+        "min_ms": 17.2851,
+        "max_ms": 17.2851,
         "rounds": 1
       },
       "reference": null,
@@ -2786,17 +2798,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-membership-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 27.9877,
-        "p95_ms": 27.9877,
-        "min_ms": 27.9877,
-        "max_ms": 27.9877,
+        "median_ms": 28.5446,
+        "p95_ms": 28.5446,
+        "min_ms": 28.5446,
+        "max_ms": 28.5446,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 24.6933,
-        "p95_ms": 24.6933,
-        "min_ms": 24.6933,
-        "max_ms": 24.6933,
+        "median_ms": 17.2851,
+        "p95_ms": 17.2851,
+        "min_ms": 17.2851,
+        "max_ms": 17.2851,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2814,17 +2826,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-membership-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 24.8632,
-        "p95_ms": 24.8632,
-        "min_ms": 24.8632,
-        "max_ms": 24.8632,
+        "median_ms": 15.2346,
+        "p95_ms": 15.2346,
+        "min_ms": 15.2346,
+        "max_ms": 15.2346,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 24.6933,
-        "p95_ms": 24.6933,
-        "min_ms": 24.6933,
-        "max_ms": 24.6933,
+        "median_ms": 17.2851,
+        "p95_ms": 17.2851,
+        "min_ms": 17.2851,
+        "max_ms": 17.2851,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2842,10 +2854,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-pop-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 3.3067,
-        "p95_ms": 3.3067,
-        "min_ms": 3.3067,
-        "max_ms": 3.3067,
+        "median_ms": 2.9615,
+        "p95_ms": 2.9615,
+        "min_ms": 2.9615,
+        "max_ms": 2.9615,
         "rounds": 1
       },
       "reference": null,
@@ -2863,17 +2875,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-pop-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 2.4746,
-        "p95_ms": 2.4746,
-        "min_ms": 2.4746,
-        "max_ms": 2.4746,
+        "median_ms": 1.6235,
+        "p95_ms": 1.6235,
+        "min_ms": 1.6235,
+        "max_ms": 1.6235,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 3.3067,
-        "p95_ms": 3.3067,
-        "min_ms": 3.3067,
-        "max_ms": 3.3067,
+        "median_ms": 2.9615,
+        "p95_ms": 2.9615,
+        "min_ms": 2.9615,
+        "max_ms": 2.9615,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2890,17 +2902,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-pop-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 9.5466,
-        "p95_ms": 9.5466,
-        "min_ms": 9.5466,
-        "max_ms": 9.5466,
+        "median_ms": 1.9459,
+        "p95_ms": 1.9459,
+        "min_ms": 1.9459,
+        "max_ms": 1.9459,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 3.3067,
-        "p95_ms": 3.3067,
-        "min_ms": 3.3067,
-        "max_ms": 3.3067,
+        "median_ms": 2.9615,
+        "p95_ms": 2.9615,
+        "min_ms": 2.9615,
+        "max_ms": 2.9615,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2917,10 +2929,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-range-queries@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 14.1488,
-        "p95_ms": 14.1488,
-        "min_ms": 14.1488,
-        "max_ms": 14.1488,
+        "median_ms": 9.2176,
+        "p95_ms": 9.2176,
+        "min_ms": 9.2176,
+        "max_ms": 9.2176,
         "rounds": 1
       },
       "reference": null,
@@ -2939,17 +2951,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-range-queries@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 30.4586,
-        "p95_ms": 30.4586,
-        "min_ms": 30.4586,
-        "max_ms": 30.4586,
+        "median_ms": 6.5436,
+        "p95_ms": 6.5436,
+        "min_ms": 6.5436,
+        "max_ms": 6.5436,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 14.1488,
-        "p95_ms": 14.1488,
-        "min_ms": 14.1488,
-        "max_ms": 14.1488,
+        "median_ms": 9.2176,
+        "p95_ms": 9.2176,
+        "min_ms": 9.2176,
+        "max_ms": 9.2176,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2967,17 +2979,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-range-queries@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 13.695,
-        "p95_ms": 13.695,
-        "min_ms": 13.695,
-        "max_ms": 13.695,
+        "median_ms": 7.3285,
+        "p95_ms": 7.3285,
+        "min_ms": 7.3285,
+        "max_ms": 7.3285,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 14.1488,
-        "p95_ms": 14.1488,
-        "min_ms": 14.1488,
-        "max_ms": 14.1488,
+        "median_ms": 9.2176,
+        "p95_ms": 9.2176,
+        "min_ms": 9.2176,
+        "max_ms": 9.2176,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -2995,10 +3007,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "large-collection-read@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 56.7556,
-        "p95_ms": 56.7556,
-        "min_ms": 56.7556,
-        "max_ms": 56.7556,
+        "median_ms": 37.0479,
+        "p95_ms": 37.0479,
+        "min_ms": 37.0479,
+        "max_ms": 37.0479,
         "rounds": 1
       },
       "reference": null,
@@ -3017,17 +3029,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "large-collection-read@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 46.0911,
-        "p95_ms": 46.0911,
-        "min_ms": 46.0911,
-        "max_ms": 46.0911,
+        "median_ms": 18.4703,
+        "p95_ms": 18.4703,
+        "min_ms": 18.4703,
+        "max_ms": 18.4703,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 56.7556,
-        "p95_ms": 56.7556,
-        "min_ms": 56.7556,
-        "max_ms": 56.7556,
+        "median_ms": 37.0479,
+        "p95_ms": 37.0479,
+        "min_ms": 37.0479,
+        "max_ms": 37.0479,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3045,17 +3057,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "large-collection-read@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 53.0079,
-        "p95_ms": 53.0079,
-        "min_ms": 53.0079,
-        "max_ms": 53.0079,
+        "median_ms": 43.5799,
+        "p95_ms": 43.5799,
+        "min_ms": 43.5799,
+        "max_ms": 43.5799,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 56.7556,
-        "p95_ms": 56.7556,
-        "min_ms": 56.7556,
-        "max_ms": 56.7556,
+        "median_ms": 37.0479,
+        "p95_ms": 37.0479,
+        "min_ms": 37.0479,
+        "max_ms": 37.0479,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3073,10 +3085,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "large-hash-list-read@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 76.6748,
-        "p95_ms": 76.6748,
-        "min_ms": 76.6748,
-        "max_ms": 76.6748,
+        "median_ms": 46.0788,
+        "p95_ms": 46.0788,
+        "min_ms": 46.0788,
+        "max_ms": 46.0788,
         "rounds": 1
       },
       "reference": null,
@@ -3095,17 +3107,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "large-hash-list-read@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 49.0147,
-        "p95_ms": 49.0147,
-        "min_ms": 49.0147,
-        "max_ms": 49.0147,
+        "median_ms": 22.8028,
+        "p95_ms": 22.8028,
+        "min_ms": 22.8028,
+        "max_ms": 22.8028,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 76.6748,
-        "p95_ms": 76.6748,
-        "min_ms": 76.6748,
-        "max_ms": 76.6748,
+        "median_ms": 46.0788,
+        "p95_ms": 46.0788,
+        "min_ms": 46.0788,
+        "max_ms": 46.0788,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3123,17 +3135,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "large-hash-list-read@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 53.9925,
-        "p95_ms": 53.9925,
-        "min_ms": 53.9925,
-        "max_ms": 53.9925,
+        "median_ms": 24.958,
+        "p95_ms": 24.958,
+        "min_ms": 24.958,
+        "max_ms": 24.958,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 76.6748,
-        "p95_ms": 76.6748,
-        "min_ms": 76.6748,
-        "max_ms": 76.6748,
+        "median_ms": 46.0788,
+        "p95_ms": 46.0788,
+        "min_ms": 46.0788,
+        "max_ms": 46.0788,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3151,10 +3163,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "resp3-hello@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 13.4592,
-        "p95_ms": 13.4592,
-        "min_ms": 13.4592,
-        "max_ms": 13.4592,
+        "median_ms": 5.631,
+        "p95_ms": 5.631,
+        "min_ms": 5.631,
+        "max_ms": 5.631,
         "rounds": 1
       },
       "reference": null,
@@ -3173,17 +3185,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "resp3-hello@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 8.2559,
-        "p95_ms": 8.2559,
-        "min_ms": 8.2559,
-        "max_ms": 8.2559,
+        "median_ms": 4.9754,
+        "p95_ms": 4.9754,
+        "min_ms": 4.9754,
+        "max_ms": 4.9754,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 13.4592,
-        "p95_ms": 13.4592,
-        "min_ms": 13.4592,
-        "max_ms": 13.4592,
+        "median_ms": 5.631,
+        "p95_ms": 5.631,
+        "min_ms": 5.631,
+        "max_ms": 5.631,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3201,17 +3213,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "resp3-hello@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 9.6828,
-        "p95_ms": 9.6828,
-        "min_ms": 9.6828,
-        "max_ms": 9.6828,
+        "median_ms": 6.9056,
+        "p95_ms": 6.9056,
+        "min_ms": 6.9056,
+        "max_ms": 6.9056,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 13.4592,
-        "p95_ms": 13.4592,
-        "min_ms": 13.4592,
-        "max_ms": 13.4592,
+        "median_ms": 5.631,
+        "p95_ms": 5.631,
+        "min_ms": 5.631,
+        "max_ms": 5.631,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3229,10 +3241,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "expire-sweep@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 311.3421,
-        "p95_ms": 311.3421,
-        "min_ms": 311.3421,
-        "max_ms": 311.3421,
+        "median_ms": 290.4934,
+        "p95_ms": 290.4934,
+        "min_ms": 290.4934,
+        "max_ms": 290.4934,
         "rounds": 1
       },
       "reference": null,
@@ -3252,17 +3264,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "expire-sweep@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 324.709,
-        "p95_ms": 324.709,
-        "min_ms": 324.709,
-        "max_ms": 324.709,
+        "median_ms": 262.3355,
+        "p95_ms": 262.3355,
+        "min_ms": 262.3355,
+        "max_ms": 262.3355,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 311.3421,
-        "p95_ms": 311.3421,
-        "min_ms": 311.3421,
-        "max_ms": 311.3421,
+        "median_ms": 290.4934,
+        "p95_ms": 290.4934,
+        "min_ms": 290.4934,
+        "max_ms": 290.4934,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3281,17 +3293,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "expire-sweep@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 355.3481,
-        "p95_ms": 355.3481,
-        "min_ms": 355.3481,
-        "max_ms": 355.3481,
+        "median_ms": 268.9116,
+        "p95_ms": 268.9116,
+        "min_ms": 268.9116,
+        "max_ms": 268.9116,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 311.3421,
-        "p95_ms": 311.3421,
-        "min_ms": 311.3421,
-        "max_ms": 311.3421,
+        "median_ms": 290.4934,
+        "p95_ms": 290.4934,
+        "min_ms": 290.4934,
+        "max_ms": 290.4934,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3310,10 +3322,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "multi-exec-mixed@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 24.8351,
-        "p95_ms": 24.8351,
-        "min_ms": 24.8351,
-        "max_ms": 24.8351,
+        "median_ms": 9.9799,
+        "p95_ms": 9.9799,
+        "min_ms": 9.9799,
+        "max_ms": 9.9799,
         "rounds": 1
       },
       "reference": null,
@@ -3332,17 +3344,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "multi-exec-mixed@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 24.1109,
-        "p95_ms": 24.1109,
-        "min_ms": 24.1109,
-        "max_ms": 24.1109,
+        "median_ms": 11.5331,
+        "p95_ms": 11.5331,
+        "min_ms": 11.5331,
+        "max_ms": 11.5331,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 24.8351,
-        "p95_ms": 24.8351,
-        "min_ms": 24.8351,
-        "max_ms": 24.8351,
+        "median_ms": 9.9799,
+        "p95_ms": 9.9799,
+        "min_ms": 9.9799,
+        "max_ms": 9.9799,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3360,17 +3372,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "multi-exec-mixed@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 22.9118,
-        "p95_ms": 22.9118,
-        "min_ms": 22.9118,
-        "max_ms": 22.9118,
+        "median_ms": 10.3481,
+        "p95_ms": 10.3481,
+        "min_ms": 10.3481,
+        "max_ms": 10.3481,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 24.8351,
-        "p95_ms": 24.8351,
-        "min_ms": 24.8351,
-        "max_ms": 24.8351,
+        "median_ms": 9.9799,
+        "p95_ms": 9.9799,
+        "min_ms": 9.9799,
+        "max_ms": 9.9799,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3388,10 +3400,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pubsub-fanout@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 38.9745,
-        "p95_ms": 38.9745,
-        "min_ms": 38.9745,
-        "max_ms": 38.9745,
+        "median_ms": 26.4451,
+        "p95_ms": 26.4451,
+        "min_ms": 26.4451,
+        "max_ms": 26.4451,
         "rounds": 1
       },
       "reference": null,
@@ -3410,17 +3422,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pubsub-fanout@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 36.2002,
-        "p95_ms": 36.2002,
-        "min_ms": 36.2002,
-        "max_ms": 36.2002,
+        "median_ms": 17.6343,
+        "p95_ms": 17.6343,
+        "min_ms": 17.6343,
+        "max_ms": 17.6343,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 38.9745,
-        "p95_ms": 38.9745,
-        "min_ms": 38.9745,
-        "max_ms": 38.9745,
+        "median_ms": 26.4451,
+        "p95_ms": 26.4451,
+        "min_ms": 26.4451,
+        "max_ms": 26.4451,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3438,17 +3450,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "pubsub-fanout@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 39.9546,
-        "p95_ms": 39.9546,
-        "min_ms": 39.9546,
-        "max_ms": 39.9546,
+        "median_ms": 22.0878,
+        "p95_ms": 22.0878,
+        "min_ms": 22.0878,
+        "max_ms": 22.0878,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 38.9745,
-        "p95_ms": 38.9745,
-        "min_ms": 38.9745,
-        "max_ms": 38.9745,
+        "median_ms": 26.4451,
+        "p95_ms": 26.4451,
+        "min_ms": 26.4451,
+        "max_ms": 26.4451,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3466,10 +3478,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-score-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 126.3942,
-        "p95_ms": 126.3942,
-        "min_ms": 126.3942,
-        "max_ms": 126.3942,
+        "median_ms": 60.9795,
+        "p95_ms": 60.9795,
+        "min_ms": 60.9795,
+        "max_ms": 60.9795,
         "rounds": 1
       },
       "reference": null,
@@ -3486,17 +3498,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-score-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 147.9402,
-        "p95_ms": 147.9402,
-        "min_ms": 147.9402,
-        "max_ms": 147.9402,
+        "median_ms": 64.7433,
+        "p95_ms": 64.7433,
+        "min_ms": 64.7433,
+        "max_ms": 64.7433,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 126.3942,
-        "p95_ms": 126.3942,
-        "min_ms": 126.3942,
-        "max_ms": 126.3942,
+        "median_ms": 60.9795,
+        "p95_ms": 60.9795,
+        "min_ms": 60.9795,
+        "max_ms": 60.9795,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3512,17 +3524,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "zset-score-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 158.5146,
-        "p95_ms": 158.5146,
-        "min_ms": 158.5146,
-        "max_ms": 158.5146,
+        "median_ms": 73.463,
+        "p95_ms": 73.463,
+        "min_ms": 73.463,
+        "max_ms": 73.463,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 126.3942,
-        "p95_ms": 126.3942,
-        "min_ms": 126.3942,
-        "max_ms": 126.3942,
+        "median_ms": 60.9795,
+        "p95_ms": 60.9795,
+        "min_ms": 60.9795,
+        "max_ms": 60.9795,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3538,10 +3550,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "bitfield-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 32.7857,
-        "p95_ms": 32.7857,
-        "min_ms": 32.7857,
-        "max_ms": 32.7857,
+        "median_ms": 21.0563,
+        "p95_ms": 21.0563,
+        "min_ms": 21.0563,
+        "max_ms": 21.0563,
         "rounds": 1
       },
       "reference": null,
@@ -3559,17 +3571,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "bitfield-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 35.7757,
-        "p95_ms": 35.7757,
-        "min_ms": 35.7757,
-        "max_ms": 35.7757,
+        "median_ms": 15.8067,
+        "p95_ms": 15.8067,
+        "min_ms": 15.8067,
+        "max_ms": 15.8067,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.7857,
-        "p95_ms": 32.7857,
-        "min_ms": 32.7857,
-        "max_ms": 32.7857,
+        "median_ms": 21.0563,
+        "p95_ms": 21.0563,
+        "min_ms": 21.0563,
+        "max_ms": 21.0563,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3586,17 +3598,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "bitfield-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 38.4002,
-        "p95_ms": 38.4002,
-        "min_ms": 38.4002,
-        "max_ms": 38.4002,
+        "median_ms": 20.8108,
+        "p95_ms": 20.8108,
+        "min_ms": 20.8108,
+        "max_ms": 20.8108,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 32.7857,
-        "p95_ms": 32.7857,
-        "min_ms": 32.7857,
-        "max_ms": 32.7857,
+        "median_ms": 21.0563,
+        "p95_ms": 21.0563,
+        "min_ms": 21.0563,
+        "max_ms": 21.0563,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3613,10 +3625,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hll-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 29.3849,
-        "p95_ms": 29.3849,
-        "min_ms": 29.3849,
-        "max_ms": 29.3849,
+        "median_ms": 18.8922,
+        "p95_ms": 18.8922,
+        "min_ms": 18.8922,
+        "max_ms": 18.8922,
         "rounds": 1
       },
       "reference": null,
@@ -3633,17 +3645,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hll-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 28.8177,
-        "p95_ms": 28.8177,
-        "min_ms": 28.8177,
-        "max_ms": 28.8177,
+        "median_ms": 17.6547,
+        "p95_ms": 17.6547,
+        "min_ms": 17.6547,
+        "max_ms": 17.6547,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 29.3849,
-        "p95_ms": 29.3849,
-        "min_ms": 29.3849,
-        "max_ms": 29.3849,
+        "median_ms": 18.8922,
+        "p95_ms": 18.8922,
+        "min_ms": 18.8922,
+        "max_ms": 18.8922,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3659,17 +3671,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hll-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 67.1178,
-        "p95_ms": 67.1178,
-        "min_ms": 67.1178,
-        "max_ms": 67.1178,
+        "median_ms": 20.172,
+        "p95_ms": 20.172,
+        "min_ms": 20.172,
+        "max_ms": 20.172,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 29.3849,
-        "p95_ms": 29.3849,
-        "min_ms": 29.3849,
-        "max_ms": 29.3849,
+        "median_ms": 18.8922,
+        "p95_ms": 18.8922,
+        "min_ms": 18.8922,
+        "max_ms": 18.8922,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3685,10 +3697,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "sort-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 8.6952,
-        "p95_ms": 8.6952,
-        "min_ms": 8.6952,
-        "max_ms": 8.6952,
+        "median_ms": 2.274,
+        "p95_ms": 2.274,
+        "min_ms": 2.274,
+        "max_ms": 2.274,
         "rounds": 1
       },
       "reference": null,
@@ -3707,17 +3719,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "sort-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 5.5104,
-        "p95_ms": 5.5104,
-        "min_ms": 5.5104,
-        "max_ms": 5.5104,
+        "median_ms": 2.4951,
+        "p95_ms": 2.4951,
+        "min_ms": 2.4951,
+        "max_ms": 2.4951,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 8.6952,
-        "p95_ms": 8.6952,
-        "min_ms": 8.6952,
-        "max_ms": 8.6952,
+        "median_ms": 2.274,
+        "p95_ms": 2.274,
+        "min_ms": 2.274,
+        "max_ms": 2.274,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3735,17 +3747,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "sort-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 6.1765,
-        "p95_ms": 6.1765,
-        "min_ms": 6.1765,
-        "max_ms": 6.1765,
+        "median_ms": 2.1761,
+        "p95_ms": 2.1761,
+        "min_ms": 2.1761,
+        "max_ms": 2.1761,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 8.6952,
-        "p95_ms": 8.6952,
-        "min_ms": 8.6952,
-        "max_ms": 8.6952,
+        "median_ms": 2.274,
+        "p95_ms": 2.274,
+        "min_ms": 2.274,
+        "max_ms": 2.274,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3763,10 +3775,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "keys-random@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 83.068,
-        "p95_ms": 83.068,
-        "min_ms": 83.068,
-        "max_ms": 83.068,
+        "median_ms": 36.04,
+        "p95_ms": 36.04,
+        "min_ms": 36.04,
+        "max_ms": 36.04,
         "rounds": 1
       },
       "reference": null,
@@ -3784,17 +3796,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "keys-random@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 85.2176,
-        "p95_ms": 85.2176,
-        "min_ms": 85.2176,
-        "max_ms": 85.2176,
+        "median_ms": 35.4614,
+        "p95_ms": 35.4614,
+        "min_ms": 35.4614,
+        "max_ms": 35.4614,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 83.068,
-        "p95_ms": 83.068,
-        "min_ms": 83.068,
-        "max_ms": 83.068,
+        "median_ms": 36.04,
+        "p95_ms": 36.04,
+        "min_ms": 36.04,
+        "max_ms": 36.04,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3811,17 +3823,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "keys-random@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 91.9334,
-        "p95_ms": 91.9334,
-        "min_ms": 91.9334,
-        "max_ms": 91.9334,
+        "median_ms": 35.7822,
+        "p95_ms": 35.7822,
+        "min_ms": 35.7822,
+        "max_ms": 35.7822,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 83.068,
-        "p95_ms": 83.068,
-        "min_ms": 83.068,
-        "max_ms": 83.068,
+        "median_ms": 36.04,
+        "p95_ms": 36.04,
+        "min_ms": 36.04,
+        "max_ms": 36.04,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3838,10 +3850,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-xread@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 51.939,
-        "p95_ms": 51.939,
-        "min_ms": 51.939,
-        "max_ms": 51.939,
+        "median_ms": 18.5689,
+        "p95_ms": 18.5689,
+        "min_ms": 18.5689,
+        "max_ms": 18.5689,
         "rounds": 1
       },
       "reference": null,
@@ -3859,17 +3871,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-xread@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 53.131,
-        "p95_ms": 53.131,
-        "min_ms": 53.131,
-        "max_ms": 53.131,
+        "median_ms": 18.9205,
+        "p95_ms": 18.9205,
+        "min_ms": 18.9205,
+        "max_ms": 18.9205,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 51.939,
-        "p95_ms": 51.939,
-        "min_ms": 51.939,
-        "max_ms": 51.939,
+        "median_ms": 18.5689,
+        "p95_ms": 18.5689,
+        "min_ms": 18.5689,
+        "max_ms": 18.5689,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3886,17 +3898,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-xread@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 62.3399,
-        "p95_ms": 62.3399,
-        "min_ms": 62.3399,
-        "max_ms": 62.3399,
+        "median_ms": 24.4313,
+        "p95_ms": 24.4313,
+        "min_ms": 24.4313,
+        "max_ms": 24.4313,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 51.939,
-        "p95_ms": 51.939,
-        "min_ms": 51.939,
-        "max_ms": 51.939,
+        "median_ms": 18.5689,
+        "p95_ms": 18.5689,
+        "min_ms": 18.5689,
+        "max_ms": 18.5689,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3913,10 +3925,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-xadd-xread@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 62.4258,
-        "p95_ms": 62.4258,
-        "min_ms": 62.4258,
-        "max_ms": 62.4258,
+        "median_ms": 29.3433,
+        "p95_ms": 29.3433,
+        "min_ms": 29.3433,
+        "max_ms": 29.3433,
         "rounds": 1
       },
       "reference": null,
@@ -3935,17 +3947,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-xadd-xread@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 65.607,
-        "p95_ms": 65.607,
-        "min_ms": 65.607,
-        "max_ms": 65.607,
+        "median_ms": 32.4974,
+        "p95_ms": 32.4974,
+        "min_ms": 32.4974,
+        "max_ms": 32.4974,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 62.4258,
-        "p95_ms": 62.4258,
-        "min_ms": 62.4258,
-        "max_ms": 62.4258,
+        "median_ms": 29.3433,
+        "p95_ms": 29.3433,
+        "min_ms": 29.3433,
+        "max_ms": 29.3433,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3963,17 +3975,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "stream-xadd-xread@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 64.6709,
-        "p95_ms": 64.6709,
-        "min_ms": 64.6709,
-        "max_ms": 64.6709,
+        "median_ms": 32.7185,
+        "p95_ms": 32.7185,
+        "min_ms": 32.7185,
+        "max_ms": 32.7185,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 62.4258,
-        "p95_ms": 62.4258,
-        "min_ms": 62.4258,
-        "max_ms": 62.4258,
+        "median_ms": 29.3433,
+        "p95_ms": 29.3433,
+        "min_ms": 29.3433,
+        "max_ms": 29.3433,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -3991,10 +4003,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hscan-cursor@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 3.6534,
-        "p95_ms": 3.6534,
-        "min_ms": 3.6534,
-        "max_ms": 3.6534,
+        "median_ms": 0.9786,
+        "p95_ms": 0.9786,
+        "min_ms": 0.9786,
+        "max_ms": 0.9786,
         "rounds": 1
       },
       "reference": null,
@@ -4012,17 +4024,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hscan-cursor@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 2.0904,
-        "p95_ms": 2.0904,
-        "min_ms": 2.0904,
-        "max_ms": 2.0904,
+        "median_ms": 0.6605,
+        "p95_ms": 0.6605,
+        "min_ms": 0.6605,
+        "max_ms": 0.6605,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 3.6534,
-        "p95_ms": 3.6534,
-        "min_ms": 3.6534,
-        "max_ms": 3.6534,
+        "median_ms": 0.9786,
+        "p95_ms": 0.9786,
+        "min_ms": 0.9786,
+        "max_ms": 0.9786,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4039,17 +4051,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "hscan-cursor@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 3.8162,
-        "p95_ms": 3.8162,
-        "min_ms": 3.8162,
-        "max_ms": 3.8162,
+        "median_ms": 1.5422,
+        "p95_ms": 1.5422,
+        "min_ms": 1.5422,
+        "max_ms": 1.5422,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 3.6534,
-        "p95_ms": 3.6534,
-        "min_ms": 3.6534,
-        "max_ms": 3.6534,
+        "median_ms": 0.9786,
+        "p95_ms": 0.9786,
+        "min_ms": 0.9786,
+        "max_ms": 0.9786,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4066,10 +4078,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "sscan-zscan-cursor@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 4.3197,
-        "p95_ms": 4.3197,
-        "min_ms": 4.3197,
-        "max_ms": 4.3197,
+        "median_ms": 1.7573,
+        "p95_ms": 1.7573,
+        "min_ms": 1.7573,
+        "max_ms": 1.7573,
         "rounds": 1
       },
       "reference": null,
@@ -4088,17 +4100,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "sscan-zscan-cursor@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 5.6344,
-        "p95_ms": 5.6344,
-        "min_ms": 5.6344,
-        "max_ms": 5.6344,
+        "median_ms": 1.2872,
+        "p95_ms": 1.2872,
+        "min_ms": 1.2872,
+        "max_ms": 1.2872,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 4.3197,
-        "p95_ms": 4.3197,
-        "min_ms": 4.3197,
-        "max_ms": 4.3197,
+        "median_ms": 1.7573,
+        "p95_ms": 1.7573,
+        "min_ms": 1.7573,
+        "max_ms": 1.7573,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4116,17 +4128,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "sscan-zscan-cursor@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 5.1851,
-        "p95_ms": 5.1851,
-        "min_ms": 5.1851,
-        "max_ms": 5.1851,
+        "median_ms": 1.7109,
+        "p95_ms": 1.7109,
+        "min_ms": 1.7109,
+        "max_ms": 1.7109,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 4.3197,
-        "p95_ms": 4.3197,
-        "min_ms": 4.3197,
-        "max_ms": 4.3197,
+        "median_ms": 1.7573,
+        "p95_ms": 1.7573,
+        "min_ms": 1.7573,
+        "max_ms": 1.7573,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4144,10 +4156,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-ops-large@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 1002.3579,
-        "p95_ms": 1002.3579,
-        "min_ms": 1002.3579,
-        "max_ms": 1002.3579,
+        "median_ms": 267.032,
+        "p95_ms": 267.032,
+        "min_ms": 267.032,
+        "max_ms": 267.032,
         "rounds": 1
       },
       "reference": null,
@@ -4166,17 +4178,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-ops-large@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 962.3057,
-        "p95_ms": 962.3057,
-        "min_ms": 962.3057,
-        "max_ms": 962.3057,
+        "median_ms": 249.8401,
+        "p95_ms": 249.8401,
+        "min_ms": 249.8401,
+        "max_ms": 249.8401,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 1002.3579,
-        "p95_ms": 1002.3579,
-        "min_ms": 1002.3579,
-        "max_ms": 1002.3579,
+        "median_ms": 267.032,
+        "p95_ms": 267.032,
+        "min_ms": 267.032,
+        "max_ms": 267.032,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4194,17 +4206,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-ops-large@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 985.8149,
-        "p95_ms": 985.8149,
-        "min_ms": 985.8149,
-        "max_ms": 985.8149,
+        "median_ms": 253.2657,
+        "p95_ms": 253.2657,
+        "min_ms": 253.2657,
+        "max_ms": 253.2657,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 1002.3579,
-        "p95_ms": 1002.3579,
-        "min_ms": 1002.3579,
-        "max_ms": 1002.3579,
+        "median_ms": 267.032,
+        "p95_ms": 267.032,
+        "min_ms": 267.032,
+        "max_ms": 267.032,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4222,10 +4234,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "lmpop-blocking@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 35.3298,
-        "p95_ms": 35.3298,
-        "min_ms": 35.3298,
-        "max_ms": 35.3298,
+        "median_ms": 14.7628,
+        "p95_ms": 14.7628,
+        "min_ms": 14.7628,
+        "max_ms": 14.7628,
         "rounds": 1
       },
       "reference": null,
@@ -4244,17 +4256,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "lmpop-blocking@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 37.7422,
-        "p95_ms": 37.7422,
-        "min_ms": 37.7422,
-        "max_ms": 37.7422,
+        "median_ms": 15.4115,
+        "p95_ms": 15.4115,
+        "min_ms": 15.4115,
+        "max_ms": 15.4115,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 35.3298,
-        "p95_ms": 35.3298,
-        "min_ms": 35.3298,
-        "max_ms": 35.3298,
+        "median_ms": 14.7628,
+        "p95_ms": 14.7628,
+        "min_ms": 14.7628,
+        "max_ms": 14.7628,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4272,17 +4284,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "lmpop-blocking@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 35.8475,
-        "p95_ms": 35.8475,
-        "min_ms": 35.8475,
-        "max_ms": 35.8475,
+        "median_ms": 14.6323,
+        "p95_ms": 14.6323,
+        "min_ms": 14.6323,
+        "max_ms": 14.6323,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 35.3298,
-        "p95_ms": 35.3298,
-        "min_ms": 35.3298,
-        "max_ms": 35.3298,
+        "median_ms": 14.7628,
+        "p95_ms": 14.7628,
+        "min_ms": 14.7628,
+        "max_ms": 14.7628,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4300,10 +4312,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "key-space-notify@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 108.9645,
-        "p95_ms": 108.9645,
-        "min_ms": 108.9645,
-        "max_ms": 108.9645,
+        "median_ms": 107.0286,
+        "p95_ms": 107.0286,
+        "min_ms": 107.0286,
+        "max_ms": 107.0286,
         "rounds": 1
       },
       "reference": null,
@@ -4322,17 +4334,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "key-space-notify@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 107.1372,
-        "p95_ms": 107.1372,
-        "min_ms": 107.1372,
-        "max_ms": 107.1372,
+        "median_ms": 106.7563,
+        "p95_ms": 106.7563,
+        "min_ms": 106.7563,
+        "max_ms": 106.7563,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 108.9645,
-        "p95_ms": 108.9645,
-        "min_ms": 108.9645,
-        "max_ms": 108.9645,
+        "median_ms": 107.0286,
+        "p95_ms": 107.0286,
+        "min_ms": 107.0286,
+        "max_ms": 107.0286,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4350,17 +4362,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "key-space-notify@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 108.448,
-        "p95_ms": 108.448,
-        "min_ms": 108.448,
-        "max_ms": 108.448,
+        "median_ms": 109.5423,
+        "p95_ms": 109.5423,
+        "min_ms": 109.5423,
+        "max_ms": 109.5423,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 108.9645,
-        "p95_ms": 108.9645,
-        "min_ms": 108.9645,
-        "max_ms": 108.9645,
+        "median_ms": 107.0286,
+        "p95_ms": 107.0286,
+        "min_ms": 107.0286,
+        "max_ms": 107.0286,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4378,10 +4390,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "resp3-collections@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 29.9489,
-        "p95_ms": 29.9489,
-        "min_ms": 29.9489,
-        "max_ms": 29.9489,
+        "median_ms": 12.5281,
+        "p95_ms": 12.5281,
+        "min_ms": 12.5281,
+        "max_ms": 12.5281,
         "rounds": 1
       },
       "reference": null,
@@ -4400,17 +4412,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "resp3-collections@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 27.4311,
-        "p95_ms": 27.4311,
-        "min_ms": 27.4311,
-        "max_ms": 27.4311,
+        "median_ms": 9.1502,
+        "p95_ms": 9.1502,
+        "min_ms": 9.1502,
+        "max_ms": 9.1502,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 29.9489,
-        "p95_ms": 29.9489,
-        "min_ms": 29.9489,
-        "max_ms": 29.9489,
+        "median_ms": 12.5281,
+        "p95_ms": 12.5281,
+        "min_ms": 12.5281,
+        "max_ms": 12.5281,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4428,17 +4440,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "resp3-collections@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 26.4072,
-        "p95_ms": 26.4072,
-        "min_ms": 26.4072,
-        "max_ms": 26.4072,
+        "median_ms": 9.7271,
+        "p95_ms": 9.7271,
+        "min_ms": 9.7271,
+        "max_ms": 9.7271,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 29.9489,
-        "p95_ms": 29.9489,
-        "min_ms": 29.9489,
-        "max_ms": 29.9489,
+        "median_ms": 12.5281,
+        "p95_ms": 12.5281,
+        "min_ms": 12.5281,
+        "max_ms": 12.5281,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4456,10 +4468,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "server-face-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 9.1002,
-        "p95_ms": 9.1002,
-        "min_ms": 9.1002,
-        "max_ms": 9.1002,
+        "median_ms": 3.6208,
+        "p95_ms": 3.6208,
+        "min_ms": 3.6208,
+        "max_ms": 3.6208,
         "rounds": 1
       },
       "reference": null,
@@ -4477,17 +4489,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "server-face-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 8.7222,
-        "p95_ms": 8.7222,
-        "min_ms": 8.7222,
-        "max_ms": 8.7222,
+        "median_ms": 3.9747,
+        "p95_ms": 3.9747,
+        "min_ms": 3.9747,
+        "max_ms": 3.9747,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 9.1002,
-        "p95_ms": 9.1002,
-        "min_ms": 9.1002,
-        "max_ms": 9.1002,
+        "median_ms": 3.6208,
+        "p95_ms": 3.6208,
+        "min_ms": 3.6208,
+        "max_ms": 3.6208,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4504,17 +4516,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "server-face-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 7.7313,
-        "p95_ms": 7.7313,
-        "min_ms": 7.7313,
-        "max_ms": 7.7313,
+        "median_ms": 5.4537,
+        "p95_ms": 5.4537,
+        "min_ms": 5.4537,
+        "max_ms": 5.4537,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 9.1002,
-        "p95_ms": 9.1002,
-        "min_ms": 9.1002,
-        "max_ms": 9.1002,
+        "median_ms": 3.6208,
+        "p95_ms": 3.6208,
+        "min_ms": 3.6208,
+        "max_ms": 3.6208,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4531,10 +4543,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "watch-exec@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 6.5095,
-        "p95_ms": 6.5095,
-        "min_ms": 6.5095,
-        "max_ms": 6.5095,
+        "median_ms": 4.1636,
+        "p95_ms": 4.1636,
+        "min_ms": 4.1636,
+        "max_ms": 4.1636,
         "rounds": 1
       },
       "reference": null,
@@ -4552,17 +4564,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "watch-exec@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 7.4574,
-        "p95_ms": 7.4574,
-        "min_ms": 7.4574,
-        "max_ms": 7.4574,
+        "median_ms": 3.7574,
+        "p95_ms": 3.7574,
+        "min_ms": 3.7574,
+        "max_ms": 3.7574,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 6.5095,
-        "p95_ms": 6.5095,
-        "min_ms": 6.5095,
-        "max_ms": 6.5095,
+        "median_ms": 4.1636,
+        "p95_ms": 4.1636,
+        "min_ms": 4.1636,
+        "max_ms": 4.1636,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4579,17 +4591,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "watch-exec@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 7.3329,
-        "p95_ms": 7.3329,
-        "min_ms": 7.3329,
-        "max_ms": 7.3329,
+        "median_ms": 3.5096,
+        "p95_ms": 3.5096,
+        "min_ms": 3.5096,
+        "max_ms": 3.5096,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 6.5095,
-        "p95_ms": 6.5095,
-        "min_ms": 6.5095,
-        "max_ms": 6.5095,
+        "median_ms": 4.1636,
+        "p95_ms": 4.1636,
+        "min_ms": 4.1636,
+        "max_ms": 4.1636,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4606,10 +4618,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-big@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 10.7125,
-        "p95_ms": 10.7125,
-        "min_ms": 10.7125,
-        "max_ms": 10.7125,
+        "median_ms": 6.5348,
+        "p95_ms": 6.5348,
+        "min_ms": 6.5348,
+        "max_ms": 6.5348,
         "rounds": 1
       },
       "reference": null,
@@ -4627,17 +4639,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-big@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 12.1144,
-        "p95_ms": 12.1144,
-        "min_ms": 12.1144,
-        "max_ms": 12.1144,
+        "median_ms": 10.9497,
+        "p95_ms": 10.9497,
+        "min_ms": 10.9497,
+        "max_ms": 10.9497,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 10.7125,
-        "p95_ms": 10.7125,
-        "min_ms": 10.7125,
-        "max_ms": 10.7125,
+        "median_ms": 6.5348,
+        "p95_ms": 6.5348,
+        "min_ms": 6.5348,
+        "max_ms": 6.5348,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4654,17 +4666,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "set-big@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 17.1776,
-        "p95_ms": 17.1776,
-        "min_ms": 17.1776,
-        "max_ms": 17.1776,
+        "median_ms": 18.7667,
+        "p95_ms": 18.7667,
+        "min_ms": 18.7667,
+        "max_ms": 18.7667,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 10.7125,
-        "p95_ms": 10.7125,
-        "min_ms": 10.7125,
-        "max_ms": 10.7125,
+        "median_ms": 6.5348,
+        "p95_ms": 6.5348,
+        "min_ms": 6.5348,
+        "max_ms": 6.5348,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4681,10 +4693,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-big@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 44.669,
-        "p95_ms": 44.669,
-        "min_ms": 44.669,
-        "max_ms": 44.669,
+        "median_ms": 30.434,
+        "p95_ms": 30.434,
+        "min_ms": 30.434,
+        "max_ms": 30.434,
         "rounds": 1
       },
       "reference": null,
@@ -4702,17 +4714,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-big@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 24.6033,
-        "p95_ms": 24.6033,
-        "min_ms": 24.6033,
-        "max_ms": 24.6033,
+        "median_ms": 16.512,
+        "p95_ms": 16.512,
+        "min_ms": 16.512,
+        "max_ms": 16.512,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 44.669,
-        "p95_ms": 44.669,
-        "min_ms": 44.669,
-        "max_ms": 44.669,
+        "median_ms": 30.434,
+        "p95_ms": 30.434,
+        "min_ms": 30.434,
+        "max_ms": 30.434,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4729,17 +4741,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "get-big@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 30.4502,
-        "p95_ms": 30.4502,
-        "min_ms": 30.4502,
-        "max_ms": 30.4502,
+        "median_ms": 40.3451,
+        "p95_ms": 40.3451,
+        "min_ms": 40.3451,
+        "max_ms": 40.3451,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 44.669,
-        "p95_ms": 44.669,
-        "min_ms": 44.669,
-        "max_ms": 44.669,
+        "median_ms": 30.434,
+        "p95_ms": 30.434,
+        "min_ms": 30.434,
+        "max_ms": 30.434,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4756,10 +4768,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "del-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 27.9575,
-        "p95_ms": 27.9575,
-        "min_ms": 27.9575,
-        "max_ms": 27.9575,
+        "median_ms": 17.2628,
+        "p95_ms": 17.2628,
+        "min_ms": 17.2628,
+        "max_ms": 17.2628,
         "rounds": 1
       },
       "reference": null,
@@ -4776,17 +4788,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "del-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 31.9217,
-        "p95_ms": 31.9217,
-        "min_ms": 31.9217,
-        "max_ms": 31.9217,
+        "median_ms": 13.3904,
+        "p95_ms": 13.3904,
+        "min_ms": 13.3904,
+        "max_ms": 13.3904,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 27.9575,
-        "p95_ms": 27.9575,
-        "min_ms": 27.9575,
-        "max_ms": 27.9575,
+        "median_ms": 17.2628,
+        "p95_ms": 17.2628,
+        "min_ms": 17.2628,
+        "max_ms": 17.2628,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4802,17 +4814,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "del-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 28.6797,
-        "p95_ms": 28.6797,
-        "min_ms": 28.6797,
-        "max_ms": 28.6797,
+        "median_ms": 20.2134,
+        "p95_ms": 20.2134,
+        "min_ms": 20.2134,
+        "max_ms": 20.2134,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 27.9575,
-        "p95_ms": 27.9575,
-        "min_ms": 27.9575,
-        "max_ms": 27.9575,
+        "median_ms": 17.2628,
+        "p95_ms": 17.2628,
+        "min_ms": 17.2628,
+        "max_ms": 17.2628,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4828,10 +4840,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "move-seq@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 57.3704,
-        "p95_ms": 57.3704,
-        "min_ms": 57.3704,
-        "max_ms": 57.3704,
+        "median_ms": 27.0353,
+        "p95_ms": 27.0353,
+        "min_ms": 27.0353,
+        "max_ms": 27.0353,
         "rounds": 1
       },
       "reference": null,
@@ -4849,17 +4861,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "move-seq@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 63.3653,
-        "p95_ms": 63.3653,
-        "min_ms": 63.3653,
-        "max_ms": 63.3653,
+        "median_ms": 22.8797,
+        "p95_ms": 22.8797,
+        "min_ms": 22.8797,
+        "max_ms": 22.8797,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 57.3704,
-        "p95_ms": 57.3704,
-        "min_ms": 57.3704,
-        "max_ms": 57.3704,
+        "median_ms": 27.0353,
+        "p95_ms": 27.0353,
+        "min_ms": 27.0353,
+        "max_ms": 27.0353,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4876,17 +4888,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "move-seq@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 61.6158,
-        "p95_ms": 61.6158,
-        "min_ms": 61.6158,
-        "max_ms": 61.6158,
+        "median_ms": 26.6555,
+        "p95_ms": 26.6555,
+        "min_ms": 26.6555,
+        "max_ms": 26.6555,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 57.3704,
-        "p95_ms": 57.3704,
-        "min_ms": 57.3704,
-        "max_ms": 57.3704,
+        "median_ms": 27.0353,
+        "p95_ms": 27.0353,
+        "min_ms": 27.0353,
+        "max_ms": 27.0353,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4903,10 +4915,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ping@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 113.4589,
-        "p95_ms": 113.4589,
-        "min_ms": 113.4589,
-        "max_ms": 113.4589,
+        "median_ms": 60.4365,
+        "p95_ms": 60.4365,
+        "min_ms": 60.4365,
+        "max_ms": 60.4365,
         "rounds": 1
       },
       "reference": null,
@@ -4923,17 +4935,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ping@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 125.5707,
-        "p95_ms": 125.5707,
-        "min_ms": 125.5707,
-        "max_ms": 125.5707,
+        "median_ms": 59.3464,
+        "p95_ms": 59.3464,
+        "min_ms": 59.3464,
+        "max_ms": 59.3464,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 113.4589,
-        "p95_ms": 113.4589,
-        "min_ms": 113.4589,
-        "max_ms": 113.4589,
+        "median_ms": 60.4365,
+        "p95_ms": 60.4365,
+        "min_ms": 60.4365,
+        "max_ms": 60.4365,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4949,17 +4961,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "ping@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 138.9661,
-        "p95_ms": 138.9661,
-        "min_ms": 138.9661,
-        "max_ms": 138.9661,
+        "median_ms": 71.9511,
+        "p95_ms": 71.9511,
+        "min_ms": 71.9511,
+        "max_ms": 71.9511,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 113.4589,
-        "p95_ms": 113.4589,
-        "min_ms": 113.4589,
-        "max_ms": 113.4589,
+        "median_ms": 60.4365,
+        "p95_ms": 60.4365,
+        "min_ms": 60.4365,
+        "max_ms": 60.4365,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -4975,10 +4987,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "bit-ops@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 107.194,
-        "p95_ms": 107.194,
-        "min_ms": 107.194,
-        "max_ms": 107.194,
+        "median_ms": 63.8604,
+        "p95_ms": 63.8604,
+        "min_ms": 63.8604,
+        "max_ms": 63.8604,
         "rounds": 1
       },
       "reference": null,
@@ -4996,17 +5008,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "bit-ops@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 108.7224,
-        "p95_ms": 108.7224,
-        "min_ms": 108.7224,
-        "max_ms": 108.7224,
+        "median_ms": 80.9622,
+        "p95_ms": 80.9622,
+        "min_ms": 80.9622,
+        "max_ms": 80.9622,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 107.194,
-        "p95_ms": 107.194,
-        "min_ms": 107.194,
-        "max_ms": 107.194,
+        "median_ms": 63.8604,
+        "p95_ms": 63.8604,
+        "min_ms": 63.8604,
+        "max_ms": 63.8604,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5023,17 +5035,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "bit-ops@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 137.8243,
-        "p95_ms": 137.8243,
-        "min_ms": 137.8243,
-        "max_ms": 137.8243,
+        "median_ms": 72.2031,
+        "p95_ms": 72.2031,
+        "min_ms": 72.2031,
+        "max_ms": 72.2031,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 107.194,
-        "p95_ms": 107.194,
-        "min_ms": 107.194,
-        "max_ms": 107.194,
+        "median_ms": 63.8604,
+        "p95_ms": 63.8604,
+        "min_ms": 63.8604,
+        "max_ms": 63.8604,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5050,10 +5062,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "setrange-getrange@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 63.5541,
-        "p95_ms": 63.5541,
-        "min_ms": 63.5541,
-        "max_ms": 63.5541,
+        "median_ms": 39.9855,
+        "p95_ms": 39.9855,
+        "min_ms": 39.9855,
+        "max_ms": 39.9855,
         "rounds": 1
       },
       "reference": null,
@@ -5071,17 +5083,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "setrange-getrange@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 72.2755,
-        "p95_ms": 72.2755,
-        "min_ms": 72.2755,
-        "max_ms": 72.2755,
+        "median_ms": 28.2096,
+        "p95_ms": 28.2096,
+        "min_ms": 28.2096,
+        "max_ms": 28.2096,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 63.5541,
-        "p95_ms": 63.5541,
-        "min_ms": 63.5541,
-        "max_ms": 63.5541,
+        "median_ms": 39.9855,
+        "p95_ms": 39.9855,
+        "min_ms": 39.9855,
+        "max_ms": 39.9855,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5098,17 +5110,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "setrange-getrange@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 73.3153,
-        "p95_ms": 73.3153,
-        "min_ms": 73.3153,
-        "max_ms": 73.3153,
+        "median_ms": 37.9676,
+        "p95_ms": 37.9676,
+        "min_ms": 37.9676,
+        "max_ms": 37.9676,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 63.5541,
-        "p95_ms": 63.5541,
-        "min_ms": 63.5541,
-        "max_ms": 63.5541,
+        "median_ms": 39.9855,
+        "p95_ms": 39.9855,
+        "min_ms": 39.9855,
+        "max_ms": 39.9855,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5125,10 +5137,10 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "rename-unlink@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 87.286,
-        "p95_ms": 87.286,
-        "min_ms": 87.286,
-        "max_ms": 87.286,
+        "median_ms": 41.848,
+        "p95_ms": 41.848,
+        "min_ms": 41.848,
+        "max_ms": 41.848,
         "rounds": 1
       },
       "reference": null,
@@ -5146,17 +5158,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "rename-unlink@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 99.1394,
-        "p95_ms": 99.1394,
-        "min_ms": 99.1394,
-        "max_ms": 99.1394,
+        "median_ms": 39.2118,
+        "p95_ms": 39.2118,
+        "min_ms": 39.2118,
+        "max_ms": 39.2118,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 87.286,
-        "p95_ms": 87.286,
-        "min_ms": 87.286,
-        "max_ms": 87.286,
+        "median_ms": 41.848,
+        "p95_ms": 41.848,
+        "min_ms": 41.848,
+        "max_ms": 41.848,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5173,17 +5185,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "rename-unlink@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 80.7579,
-        "p95_ms": 80.7579,
-        "min_ms": 80.7579,
-        "max_ms": 80.7579,
+        "median_ms": 47.8041,
+        "p95_ms": 47.8041,
+        "min_ms": 47.8041,
+        "max_ms": 47.8041,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 87.286,
-        "p95_ms": 87.286,
-        "min_ms": 87.286,
-        "max_ms": 87.286,
+        "median_ms": 41.848,
+        "p95_ms": 41.848,
+        "min_ms": 41.848,
+        "max_ms": 41.848,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5197,13 +5209,241 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       }
     },
     {
+      "workload": "setnx-getset@ioredis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 35.6949,
+        "p95_ms": 35.6949,
+        "min_ms": 35.6949,
+        "max_ms": 35.6949,
+        "rounds": 1
+      },
+      "reference": null,
+      "reference_engine": null,
+      "provenance": {
+        "scenario": "redis-string-setnx-getset",
+        "scenario_params": {
+          "keys": "200",
+          "commands": "SETNX,GETSET",
+          "value_bytes": "64"
+        },
+        "data_scale": "keys=200"
+      }
+    },
+    {
+      "workload": "setnx-getset@@yydb/redis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 33.1997,
+        "p95_ms": 33.1997,
+        "min_ms": 33.1997,
+        "max_ms": 33.1997,
+        "rounds": 1
+      },
+      "reference": {
+        "median_ms": 35.6949,
+        "p95_ms": 35.6949,
+        "min_ms": 35.6949,
+        "max_ms": 35.6949,
+        "rounds": 1
+      },
+      "reference_engine": "ioredis",
+      "provenance": {
+        "scenario": "redis-string-setnx-getset",
+        "scenario_params": {
+          "keys": "200",
+          "commands": "SETNX,GETSET",
+          "value_bytes": "64"
+        },
+        "data_scale": "keys=200"
+      }
+    },
+    {
+      "workload": "setnx-getset@node-redis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 36.555,
+        "p95_ms": 36.555,
+        "min_ms": 36.555,
+        "max_ms": 36.555,
+        "rounds": 1
+      },
+      "reference": {
+        "median_ms": 35.6949,
+        "p95_ms": 35.6949,
+        "min_ms": 35.6949,
+        "max_ms": 35.6949,
+        "rounds": 1
+      },
+      "reference_engine": "ioredis",
+      "provenance": {
+        "scenario": "redis-string-setnx-getset",
+        "scenario_params": {
+          "keys": "200",
+          "commands": "SETNX,GETSET",
+          "value_bytes": "64"
+        },
+        "data_scale": "keys=200"
+      }
+    },
+    {
+      "workload": "smove-spop@ioredis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 48.3904,
+        "p95_ms": 48.3904,
+        "min_ms": 48.3904,
+        "max_ms": 48.3904,
+        "rounds": 1
+      },
+      "reference": null,
+      "reference_engine": null,
+      "provenance": {
+        "scenario": "redis-set-smove-spop",
+        "scenario_params": {
+          "members": "200",
+          "commands": "SMOVE,SPOP"
+        },
+        "data_scale": "keys=2,members=200"
+      }
+    },
+    {
+      "workload": "smove-spop@@yydb/redis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 36.4441,
+        "p95_ms": 36.4441,
+        "min_ms": 36.4441,
+        "max_ms": 36.4441,
+        "rounds": 1
+      },
+      "reference": {
+        "median_ms": 48.3904,
+        "p95_ms": 48.3904,
+        "min_ms": 48.3904,
+        "max_ms": 48.3904,
+        "rounds": 1
+      },
+      "reference_engine": "ioredis",
+      "provenance": {
+        "scenario": "redis-set-smove-spop",
+        "scenario_params": {
+          "members": "200",
+          "commands": "SMOVE,SPOP"
+        },
+        "data_scale": "keys=2,members=200"
+      }
+    },
+    {
+      "workload": "smove-spop@node-redis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 41.2703,
+        "p95_ms": 41.2703,
+        "min_ms": 41.2703,
+        "max_ms": 41.2703,
+        "rounds": 1
+      },
+      "reference": {
+        "median_ms": 48.3904,
+        "p95_ms": 48.3904,
+        "min_ms": 48.3904,
+        "max_ms": 48.3904,
+        "rounds": 1
+      },
+      "reference_engine": "ioredis",
+      "provenance": {
+        "scenario": "redis-set-smove-spop",
+        "scenario_params": {
+          "members": "200",
+          "commands": "SMOVE,SPOP"
+        },
+        "data_scale": "keys=2,members=200"
+      }
+    },
+    {
+      "workload": "zrangestore-zdiff@ioredis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 0.8435,
+        "p95_ms": 0.8435,
+        "min_ms": 0.8435,
+        "max_ms": 0.8435,
+        "rounds": 1
+      },
+      "reference": null,
+      "reference_engine": null,
+      "provenance": {
+        "scenario": "redis-zset-zrangestore-zdiff",
+        "scenario_params": {
+          "members": "200",
+          "commands": "ZRANGESTORE,ZDIFF"
+        },
+        "data_scale": "keys=3,members=200"
+      }
+    },
+    {
+      "workload": "zrangestore-zdiff@@yydb/redis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 0.5036,
+        "p95_ms": 0.5036,
+        "min_ms": 0.5036,
+        "max_ms": 0.5036,
+        "rounds": 1
+      },
+      "reference": {
+        "median_ms": 0.8435,
+        "p95_ms": 0.8435,
+        "min_ms": 0.8435,
+        "max_ms": 0.8435,
+        "rounds": 1
+      },
+      "reference_engine": "ioredis",
+      "provenance": {
+        "scenario": "redis-zset-zrangestore-zdiff",
+        "scenario_params": {
+          "members": "200",
+          "commands": "ZRANGESTORE,ZDIFF"
+        },
+        "data_scale": "keys=3,members=200"
+      }
+    },
+    {
+      "workload": "zrangestore-zdiff@node-redis",
+      "unit": "ms",
+      "ours": {
+        "median_ms": 0.4732,
+        "p95_ms": 0.4732,
+        "min_ms": 0.4732,
+        "max_ms": 0.4732,
+        "rounds": 1
+      },
+      "reference": {
+        "median_ms": 0.8435,
+        "p95_ms": 0.8435,
+        "min_ms": 0.8435,
+        "max_ms": 0.8435,
+        "rounds": 1
+      },
+      "reference_engine": "ioredis",
+      "provenance": {
+        "scenario": "redis-zset-zrangestore-zdiff",
+        "scenario_params": {
+          "members": "200",
+          "commands": "ZRANGESTORE,ZDIFF"
+        },
+        "data_scale": "keys=3,members=200"
+      }
+    },
+    {
       "workload": "connect@ioredis",
       "unit": "ms",
       "ours": {
-        "median_ms": 106.7149,
-        "p95_ms": 106.7149,
-        "min_ms": 106.7149,
-        "max_ms": 106.7149,
+        "median_ms": 69.4902,
+        "p95_ms": 69.4902,
+        "min_ms": 69.4902,
+        "max_ms": 69.4902,
         "rounds": 1
       },
       "reference": null,
@@ -5221,17 +5461,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "connect@@yydb/redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 31.3717,
-        "p95_ms": 31.3717,
-        "min_ms": 31.3717,
-        "max_ms": 31.3717,
+        "median_ms": 24.2739,
+        "p95_ms": 24.2739,
+        "min_ms": 24.2739,
+        "max_ms": 24.2739,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 106.7149,
-        "p95_ms": 106.7149,
-        "min_ms": 106.7149,
-        "max_ms": 106.7149,
+        "median_ms": 69.4902,
+        "p95_ms": 69.4902,
+        "min_ms": 69.4902,
+        "max_ms": 69.4902,
         "rounds": 1
       },
       "reference_engine": "ioredis",
@@ -5248,17 +5488,17 @@ provenance applies to all rows, row-level `provenance` overrides field by field)
       "workload": "connect@node-redis",
       "unit": "ms",
       "ours": {
-        "median_ms": 68.6669,
-        "p95_ms": 68.6669,
-        "min_ms": 68.6669,
-        "max_ms": 68.6669,
+        "median_ms": 63.7962,
+        "p95_ms": 63.7962,
+        "min_ms": 63.7962,
+        "max_ms": 63.7962,
         "rounds": 1
       },
       "reference": {
-        "median_ms": 106.7149,
-        "p95_ms": 106.7149,
-        "min_ms": 106.7149,
-        "max_ms": 106.7149,
+        "median_ms": 69.4902,
+        "p95_ms": 69.4902,
+        "min_ms": 69.4902,
+        "max_ms": 69.4902,
         "rounds": 1
       },
       "reference_engine": "ioredis",
