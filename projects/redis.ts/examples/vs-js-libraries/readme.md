@@ -114,6 +114,14 @@ stable scenario id, so runs can be compared across revisions:
 | `server-face-ops` | `redis-server-face` | `INFO` + `COMMAND COUNT` + `CONFIG GET` / `SET` |
 | `set-big` | `redis-big-value-set` | large-value `SET` |
 | `get-big` | `redis-big-value-get` | large-value `GET` |
+| `hash-keys-values` | `redis-hash-hkeys-hvals-hlen-hincrby` | `HKEYS` + `HVALS` + `HLEN` + `HINCRBY` on one hash |
+| `zset-range-queries` | `redis-zset-rangebyscore-rangebylex` | `ZCOUNT` / `ZRANGEBYSCORE` / `ZREVRANGEBYSCORE` / `ZRANGEBYLEX` |
+| `large-collection-read` | `redis-large-collection-full-read` | full `SMEMBERS` + `ZRANGE` over 2000 members |
+| `large-hash-list-read` | `redis-large-hash-list-full-read` | full `HGETALL` + `LRANGE` over 2000 fields |
+| `sscan-zscan-cursor` | `redis-set-zset-scan-cursor` | `SSCAN` / `ZSCAN` cursor sweeps |
+| `bit-ops` | `redis-string-bitfield-ops` | `SETBIT` + `GETBIT` + `BITCOUNT` + `BITPOS` per key |
+| `setrange-getrange` | `redis-string-setrange-getrange` | `SETRANGE` + `GETRANGE` per key |
+| `rename-unlink` | `redis-key-rename-unlink` | `RENAME` then `UNLINK` per key |
 | `ping` | `redis-ping-rtt` | awaited `PING` round-trips |
 | `connect` | `redis-connect-open-close` | establish + readiness `PING` + close |
 

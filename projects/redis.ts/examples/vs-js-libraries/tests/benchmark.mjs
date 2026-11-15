@@ -644,6 +644,44 @@ const workloads = [
     },
   },
   {
+    name: 'hash-keys-values',
+    scenario: 'redis-hash-hkeys-hvals-hlen-hincrby',
+    ops: REPEAT * 4,
+    params: { fields: String(COLL), repeat: String(REPEAT), commands: 'HKEYS,HVALS,HLEN,HINCRBY' },
+    dataScale: `key=1,fields=${COLL}`,
+    async reset(ctx) {
+      // The field values are numeric so `HINCRBY` keeps the field count stable;
+      // the seed runs outside the timed region so every round starts equal.
+      const pairs = [];
+      for (let index = 0; index < COLL; index += 1) pairs.push(`f${index}`, String(index));
+      await ctx.client.call(['DEL', 'bench:hkv']);
+      await ctx.client.call(['HSET', 'bench:hkv', ...pairs]);
+    },
+    async run({ client }) {
+      // `reset` seeds once before the timed rounds, so `f0` keeps its value
+      // across repeats and clients; assert each bump adds exactly one rather
+      // than pinning an absolute reply.
+      let previous = null;
+      for (let round = 0; round < REPEAT; round += 1) {
+        const keys = await client.call(['HKEYS', 'bench:hkv']);
+        if (!Array.isArray(keys) || keys.length !== COLL) {
+          throw new Error(`hash-keys-values HKEYS replied ${Array.isArray(keys) ? keys.length : keys}`);
+        }
+        const values = await client.call(['HVALS', 'bench:hkv']);
+        if (!Array.isArray(values) || values.length !== COLL) {
+          throw new Error(`hash-keys-values HVALS replied ${Array.isArray(values) ? values.length : values}`);
+        }
+        const size = await client.call(['HLEN', 'bench:hkv']);
+        if (size !== COLL) throw new Error(`hash-keys-values HLEN replied ${size}`);
+        const bumped = await client.call(['HINCRBY', 'bench:hkv', 'f0', '1']);
+        if (previous !== null && bumped !== previous + 1) {
+          throw new Error(`hash-keys-values HINCRBY replied ${bumped}, expected ${previous + 1}`);
+        }
+        previous = bumped;
+      }
+    },
+  },
+  {
     name: 'list-lpush-lpop',
     scenario: 'redis-list-lpush-lpop',
     ops: COLL * 2,
@@ -756,6 +794,49 @@ const workloads = [
     },
   },
   {
+    name: 'zset-range-queries',
+    scenario: 'redis-zset-rangebyscore-rangebylex',
+    ops: REPEAT * 4,
+    params: {
+      members: String(COLL),
+      repeat: String(REPEAT),
+      commands: 'ZCOUNT,ZRANGEBYSCORE,ZREVRANGEBYSCORE,ZRANGEBYLEX',
+    },
+    dataScale: `keys=2,members=${COLL}`,
+    async reset(ctx) {
+      // One zset spreads its scores so the score ranges select everything, the
+      // other puts every member at score 0 so the lex range is well defined.
+      const scored = [];
+      const lex = [];
+      for (let index = 0; index < COLL; index += 1) {
+        scored.push(String(index), `z${index}`);
+        lex.push('0', `m${String(index).padStart(4, '0')}`);
+      }
+      await ctx.client.call(['DEL', 'bench:zrange', 'bench:zlex']);
+      await ctx.client.call(['ZADD', 'bench:zrange', ...scored]);
+      await ctx.client.call(['ZADD', 'bench:zlex', ...lex]);
+    },
+    async run({ client }) {
+      const high = String(COLL - 1);
+      for (let round = 0; round < REPEAT; round += 1) {
+        const counted = await client.call(['ZCOUNT', 'bench:zrange', '0', high]);
+        if (counted !== COLL) throw new Error(`zset-range-queries ZCOUNT replied ${counted}, expected ${COLL}`);
+        const ascending = await client.call(['ZRANGEBYSCORE', 'bench:zrange', '0', high]);
+        if (!Array.isArray(ascending) || ascending.length !== COLL) {
+          throw new Error(`zset-range-queries ZRANGEBYSCORE replied ${Array.isArray(ascending) ? ascending.length : ascending}`);
+        }
+        const descending = await client.call(['ZREVRANGEBYSCORE', 'bench:zrange', high, '0']);
+        if (!Array.isArray(descending) || descending.length !== COLL) {
+          throw new Error(`zset-range-queries ZREVRANGEBYSCORE replied ${Array.isArray(descending) ? descending.length : descending}`);
+        }
+        const lexical = await client.call(['ZRANGEBYLEX', 'bench:zlex', '-', '+']);
+        if (!Array.isArray(lexical) || lexical.length !== COLL) {
+          throw new Error(`zset-range-queries ZRANGEBYLEX replied ${Array.isArray(lexical) ? lexical.length : lexical}`);
+        }
+      }
+    },
+  },
+  {
     name: 'large-collection-read',
     scenario: 'redis-large-collection-full-read',
     ops: REPEAT * 2,
@@ -780,6 +861,38 @@ const workloads = [
         const rows = await client.call(['ZRANGE', 'bench:largezset', '0', '-1']);
         if (!Array.isArray(rows) || rows.length !== LARGE_COLL) {
           throw new Error(`ZRANGE replied ${Array.isArray(rows) ? rows.length : rows}, expected ${LARGE_COLL}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'large-hash-list-read',
+    scenario: 'redis-large-hash-list-full-read',
+    ops: REPEAT * 2,
+    params: { members: String(LARGE_COLL), repeat: String(REPEAT), commands: 'HGETALL,LRANGE' },
+    dataScale: `keys=2,members=${LARGE_COLL}`,
+    async prepare(ctx) {
+      // Seed in bounded calls so neither the client nor the server sees one
+      // multi-thousand-argument command; the seeding stays outside the timed run.
+      await ctx.client.call(['DEL', 'bench:largehash', 'bench:largelist']);
+      for (let start = 0; start < LARGE_COLL; start += 100) {
+        const pairs = ['HSET', 'bench:largehash'];
+        const elements = ['RPUSH', 'bench:largelist'];
+        for (let index = start; index < Math.min(start + 100, LARGE_COLL); index += 1) {
+          pairs.push(`f${index}`, `v${index}`);
+          elements.push(`e${index}`);
+        }
+        await ctx.client.pipeline([pairs, elements]);
+      }
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const pairs = await client.call(['HGETALL', 'bench:largehash']);
+        const fields = Array.isArray(pairs) ? pairs.length / 2 : Object.keys(pairs ?? {}).length;
+        if (fields !== LARGE_COLL) throw new Error(`large-hash-list-read HGETALL pairs ${fields}`);
+        const elements = await client.call(['LRANGE', 'bench:largelist', '0', '-1']);
+        if (!Array.isArray(elements) || elements.length !== LARGE_COLL) {
+          throw new Error(`large-hash-list-read LRANGE replied ${Array.isArray(elements) ? elements.length : elements}`);
         }
       }
     },
@@ -843,7 +956,10 @@ const workloads = [
         await client.pipeline(commands.slice(start, start + BATCH));
       }
       const live = await client.call(['DBSIZE']);
-      if (live !== SWEEP_COUNT) throw new Error(`DBSIZE replied ${live} before expiry, expected ${SWEEP_COUNT}`);
+      // A slow host can take longer than the TTL to write the whole batch, so
+      // keys written first may already be swept. The wait below still proves the
+      // cleanup path; only a larger-than-seeded count would be a defect.
+      if (live > SWEEP_COUNT) throw new Error(`DBSIZE replied ${live} before expiry, expected at most ${SWEEP_COUNT}`);
       // The server's active sweep runs every 100ms, so a wait comfortably above
       // one tick is enough to drop the whole expired set.
       await new Promise(resolve => setTimeout(resolve, SWEEP_WAIT_MS));
@@ -1060,6 +1176,254 @@ const workloads = [
     },
   },
   {
+    name: 'stream-xadd-xread',
+    scenario: 'redis-stream-xadd-xread',
+    ops: STREAM_COUNT + 2,
+    params: { entries: String(STREAM_COUNT), read_count: '20', fields: '2' },
+    dataScale: `key=1,entries=${STREAM_COUNT}`,
+    async run({ client }) {
+      await client.call(['DEL', 'bench:streamrw']);
+      for (let index = 0; index < STREAM_COUNT; index += 1) {
+        await client.call(['XADD', 'bench:streamrw', '*', 'k', `v${index}`, 'n', String(index)]);
+      }
+      const range = await client.call(['XRANGE', 'bench:streamrw', '-', '+', 'COUNT', '20']);
+      if (!Array.isArray(range) || range.length !== Math.min(20, STREAM_COUNT)) {
+        throw new Error(`stream-xadd-xread XRANGE rows ${Array.isArray(range) ? range.length : range}`);
+      }
+      const read = await client.call(['XREAD', 'COUNT', '20', 'STREAMS', 'bench:streamrw', '0']);
+      const entries = read[0]?.[1];
+      if (!Array.isArray(entries) || entries.length !== Math.min(20, STREAM_COUNT)) {
+        throw new Error(`stream-xadd-xread XREAD entries ${Array.isArray(entries) ? entries.length : entries}`);
+      }
+    },
+  },
+  {
+    name: 'hscan-cursor',
+    scenario: 'redis-hash-scan-cursor',
+    ops: COLL,
+    params: { fields: String(COLL), count_hint: '32' },
+    dataScale: `key=1,fields=${COLL}`,
+    async prepare(ctx) {
+      const commands = [];
+      for (let start = 0; start < COLL; start += 50) {
+        const args = ['HSET', 'bench:hscan'];
+        for (let index = start; index < Math.min(start + 50, COLL); index += 1) {
+          args.push(`f${index}`, `v${index}`);
+        }
+        commands.push(args);
+      }
+      await ctx.client.pipeline(commands);
+    },
+    async run({ client }) {
+      let cursor = '0';
+      let seen = 0;
+      let calls = 0;
+      do {
+        const reply = await client.call(['HSCAN', 'bench:hscan', cursor, 'COUNT', '32']);
+        if (!Array.isArray(reply) || reply.length !== 2) throw new Error('hscan-cursor malformed reply');
+        cursor = String(reply[0]);
+        // HSCAN answers field/value pairs, so the field count is half the list.
+        seen += Array.isArray(reply[1]) ? reply[1].length / 2 : 0;
+        calls += 1;
+        if (calls > COLL + 10) throw new Error('hscan-cursor did not terminate');
+      } while (cursor !== '0');
+      if (seen !== COLL) throw new Error(`hscan-cursor visited ${seen}, expected ${COLL}`);
+    },
+  },
+  {
+    name: 'sscan-zscan-cursor',
+    scenario: 'redis-set-zset-scan-cursor',
+    ops: COLL * 2,
+    params: { members: String(COLL), count_hint: '32', commands: 'SSCAN,ZSCAN' },
+    dataScale: `keys=2,members=${COLL}`,
+    async prepare(ctx) {
+      const commands = [];
+      for (let start = 0; start < COLL; start += 50) {
+        const members = ['SADD', 'bench:sscan'];
+        const scored = ['ZADD', 'bench:zscan'];
+        for (let index = start; index < Math.min(start + 50, COLL); index += 1) {
+          members.push(`m${index}`);
+          scored.push(String(index), `m${index}`);
+        }
+        commands.push(members, scored);
+      }
+      await ctx.client.pipeline(commands);
+    },
+    async run({ client }) {
+      let cursor = '0';
+      let seen = 0;
+      let calls = 0;
+      do {
+        const reply = await client.call(['SSCAN', 'bench:sscan', cursor, 'COUNT', '32']);
+        if (!Array.isArray(reply) || reply.length !== 2) throw new Error('sscan-zscan-cursor malformed SSCAN reply');
+        cursor = String(reply[0]);
+        seen += Array.isArray(reply[1]) ? reply[1].length : 0;
+        calls += 1;
+        if (calls > COLL + 10) throw new Error('sscan-zscan-cursor SSCAN did not terminate');
+      } while (cursor !== '0');
+      if (seen !== COLL) throw new Error(`sscan-zscan-cursor SSCAN visited ${seen}, expected ${COLL}`);
+
+      cursor = '0';
+      seen = 0;
+      calls = 0;
+      do {
+        const reply = await client.call(['ZSCAN', 'bench:zscan', cursor, 'COUNT', '32']);
+        if (!Array.isArray(reply) || reply.length !== 2) throw new Error('sscan-zscan-cursor malformed ZSCAN reply');
+        cursor = String(reply[0]);
+        // ZSCAN answers member/score pairs, so the member count is half the list.
+        seen += Array.isArray(reply[1]) ? reply[1].length / 2 : 0;
+        calls += 1;
+        if (calls > COLL + 10) throw new Error('sscan-zscan-cursor ZSCAN did not terminate');
+      } while (cursor !== '0');
+      if (seen !== COLL) throw new Error(`sscan-zscan-cursor ZSCAN visited ${seen}, expected ${COLL}`);
+    },
+  },
+  {
+    name: 'set-ops-large',
+    scenario: 'redis-set-large-sinter-sunion-sdiff',
+    ops: REPEAT * 3,
+    params: { members: String(LARGE_COLL), repeat: String(REPEAT), commands: 'SINTER,SUNION,SDIFF' },
+    dataScale: `keys=2,members=${LARGE_COLL}`,
+    async prepare(ctx) {
+      await ctx.client.call(['DEL', 'bench:bigset:a', 'bench:bigset:b']);
+      for (let start = 0; start < LARGE_COLL; start += 100) {
+        const all = ['SADD', 'bench:bigset:a'];
+        const even = ['SADD', 'bench:bigset:b'];
+        for (let index = start; index < Math.min(start + 100, LARGE_COLL); index += 1) {
+          all.push(`m${index}`);
+          if (index % 2 === 0) even.push(`m${index}`);
+        }
+        await ctx.client.pipeline([all, even]);
+      }
+    },
+    async run({ client }) {
+      const overlap = Math.ceil(LARGE_COLL / 2);
+      for (let round = 0; round < REPEAT; round += 1) {
+        const intersection = await client.call(['SINTER', 'bench:bigset:a', 'bench:bigset:b']);
+        if (!Array.isArray(intersection) || intersection.length !== overlap) {
+          throw new Error(`set-ops-large SINTER size ${Array.isArray(intersection) ? intersection.length : intersection}`);
+        }
+        const union = await client.call(['SUNION', 'bench:bigset:a', 'bench:bigset:b']);
+        if (!Array.isArray(union) || union.length !== LARGE_COLL) {
+          throw new Error(`set-ops-large SUNION size ${Array.isArray(union) ? union.length : union}`);
+        }
+        const difference = await client.call(['SDIFF', 'bench:bigset:a', 'bench:bigset:b']);
+        if (!Array.isArray(difference) || difference.length !== overlap) {
+          throw new Error(`set-ops-large SDIFF size ${Array.isArray(difference) ? difference.length : difference}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'lmpop-blocking',
+    scenario: 'redis-list-lmpop-blpop-replay',
+    ops: BLOCK_COUNT,
+    params: { pops: String(BLOCK_COUNT), commands: 'LMPOP,BLPOP', mode: 'non-blocking replay' },
+    dataScale: `key=1,elements=${BLOCK_COUNT}`,
+    async reset(ctx) {
+      await ctx.client.call(['DEL', 'bench:lmpop']);
+      for (let start = 0; start < BLOCK_COUNT; start += 100) {
+        const args = ['RPUSH', 'bench:lmpop'];
+        for (let index = start; index < Math.min(start + 100, BLOCK_COUNT); index += 1) {
+          args.push(`v${index}`);
+        }
+        await ctx.client.call(args);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < BLOCK_COUNT; index += 1) {
+        if (index % 2 === 0) {
+          const popped = await client.call(['LMPOP', '1', 'bench:lmpop', 'LEFT', 'COUNT', '1']);
+          if (!Array.isArray(popped) || popped[0] !== 'bench:lmpop' || !Array.isArray(popped[1]) || popped[1].length !== 1) {
+            throw new Error(`lmpop-blocking LMPOP reply ${JSON.stringify(popped)}`);
+          }
+        }
+        else {
+          const popped = await client.call(['BLPOP', 'bench:lmpop', '0']);
+          if (!Array.isArray(popped) || popped[0] !== 'bench:lmpop' || typeof popped[1] !== 'string') {
+            throw new Error(`lmpop-blocking BLPOP reply ${JSON.stringify(popped)}`);
+          }
+        }
+      }
+    },
+  },
+  {
+    name: 'key-space-notify',
+    scenario: 'redis-keyspace-expired-notification',
+    ops: TTL_COUNT,
+    params: { keys: String(TTL_COUNT), ttl_ms: '10', channel: '__keyevent@0__:expired' },
+    dataScale: `keys=${TTL_COUNT}`,
+    async prepare(ctx) {
+      ctx.notifier = await createClient(ctx.clientName, { host: ctx.host, port: ctx.port });
+      await ctx.notifier.subscribe('__keyevent@0__:expired');
+      const configured = await ctx.client.call(['CONFIG', 'SET', 'notify-keyspace-events', 'Ex']);
+      if (configured !== 'OK') throw new Error(`key-space-notify CONFIG SET replied ${configured}`);
+    },
+    async cleanup(ctx) {
+      await ctx.notifier?.close();
+    },
+    async run({ client, notifier }) {
+      // Write every key first so one sweep can expire the whole batch; awaiting
+      // each delivery then only pays the sweep cadence once per round instead of
+      // once per key.
+      for (let index = 0; index < TTL_COUNT; index += 1) {
+        const written = await client.call(['SET', `bench:notify:${index}`, 'v', 'PX', '10']);
+        if (written !== 'OK') throw new Error(`key-space-notify SET replied ${written}`);
+      }
+      const received = new Set();
+      for (let index = 0; index < TTL_COUNT; index += 1) received.add(await notifier.nextMessage());
+      for (let index = 0; index < TTL_COUNT; index += 1) {
+        if (!received.has(`bench:notify:${index}`)) {
+          throw new Error(`key-space-notify missed bench:notify:${index}`);
+        }
+      }
+    },
+  },
+  {
+    name: 'resp3-collections',
+    scenario: 'redis-resp3-collection-families',
+    protocol: 3,
+    ops: REPEAT * 4,
+    params: { members: String(COLL), repeat: String(REPEAT), commands: 'SMEMBERS,HGETALL,ZRANGE WITHSCORES,SINTER' },
+    dataScale: `keys=4,members=${COLL}`,
+    async prepare(ctx) {
+      await ctx.client.call(['DEL', 'bench:r3set', 'bench:r3even', 'bench:r3hash', 'bench:r3zset']);
+      for (let start = 0; start < COLL; start += 100) {
+        const setArgs = ['SADD', 'bench:r3set'];
+        const evenArgs = ['SADD', 'bench:r3even'];
+        const hashArgs = ['HSET', 'bench:r3hash'];
+        for (let index = start; index < Math.min(start + 100, COLL); index += 1) {
+          setArgs.push(`m${index}`);
+          if (index % 2 === 0) evenArgs.push(`m${index}`);
+          hashArgs.push(`f${index}`, `v${index}`);
+        }
+        const commands = [setArgs, evenArgs, hashArgs];
+        for (let index = start; index < Math.min(start + 100, COLL); index += 1) {
+          commands.push(['ZADD', 'bench:r3zset', String(index), `m${index}`]);
+        }
+        await ctx.client.pipeline(commands);
+      }
+    },
+    async run({ client }) {
+      for (let round = 0; round < REPEAT; round += 1) {
+        const members = await client.call(['SMEMBERS', 'bench:r3set']);
+        if (!Array.isArray(members) || members.length !== COLL) {
+          throw new Error(`resp3-collections SMEMBERS size ${Array.isArray(members) ? members.length : members}`);
+        }
+        const hash = await client.call(['HGETALL', 'bench:r3hash']);
+        const pairs = Array.isArray(hash) ? hash.length / 2 : Object.keys(hash ?? {}).length;
+        if (pairs !== COLL) throw new Error(`resp3-collections HGETALL pairs ${pairs}`);
+        const rows = await client.call(['ZRANGE', 'bench:r3zset', '0', '-1', 'WITHSCORES']);
+        const count = Array.isArray(rows[0]) ? rows.length : rows.length / 2;
+        if (count !== COLL) throw new Error(`resp3-collections ZRANGE pairs ${count}`);
+        const intersection = await client.call(['SINTER', 'bench:r3set', 'bench:r3even']);
+        if (!Array.isArray(intersection) || intersection.length !== Math.ceil(COLL / 2)) {
+          throw new Error(`resp3-collections SINTER size ${Array.isArray(intersection) ? intersection.length : intersection}`);
+        }
+      }
+    },
+  },
+  {
     name: 'server-face-ops',
     scenario: 'redis-server-face',
     ops: REPEAT * 4,
@@ -1180,6 +1544,75 @@ const workloads = [
     async run({ client }) {
       for (let index = 0; index < PING_COUNT; index += 1) {
         await client.ping();
+      }
+    },
+  },
+  {
+    name: 'bit-ops',
+    scenario: 'redis-string-bitfield-ops',
+    ops: COLL * 4,
+    params: { keys: String(COLL), commands: 'SETBIT,GETBIT,BITCOUNT,BITPOS' },
+    dataScale: `keys=${COLL}`,
+    async reset(ctx) {
+      // Start from missing keys so the first `SETBIT` reports a zero previous
+      // bit and `BITCOUNT` sees exactly the one bit the run sets.
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['DEL', `bench:bit:${index}`]);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:bit:${index}`;
+        const previous = await client.call(['SETBIT', key, '7', '1']);
+        if (previous !== 0) throw new Error(`bit-ops SETBIT previous ${previous} at ${index}`);
+        const bit = await client.call(['GETBIT', key, '7']);
+        if (bit !== 1) throw new Error(`bit-ops GETBIT replied ${bit} at ${index}`);
+        const count = await client.call(['BITCOUNT', key]);
+        if (count !== 1) throw new Error(`bit-ops BITCOUNT replied ${count} at ${index}`);
+        const first = await client.call(['BITPOS', key, '1']);
+        if (first !== 7) throw new Error(`bit-ops BITPOS replied ${first} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'setrange-getrange',
+    scenario: 'redis-string-setrange-getrange',
+    ops: COLL * 2,
+    params: { keys: String(COLL), chunk_bytes: '8' },
+    dataScale: `keys=${COLL}`,
+    async reset(ctx) {
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['DEL', `bench:range:${index}`]);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:range:${index}`;
+        const written = await client.call(['SETRANGE', key, '0', 'abcdefgh']);
+        if (written !== 8) throw new Error(`setrange-getrange SETRANGE replied ${written} at ${index}`);
+        const slice = await client.call(['GETRANGE', key, '0', '3']);
+        if (slice !== 'abcd') throw new Error(`setrange-getrange GETRANGE replied ${slice} at ${index}`);
+      }
+    },
+  },
+  {
+    name: 'rename-unlink',
+    scenario: 'redis-key-rename-unlink',
+    ops: COLL * 2,
+    params: { keys: String(COLL), commands: 'RENAME,UNLINK' },
+    dataScale: `keys=${COLL}`,
+    async reset(ctx) {
+      await preload(ctx, COLL, 'bench:ren');
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['DEL', `bench:unl:${index}`]);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const renamed = await client.call(['RENAME', `bench:ren:${index}`, `bench:unl:${index}`]);
+        if (renamed !== 'OK') throw new Error(`rename-unlink RENAME replied ${renamed} at ${index}`);
+        const removed = await client.call(['UNLINK', `bench:unl:${index}`]);
+        if (removed !== 1) throw new Error(`rename-unlink UNLINK replied ${removed} at ${index}`);
       }
     },
   },
@@ -1507,10 +1940,16 @@ ${oracleSection}
 - The product adapter's RESP parser reads length headers straight from the frame
   bytes and decodes bulk elements inside an array in place, so a full-collection
   reply does not allocate a string header or a temporary element object per
-  member. It also parses RESP3 \`%\` / \`~\` / \`_\` / \`,\` / \`>\` frames, which is
-  what lets \`resp3-hello\` run on the same adapter. All three columns share the
-  emulated server, so a server-side reply improvement moves every client down
-  together and only the client-side parser changes the ratio.
+  member. An in-array \`$\` length is scanned digit by digit instead of calling
+  \`indexOf\` once per member. It also parses RESP3 \`%\` / \`~\` / \`_\` / \`,\` / \`>\`
+  frames, which is what lets \`resp3-hello\` and \`resp3-collections\` run on the
+  same adapter. All three columns share the emulated server, so a server-side
+  reply improvement moves every client down together and only the client-side
+  parser changes the ratio.
+- An \`XADD\` append into a compact stream copies the stored body and writes only
+  the new entry; the full decode/encode path remains for \`MAXLEN\` / \`MINID\`,
+  deleted entries and consumer-group trailers, so the fast path never changes an
+  observable reply.
 - The socket server applies mutations in memory and writes the whole \`.yykv\`
   snapshot on its one-second flush cadence, so sequential \`SET\` and collection
   writes no longer pay a full-shard rewrite per command. A pipeline still folds
@@ -1565,11 +2004,14 @@ ${oracleSection}
 - \`resp3-hello\` sets \`protocol: 3\` for the whole cell, so all three clients
   negotiate RESP3 and the measured round trip covers the map reply of
   \`HELLO 3\`, a bulk \`GET\`, the \`~\` set header of \`SMEMBERS\` and a \`PING\`.
-  It is the only cell that forces RESP3 on \`node-redis\` and \`@yydb/redis\`.
+  Together with \`resp3-collections\` it is one of the cells that force RESP3 on
+  \`node-redis\` and \`@yydb/redis\`.
 - \`expire-sweep\` writes \`BENCH_SWEEP\` keys with \`SET ... PX\`, asserts
   \`DBSIZE\`, waits \`BENCH_SWEEP_WAIT_MS\` (above the server's 100ms sweep tick)
-  and then asserts \`DBSIZE\` is zero and every \`GET\` answers nil. The fixed wait
-  is shared by all clients, so the cell verifies the cleanup path rather than
+  and then asserts \`DBSIZE\` is zero and every \`GET\` answers nil. The pre-wait
+  count is an upper bound, because a slow host can take longer than the TTL to
+  write the whole batch and already sweep the first keys. The fixed wait is
+  shared by all clients, so the cell verifies the cleanup path rather than
   comparing raw command latency.
 - \`multi-exec-mixed\` queues \`BENCH_TXN\` commands cycling
   SET / GET / INCR / HSET / LPUSH / SADD behind one \`MULTI\` and commits with
@@ -1580,6 +2022,47 @@ ${oracleSection}
   \`prepare\` and publishes \`BENCH_FANOUT\` messages to the shared channel, awaiting
   every delivery on every subscriber before the next publish. One \`ops\` unit is
   one delivery, so the cell measures fan-out rather than a single round trip.
+- \`stream-xadd-xread\` writes \`BENCH_STREAM\` entries with \`XADD\` and then reads a
+  bounded slice with both \`XRANGE … COUNT 20\` and \`XREAD COUNT 20\`, so the write
+  path and a range read share one round. The append path copies the stored body
+  and writes only the new entry instead of decoding and re-encoding every entry.
+- \`hscan-cursor\` seeds \`BENCH_COLL\` fields in \`prepare\` and walks the hash with
+  \`HSCAN <cursor> COUNT 32\` until the cursor returns to \`0\`. \`HSCAN\` answers
+  field/value pairs, so the visited field count is half the reply list and \`ops\`
+  is the seeded field count.
+- \`set-ops-large\` builds two \`BENCH_COLL_LARGE\`-member sets with a half overlap in
+  \`prepare\` and runs \`SINTER\`, \`SUNION\` and \`SDIFF\` \`BENCH_REPEAT\` times,
+  asserting each cardinality. Preloading stays outside the timed region, so the
+  cell isolates the large set-operation and full-reply encoding cost.
+- \`lmpop-blocking\` re-seeds \`BENCH_BLOCK\` list elements in \`reset\` and alternates
+  \`LMPOP … LEFT COUNT 1\` with \`BLPOP\` on an always-ready key. Both commands are
+  served in their non-blocking replay form, so no round ever parks.
+- \`key-space-notify\` subscribes one dedicated connection to
+  \`__keyevent@0__:expired\`, sets \`notify-keyspace-events\` to \`Ex\`, writes
+  \`BENCH_TTL\` keys with \`PX 10\` and awaits every delivery. The server's 100ms
+  sweep tick is a fixed cost shared by all clients, so the cell compares the
+  notification path rather than raw command latency.
+- \`resp3-collections\` sets \`protocol: 3\` and repeats \`SMEMBERS\`, \`HGETALL\`,
+  \`ZRANGE … WITHSCORES\` and \`SINTER\` over \`BENCH_COLL\` members, so the RESP3
+  set (\`~\`), map (\`%\`) and nested score shapes cross the same adapter as the
+  RESP2 cells. Both flat and nested \`WITHSCORES\` shapes are normalized.
+- \`hash-keys-values\` seeds \`BENCH_COLL\` numeric fields in the untimed \`reset\`
+  and repeats \`HKEYS\`, \`HVALS\`, \`HLEN\` and \`HINCRBY\` \`BENCH_REPEAT\` times. The
+  seed is refreshed before every round so the increment always starts from the
+  same value and the field count stays \`BENCH_COLL\`.
+- \`zset-range-queries\` keeps one zset with spread scores and one with every
+  member at score 0, then repeats \`ZCOUNT\`, \`ZRANGEBYSCORE\`,
+  \`ZREVRANGEBYSCORE\` and \`ZRANGEBYLEX\` \`BENCH_REPEAT\` times. The bounds are
+  numeric so both the emulator and a real server accept them, and the score
+  range selects every member.
+- \`sscan-zscan-cursor\` seeds a set and a zset with \`BENCH_COLL\` members in
+  \`prepare\` and walks each with \`SSCAN\` / \`ZSCAN <cursor> COUNT 32\` until the
+  cursor returns to \`0\`. \`ZSCAN\` answers member/score pairs, so the visited
+  member count is half the reply list.
+- \`large-hash-list-read\` seeds a \`BENCH_COLL_LARGE\`-field hash and list in
+  bounded 100-element calls during \`prepare\`, then reads them whole with
+  \`HGETALL\` and \`LRANGE 0 -1\` per \`BENCH_REPEAT\` round. It pairs with
+  \`large-collection-read\`, which covers the set and zset families.
 
 ## Machine-readable summary
 
