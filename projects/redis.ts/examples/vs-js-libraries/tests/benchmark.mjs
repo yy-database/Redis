@@ -1714,6 +1714,95 @@ const workloads = [
     },
   },
   {
+    name: 'zset-remove-ops',
+    scenario: 'redis-zset-remove',
+    ops: COLL + 3,
+    params: { members: String(COLL), commands: 'ZREM,ZREMRANGEBYRANK,ZREMRANGEBYSCORE,ZCARD' },
+    dataScale: `key=bench:zrem,members=${COLL}`,
+    async reset(ctx) {
+      // 每轮从满集合开始，删除量与幸存量才有固定断言。
+      await ctx.client.call(['DEL', 'bench:zrem']);
+      const seed = [];
+      for (let index = 0; index < COLL; index += 1) seed.push(String(index), `m${index}`);
+      await ctx.client.call(['ZADD', 'bench:zrem', ...seed]);
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL / 4; index += 1) {
+        const removed = await client.call(['ZREM', 'bench:zrem', `m${index}`]);
+        if (removed !== 1) throw new Error(`zset-remove-ops ZREM replied ${removed} at ${index}`);
+      }
+      // 前 50 名已被 ZREM 摘除，秩区间从余下成员的 0 开始。
+      const byRank = await client.call(['ZREMRANGEBYRANK', 'bench:zrem', '0', String(COLL / 4 - 1)]);
+      if (byRank !== COLL / 4) throw new Error(`zset-remove-ops ZREMRANGEBYRANK replied ${byRank}`);
+      const byScore = await client.call(['ZREMRANGEBYSCORE', 'bench:zrem', String(COLL / 2), String(COLL * 3 / 4 - 1)]);
+      if (byScore !== COLL / 4) throw new Error(`zset-remove-ops ZREMRANGEBYSCORE replied ${byScore}`);
+      const remaining = await client.call(['ZCARD', 'bench:zrem']);
+      if (remaining !== COLL / 4) throw new Error(`zset-remove-ops ZCARD replied ${remaining}, expected ${COLL / 4}`);
+    },
+  },
+  {
+    name: 'set-store-ops',
+    scenario: 'redis-set-store-algebra',
+    ops: 4 * REPEAT,
+    params: { members: String(COLL), repeat: String(REPEAT), commands: 'SINTERSTORE,SUNIONSTORE,SDIFFSTORE,ZUNIONSTORE' },
+    dataScale: `sets=2,members=${COLL},dest=${REPEAT * 4}`,
+    async prepare(ctx) {
+      await seedStoreSources(ctx.client);
+    },
+    async reset(ctx) {
+      await seedStoreSources(ctx.client);
+      const dest = [];
+      for (let index = 0; index < REPEAT; index += 1) {
+        dest.push(storeDest('inter', index), storeDest('union', index), storeDest('diff', index), storeDest('zunion', index));
+      }
+      await ctx.client.call(['DEL', ...dest]);
+    },
+    async run({ client }) {
+      for (let index = 0; index < REPEAT; index += 1) {
+        const inter = await client.call(['SINTERSTORE', storeDest('inter', index), 'bench:store:a', 'bench:store:b']);
+        if (inter !== COLL / 2) throw new Error(`set-store-ops SINTERSTORE replied ${inter}`);
+        const union = await client.call(['SUNIONSTORE', storeDest('union', index), 'bench:store:a', 'bench:store:b']);
+        if (union !== COLL + COLL / 2) throw new Error(`set-store-ops SUNIONSTORE replied ${union}`);
+        const diff = await client.call(['SDIFFSTORE', storeDest('diff', index), 'bench:store:a', 'bench:store:b']);
+        if (diff !== COLL / 2) throw new Error(`set-store-ops SDIFFSTORE replied ${diff}`);
+        const zunion = await client.call(['ZUNIONSTORE', storeDest('zunion', index), '2', 'bench:store:z1', 'bench:store:z2']);
+        if (zunion !== COLL + COLL / 2) throw new Error(`set-store-ops ZUNIONSTORE replied ${zunion}`);
+      }
+    },
+  },
+  {
+    name: 'expire-ms',
+    scenario: 'redis-key-expire-milliseconds',
+    ops: COLL * 5,
+    params: { keys: String(COLL), commands: 'PSETEX,PTTL,PEXPIRE,PERSIST' },
+    dataScale: `keys=${COLL},value_bytes=64`,
+    async prepare(ctx) {
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['PSETEX', `bench:ms:${index}`, '100000', VALUE]);
+      }
+    },
+    async reset(ctx) {
+      for (let index = 0; index < COLL; index += 1) {
+        await ctx.client.call(['PSETEX', `bench:ms:${index}`, '100000', VALUE]);
+      }
+    },
+    async run({ client }) {
+      for (let index = 0; index < COLL; index += 1) {
+        const key = `bench:ms:${index}`;
+        const initial = await client.call(['PTTL', key]);
+        if (!(initial > 0 && initial <= 100000)) throw new Error(`expire-ms PTTL replied ${initial} at ${index}`);
+        const attached = await client.call(['PEXPIRE', key, '50000']);
+        if (attached !== 1) throw new Error(`expire-ms PEXPIRE replied ${attached} at ${index}`);
+        const shortened = await client.call(['PTTL', key]);
+        if (!(shortened > 0 && shortened <= 50000)) throw new Error(`expire-ms PTTL after PEXPIRE replied ${shortened}`);
+        const persisted = await client.call(['PERSIST', key]);
+        if (persisted !== 1) throw new Error(`expire-ms PERSIST replied ${persisted} at ${index}`);
+        const cleared = await client.call(['PTTL', key]);
+        if (cleared !== -1) throw new Error(`expire-ms PTTL after PERSIST replied ${cleared}`);
+      }
+    },
+  },
+  {
     name: 'expire-options',
     scenario: 'redis-key-expire-options',
     ops: COLL * 6,
@@ -2073,6 +2162,31 @@ async function preload(ctx, total, prefix, value = VALUE) {
     }
     await ctx.client.pipeline(commands);
   }
+}
+
+// `set-store-ops` 的两个源集合：A 为 a0..a(COLL-1)，B 为前一半 a 加后一半 b，
+// 于是交集 COLL/2、并集 COLL+COLL/2、差集 COLL/2 都是固定断言。
+async function seedStoreSources(client) {
+  const commands = [['DEL', 'bench:store:a', 'bench:store:b', 'bench:store:z1', 'bench:store:z2']];
+  const a = [];
+  const b = [];
+  const z1 = [];
+  const z2 = [];
+  for (let index = 0; index < COLL; index += 1) {
+    a.push(`a${index}`);
+    b.push(index < COLL / 2 ? `a${index}` : `b${index}`);
+    z1.push('1', `a${index}`);
+    z2.push('2', index < COLL / 2 ? `a${index}` : `b${index}`);
+  }
+  commands.push(['SADD', 'bench:store:a', ...a]);
+  commands.push(['SADD', 'bench:store:b', ...b]);
+  commands.push(['ZADD', 'bench:store:z1', ...z1]);
+  commands.push(['ZADD', 'bench:store:z2', ...z2]);
+  await client.pipeline(commands);
+}
+
+function storeDest(kind, index) {
+  return `bench:store:dest:${kind}:${index}`;
 }
 
 async function measure(clientName, workload, target) {
