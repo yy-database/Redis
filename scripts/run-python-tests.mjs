@@ -10,23 +10,30 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const crate = join(root, 'projects', 'redis.rs', 'redis-pyo3');
+const workspace = join(root, 'projects', 'redis.rs');
 const project = join(root, 'projects', 'redis.py', 'packages', 'redis');
 const tests = join(project, 'tests');
 const python = process.env.PYTHON ?? 'python';
 const force = process.argv.includes('--force');
+
+function crateSources(name) {
+    const directory = join(workspace, name);
+    return [
+        join(directory, 'Cargo.toml'),
+        ...readdirSync(join(directory, 'src'))
+            .sort()
+            .map(file => join(directory, 'src', file)),
+    ];
+}
 
 function fingerprint() {
     const hash = createHash('sha256');
     const sources = [
         join(project, 'pyproject.toml'),
         join(project, 'redis', '__init__.py'),
-        join(crate, 'Cargo.toml'),
-        join(crate, 'src', 'lib.rs'),
-        join(root, 'projects', 'redis.rs', 'Cargo.lock'),
-        ...readdirSync(join(root, 'projects', 'redis.rs', 'redis-wasm', 'src'))
-            .sort()
-            .map(name => join(root, 'projects', 'redis.rs', 'redis-wasm', 'src', name)),
+        ...crateSources('redis-pyo3'),
+        ...crateSources('redis-napi'),
+        join(workspace, 'Cargo.lock'),
     ];
     for (const file of sources) {
         hash.update(readFileSync(file));

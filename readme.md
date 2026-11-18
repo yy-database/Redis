@@ -27,9 +27,11 @@ notes.
 - A `redis-cli`-shaped client that supports one-shot commands, an interactive
   line mode, and `-3` for RESP3.
 
-The Rust crates are `redis-wasm` (portable RESP and codecs, no listener),
-`redis-napi` (Node-API exports) and `redis-pyo3` (the `_native` Python
-extension). Neither binding owns a server loop or a process entry point.
+The Rust crates are `redis-napi` (Node-API exports) and `redis-pyo3` (the
+`_native` Python extension). Neither binding owns RESP framing, a command
+dispatcher, a server loop or a process entry point; those live upstream in
+`database.protocol.redis`, `database.execution.redis` and
+`database.storage::cluster_kv::redis`.
 
 ## Supported commands
 
@@ -295,13 +297,14 @@ Tests and gates:
 
 ## Format ownership
 
-Redis owns the mapping from its record model onto the `database-formats`
-`.yyds` and `.yykv` codecs in `projects/redis.rs/redis-wasm/src/format.rs`.
-It writes the v3 shard shape and the v0 catalog shape described above, but reads
-deliberately less than the shared codec accepts: inline values only, exactly one
-shard, and no resolved contract or owner sections. This document records the
-current behavior only and promises no wider interchange beyond the shared
-format contract.
+The `.yyds` catalog and `.yykv` shard codecs are owned upstream by
+`database.storage::cluster_kv::redis` (byte layout, shard repair and namespace
+rules) and `database.protocol.redis` (RESP framing). This repository only maps
+its record model onto those codecs and writes the v3 shard shape and the v0
+catalog shape described above, but reads deliberately less than the shared
+codec accepts: inline values only, exactly one shard, and no resolved contract
+or owner sections. This document records the current behavior only and promises
+no wider interchange beyond the shared format contract.
 
 ## License
 
