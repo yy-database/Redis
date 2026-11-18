@@ -18,9 +18,9 @@ use std::{
 
 use database_cluster::topology::ShardMap;
 use database_execution::cluster::{KeyValueExecutor, LocalExecutor};
+use database_execution::cluster::redis::blocking::BlockingRegistry;
 use database_server::yyds::redis::{
     EmbeddedServerFace,
-    blocking::BlockingRegistry,
     connection::{KeyAccessTracker, serve_cancellable_with_executor_and_tracker},
     execute_server_command,
     pubsub::PubSubRegistry,
