@@ -3879,12 +3879,12 @@
       }
     },
     {
-      "id": "wire.parse_integer.accepted.negative-zero",
+      "id": "wire.parse_integer.rejected.negative-zero",
       "face": "resp",
       "op": "parse_integer",
       "inputText": "-0",
       "expect": {
-        "value": 0
+        "value": null
       }
     },
     {

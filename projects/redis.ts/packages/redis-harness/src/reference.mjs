@@ -4,7 +4,7 @@
 //! alone. Acceptance checks compare the native output against these values, so
 //! a defect inside the binding cannot validate itself.
 
-export const YYKV_MAGIC = Buffer.from([0x59, 0x59, 0x4b, 0x56, 0x03]);
+export const YYKV_MAGIC = Buffer.from([0x59, 0x59, 0x4b, 0x56, 0x04]);
 export const YYDS_MAGIC = Buffer.from([0x59, 0x59, 0x44, 0x53, 0x01]);
 
 const FNV_OFFSET = 0xcbf29ce484222325n;
@@ -44,16 +44,20 @@ function takeU64(bytes, cursor) {
     return { value: take(bytes, cursor, 8).readBigUInt64LE(0), next: cursor + 8 };
 }
 
-/** Reads one `.yykv` snapshot: five byte magic, checksum, then the body. */
+/** Reads one `.yykv` snapshot: five byte magic, body length, checksum, then the body. */
 export function parseShard(bytes) {
-    if (bytes.length < 13) {
+    if (bytes.length < 21) {
         throw new Error('shard shorter than its header');
     }
     if (!bytes.subarray(0, 5).equals(YYKV_MAGIC)) {
         throw new Error('unknown shard magic');
     }
-    const checksum = bytes.readBigUInt64LE(5);
-    const body = bytes.subarray(13);
+    const bodyLength = bytes.readBigUInt64LE(5);
+    const checksum = bytes.readBigUInt64LE(13);
+    const body = bytes.subarray(21);
+    if (BigInt(body.length) !== bodyLength) {
+        throw new Error(`shard body length ${body.length} != ${bodyLength}`);
+    }
     const actual = fnv1a(body);
     if (actual !== checksum) {
         throw new Error(`shard checksum mismatch: ${actual} != ${checksum}`);

@@ -352,7 +352,7 @@ test('a corrupted shard body is rejected at open', () => {
     writeFileSync(shardPath, damaged);
     assert.throws(() => new Store(directory), /checksum mismatch/);
 
-    writeFileSync(shardPath, Buffer.from('YYKV\x03short'));
+    writeFileSync(shardPath, Buffer.from('YYKV\x04short'));
     assert.throws(() => new Store(directory), /truncated/);
 });
 
