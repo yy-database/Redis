@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Python binding for the RESP and `.yyds` primitives"
+description = "Python binding over the upstream Redis RESP codec and `.yykv` keyspace shard"
 publish = false
 
 [lib]
@@ -13,6 +13,8 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
+database-protocol-redis = { workspace = true }
+database-storage = { workspace = true }
+database-types = { workspace = true }
 pyo3 = { workspace = true }
-redis-wasm = { path = "../redis-wasm" }
 serde_json = { workspace = true }

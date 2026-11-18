@@ -1,27 +1,25 @@
-//! Python binding exposing the portable RESP and `.yyds` primitives.
+//! Python binding over the upstream Redis primitives.
 //!
 //! The binding owns no listener, no command dispatcher, and no process entry
 //! point. The Python package composes these calls into a server loop or a client.
+//! Every domain rule lives upstream, so this crate only maps parameters and results.
 
+use database_protocol_redis::codec::Reply;
+use database_storage::cluster_kv::redis::{
+    RedisShard, RenameOutcome, check_kind, format::record_bytes, repair_missing_shard,
+};
 use pyo3::{
     exceptions::{PyRuntimeError, PyValueError},
     prelude::*,
 };
-use redis_wasm::format::record_bytes;
-use redis_wasm::resp::Reply;
-use redis_wasm::store::{Node, RenameOutcome};
 
 fn runtime(error: impl ToString) -> PyErr {
     PyRuntimeError::new_err(error.to_string())
 }
 
 /// Rejects a value kind the shard does not name.
-fn check_kind(kind: &str) -> PyResult<()> {
-    if redis_wasm::store::KINDS.contains(&kind) {
-        Ok(())
-    } else {
-        Err(PyValueError::new_err(format!("unknown value kind `{kind}`")))
-    }
+fn reject_unknown_kind(kind: &str) -> PyResult<()> {
+    check_kind(kind).map_err(PyValueError::new_err)
 }
 
 /// Parses one command from the front of `input`.
@@ -29,7 +27,7 @@ fn check_kind(kind: &str) -> PyResult<()> {
 /// Returns `(consumed, args)` or `None` when more bytes are needed.
 #[pyfunction]
 fn decode_command(input: &[u8]) -> PyResult<Option<(usize, Vec<Vec<u8>>)>> {
-    match redis_wasm::resp::decode_command(input) {
+    match database_protocol_redis::codec::decode_command(input) {
         Ok(Some((request, consumed))) => Ok(Some((consumed, request.args))),
         Ok(None) => Ok(None),
         Err(error) => Err(PyValueError::new_err(error)),
@@ -39,7 +37,7 @@ fn decode_command(input: &[u8]) -> PyResult<Option<(usize, Vec<Vec<u8>>)>> {
 /// Encodes one command as a multibulk request.
 #[pyfunction]
 fn encode_command(args: Vec<Vec<u8>>) -> Vec<u8> {
-    redis_wasm::resp::encode_command(&args)
+    database_protocol_redis::codec::encode_command(&args)
 }
 
 /// Encodes one reply specification for the negotiated protocol version.
@@ -47,7 +45,7 @@ fn encode_command(args: Vec<Vec<u8>>) -> Vec<u8> {
 fn encode_reply(spec: &str, protocol: u8) -> PyResult<Vec<u8>> {
     let spec: serde_json::Value = serde_json::from_str(spec).map_err(runtime)?;
     let reply = Reply::from_spec(&spec).map_err(PyValueError::new_err)?;
-    Ok(redis_wasm::resp::encode_reply(&reply, protocol))
+    Ok(database_protocol_redis::codec::encode_reply(&reply, protocol))
 }
 
 /// Parses one reply from the front of `input`.
@@ -55,7 +53,7 @@ fn encode_reply(spec: &str, protocol: u8) -> PyResult<Vec<u8>> {
 /// Returns `(spec, consumed)` or `None` when more bytes are needed.
 #[pyfunction]
 fn decode_reply(input: &[u8]) -> PyResult<Option<(String, usize)>> {
-    match redis_wasm::resp::decode_reply(input) {
+    match database_protocol_redis::codec::decode_reply(input) {
         Ok(Some((reply, consumed))) => Ok(Some((reply.to_spec().to_string(), consumed))),
         Ok(None) => Ok(None),
         Err(error) => Err(PyValueError::new_err(error)),
@@ -65,7 +63,7 @@ fn decode_reply(input: &[u8]) -> PyResult<Option<(String, usize)>> {
 /// Parses a canonical Redis integer, rejecting leading zeros and a plus sign.
 #[pyfunction]
 fn parse_integer(value: &[u8]) -> Option<i64> {
-    redis_wasm::format::parse_integer(value)
+    database_types::canonical::parse_i64(value)
 }
 
 /// Creates the shard registered by an existing `.yyds` catalog when it is missing.
@@ -74,13 +72,13 @@ fn parse_integer(value: &[u8]) -> Option<i64> {
 /// validated but never rewritten, and an existing shard is never overwritten.
 #[pyfunction]
 fn repair_shard(data_dir: &str) -> PyResult<String> {
-    redis_wasm::store::repair_missing_shard(data_dir).map_err(runtime)
+    repair_missing_shard(data_dir).map_err(runtime)
 }
 
 /// A `.yyds` catalog plus `.yykv` shard opened by the host.
 #[pyclass]
 struct Store {
-    node: Node,
+    node: RedisShard,
 }
 
 #[pymethods]
@@ -88,9 +86,7 @@ impl Store {
     /// Opens the storage directory, creating the catalog and an empty shard when absent.
     #[new]
     fn new(data_dir: String) -> PyResult<Self> {
-        Ok(Self {
-            node: Node::open(data_dir).map_err(runtime)?,
-        })
+        Ok(Self { node: RedisShard::open(data_dir).map_err(runtime)? })
     }
 
     /// Returns the live value for one key.
@@ -127,42 +123,39 @@ impl Store {
 
     /// Returns the live value of one kind (`""`, `hash`, `list`, `set`, `zset` or `stream`).
     fn get_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<Vec<u8>>> {
-        check_kind(kind)?;
-        Ok(self
-            .node
-            .get_kind(db, kind, key)
-            .map(|record| record_bytes(record).to_vec()))
+        reject_unknown_kind(kind)?;
+        Ok(self.node.get_kind(db, kind, key).map(|record| record_bytes(record).to_vec()))
     }
 
     /// Inserts or replaces one kind with an optional absolute deadline in epoch milliseconds.
     #[pyo3(signature = (db, kind, key, value, expires_at = None))]
     fn set_kind(&mut self, db: u8, kind: &str, key: &[u8], value: &[u8], expires_at: Option<i64>) -> PyResult<()> {
-        check_kind(kind)?;
+        reject_unknown_kind(kind)?;
         self.node.set_kind(db, kind, key, value, expires_at).map_err(runtime)
     }
 
     /// Deletes one kind, reporting whether a live record was removed.
     fn delete_kind(&mut self, db: u8, kind: &str, key: &[u8]) -> PyResult<bool> {
-        check_kind(kind)?;
+        reject_unknown_kind(kind)?;
         self.node.delete_kind(db, kind, key).map_err(runtime)
     }
 
     /// Whether one kind of the key exists and is live.
     fn exists_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<bool> {
-        check_kind(kind)?;
+        reject_unknown_kind(kind)?;
         Ok(self.node.contains_kind(db, kind, key))
     }
 
     /// Absolute deadline in epoch milliseconds for one kind, `None` when it carries none.
     fn deadline_kind(&self, db: u8, kind: &str, key: &[u8]) -> PyResult<Option<i64>> {
-        check_kind(kind)?;
+        reject_unknown_kind(kind)?;
         Ok(self.node.deadline_kind(db, kind, key))
     }
 
     /// Sets or clears the deadline of a live kind.
     #[pyo3(signature = (db, kind, key, expires_at = None))]
     fn expire_kind(&mut self, db: u8, kind: &str, key: &[u8], expires_at: Option<i64>) -> PyResult<bool> {
-        check_kind(kind)?;
+        reject_unknown_kind(kind)?;
         self.node.set_deadline_kind(db, kind, key, expires_at).map_err(runtime)
     }
 
@@ -206,7 +199,7 @@ impl Store {
         let outcome = self.node.incr_by(db, key, delta).map_err(runtime)?;
         Ok(match outcome {
             Ok(value) => (Some(value), None),
-            Err(error) => (None, Some(error)),
+            Err(error) => (None, Some(error.to_string())),
         })
     }
 

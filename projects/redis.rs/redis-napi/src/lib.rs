@@ -1,7 +1,9 @@
-//! Node-API binding exposing the portable RESP and `.yyds` primitives.
+//! Node-API binding over the upstream Redis primitives.
 //!
 //! The binding owns no listener, no command dispatcher, and no process entry
-//! point. A host composes these calls into a server loop or a client.
+//! point. A host composes these calls into a server loop or a client. Every
+//! domain rule (RESP framing, value kinds, expiry, `WATCH` versions, durability)
+//! lives upstream, so this crate only maps parameters and results.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -10,15 +12,15 @@ use database::harness::{
     Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, Stats, SuiteReport,
     check_baseline, evaluate, per_op_ms, render_json, summarize,
 };
-use database_execution::cluster::KeyValueExecutor;
-use database_query::cluster_kv::{KeyValueAction, KeyValueCommand, KeyValueResult};
+use database_execution::cluster::redis::RedisExecutor;
+use database_protocol_redis::codec::Reply;
 use database_server::yyds::redis::{ClientRegistry, EmbeddedServerFace};
-use database_types::cluster::{Error as ClusterError, FenceToken, Namespace};
+use database_storage::cluster_kv::redis::{
+    RedisShard, RenameOutcome, format::record_bytes, namespace, repair_missing_shard,
+};
+use database_types::cluster::Namespace;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use redis_wasm::format::record_bytes;
-use redis_wasm::resp::Reply;
-use redis_wasm::store::{Node, RenameOutcome};
 
 /// One parsed command with the number of bytes it consumed.
 #[napi(object)]
@@ -105,17 +107,13 @@ fn reason(error: impl ToString) -> napi::Error {
 
 /// Rejects a value kind the shard does not name.
 fn check_kind(kind: &str) -> std::result::Result<(), napi::Error> {
-    if redis_wasm::store::KINDS.contains(&kind) {
-        Ok(())
-    } else {
-        Err(reason(format!("unknown value kind `{kind}`")))
-    }
+    database_execution::cluster::redis::check_kind(kind).map_err(reason)
 }
 
 /// Parses one command from the front of `input`, or `null` when more bytes are needed.
 #[napi]
 pub fn decode_command(input: Buffer) -> std::result::Result<Option<DecodedCommand>, napi::Error> {
-    match redis_wasm::resp::decode_command(&input) {
+    match database_protocol_redis::codec::decode_command(&input) {
         Ok(Some((request, consumed))) => Ok(Some(DecodedCommand {
             consumed: consumed as u32,
             args: request.args.into_iter().map(Buffer::from).collect(),
@@ -129,7 +127,7 @@ pub fn decode_command(input: Buffer) -> std::result::Result<Option<DecodedComman
 #[napi]
 pub fn encode_command(args: Vec<Buffer>) -> Buffer {
     let args = args.into_iter().map(|arg| arg.to_vec()).collect::<Vec<_>>();
-    Buffer::from(redis_wasm::resp::encode_command(&args))
+    Buffer::from(database_protocol_redis::codec::encode_command(&args))
 }
 
 /// Encodes several commands back to back for one pipeline write.
@@ -139,13 +137,13 @@ pub fn encode_commands(commands: Vec<Vec<Buffer>>) -> Buffer {
         .into_iter()
         .map(|args| args.into_iter().map(|arg| arg.to_vec()).collect::<Vec<_>>())
         .collect::<Vec<_>>();
-    Buffer::from(redis_wasm::resp::encode_commands(&commands))
+    Buffer::from(database_protocol_redis::codec::encode_commands(&commands))
 }
 
 /// Decodes every complete request at the front of `input`.
 #[napi]
 pub fn decode_commands(input: Buffer) -> std::result::Result<DecodedCommands, napi::Error> {
-    let batch = redis_wasm::resp::decode_commands(&input);
+    let batch = database_protocol_redis::codec::decode_commands(&input);
     Ok(DecodedCommands {
         consumed: batch.consumed as u32,
         commands: batch
@@ -165,7 +163,7 @@ pub fn decode_commands(input: Buffer) -> std::result::Result<DecodedCommands, na
 pub fn encode_reply(spec: String, protocol: u8) -> std::result::Result<Buffer, napi::Error> {
     let spec: serde_json::Value = serde_json::from_str(&spec).map_err(reason)?;
     let reply = Reply::from_spec(&spec).map_err(reason)?;
-    Ok(Buffer::from(redis_wasm::resp::encode_reply(&reply, protocol)))
+    Ok(Buffer::from(database_protocol_redis::codec::encode_reply(&reply, protocol)))
 }
 
 /// Encodes several reply specifications, carried as one JSON array.
@@ -177,13 +175,13 @@ pub fn encode_replies(specs: String, protocol: u8) -> std::result::Result<Buffer
         .map(Reply::from_spec)
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(reason)?;
-    Ok(Buffer::from(redis_wasm::resp::encode_replies(&replies, protocol)))
+    Ok(Buffer::from(database_protocol_redis::codec::encode_replies(&replies, protocol)))
 }
 
 /// Parses one reply from the front of `input`, or `null` when more bytes are needed.
 #[napi]
 pub fn decode_reply(input: Buffer) -> std::result::Result<Option<DecodedReply>, napi::Error> {
-    match redis_wasm::resp::decode_reply(&input) {
+    match database_protocol_redis::codec::decode_reply(&input) {
         Ok(Some((reply, consumed))) => Ok(Some(DecodedReply {
             consumed: consumed as u32,
             spec: reply.to_spec().to_string(),
@@ -196,7 +194,7 @@ pub fn decode_reply(input: Buffer) -> std::result::Result<Option<DecodedReply>, 
 /// Decodes every complete reply at the front of `input`.
 #[napi]
 pub fn decode_replies(input: Buffer) -> std::result::Result<DecodedReplies, napi::Error> {
-    let batch = redis_wasm::resp::decode_replies(&input);
+    let batch = database_protocol_redis::codec::decode_replies(&input);
     Ok(DecodedReplies {
         consumed: batch.consumed as u32,
         specs: batch.replies.iter().map(|reply| reply.to_spec().to_string()).collect(),
@@ -207,7 +205,7 @@ pub fn decode_replies(input: Buffer) -> std::result::Result<DecodedReplies, napi
 /// Parses a canonical Redis integer, rejecting leading zeros and a plus sign.
 #[napi]
 pub fn parse_integer(value: Buffer) -> Option<i64> {
-    redis_wasm::format::parse_integer(&value)
+    database_types::canonical::parse_i64(&value)
 }
 
 /// Embedded server sessions keyed by the host connection id.
@@ -223,13 +221,13 @@ struct ServerSessions {
 /// A `.yyds` catalog plus `.yykv` shard opened by the host.
 #[napi]
 pub struct Store {
-    node: Mutex<Node>,
+    node: Mutex<RedisShard>,
     server: Mutex<ServerSessions>,
 }
 
 impl Store {
     /// Locks the shard for one call, recovering the guard when a panic poisoned it.
-    fn shard(&self) -> MutexGuard<'_, Node> {
+    fn shard(&self) -> MutexGuard<'_, RedisShard> {
         self.node.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
@@ -245,7 +243,7 @@ impl Store {
         args: &[Buffer],
     ) -> std::result::Result<(Vec<u8>, bool, Vec<u32>), napi::Error> {
         let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let executor = StoreExecutor { node: &self.node };
+        let executor = RedisExecutor::new(&self.node);
         let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let registry = Arc::clone(&sessions.registry);
         let face = sessions
@@ -272,345 +270,13 @@ impl Store {
     }
 }
 
-/// Routes the upstream executor contract onto the shard owned by the binding.
-///
-/// Only namespace-scoped reads, kind writes and deletes are expressed here. The
-/// command semantics, reply framing and type checks stay in the upstream facade;
-/// this type carries no command knowledge of its own.
-#[derive(Debug)]
-struct StoreExecutor<'a> {
-    node: &'a Mutex<Node>,
-}
-
-/// Splits `redis:db<db>[:kind]` back into the database index and value kind.
-fn locate(namespace: &Namespace) -> Option<(u8, &'static str)> {
-    let rest = namespace.0.strip_prefix(redis_wasm::store::NAMESPACE_PREFIX)?;
-    let (index, kind) = match rest.split_once(':') {
-        Some((index, kind)) => (index, kind),
-        None => (rest, ""),
-    };
-    let db = index.parse::<u8>().ok()?;
-    redis_wasm::store::KINDS
-        .into_iter()
-        .find(|candidate| *candidate == kind)
-        .map(|kind| (db, kind))
-}
-
-/// Counts the length-framed chunks of a flat collection blob.
-fn count_chunks(flat: &[u8]) -> Option<usize> {
-    let mut offset = 0;
-    let mut chunks = 0;
-    while offset < flat.len() {
-        let raw = flat.get(offset..offset + 4)?;
-        let length = u32::from_le_bytes(raw.try_into().ok()?) as usize;
-        offset = offset.checked_add(4)?.checked_add(length)?;
-        if offset > flat.len() {
-            return None;
-        }
-        chunks += 1;
-    }
-    Some(chunks)
-}
-
-/// Presents a flat hash blob in the counted form expected by the upstream handler.
-///
-/// The shard keeps collection values as flat length-framed chunks, while the upstream
-/// handler frames a hash with its field count. The conversion is byte-only: field
-/// order, field bytes and value bytes are untouched. A malformed blob is handed over
-/// unchanged so the upstream decoder reports it as corrupt.
-fn hash_with_count(flat: &[u8]) -> Vec<u8> {
-    let Some(chunks) = count_chunks(flat) else {
-        return flat.to_vec();
-    };
-    let mut out = Vec::with_capacity(flat.len() + 4);
-    out.extend_from_slice(&((chunks / 2) as u32).to_le_bytes());
-    out.extend_from_slice(flat);
-    out
-}
-
-/// Drops the upstream field count and returns the flat layout stored by the shard.
-fn hash_without_count(counted: &[u8]) -> Vec<u8> {
-    if counted.len() >= 4 {
-        counted[4..].to_vec()
-    } else {
-        counted.to_vec()
-    }
-}
-
-/// Presents a flat set blob in the counted form expected by the upstream handler.
-///
-/// The shard keeps collection values as flat length-framed chunks, while the upstream
-/// handler frames a set with its member count. The conversion is byte-only: member
-/// order and member bytes are untouched. A malformed blob is handed over unchanged
-/// so the upstream decoder reports it as corrupt.
-fn set_with_count(flat: &[u8]) -> Vec<u8> {
-    let Some(chunks) = count_chunks(flat) else {
-        return flat.to_vec();
-    };
-    let mut out = Vec::with_capacity(flat.len() + 4);
-    out.extend_from_slice(&(chunks as u32).to_le_bytes());
-    out.extend_from_slice(flat);
-    out
-}
-
-/// Drops the upstream member count and returns the flat layout stored by the shard.
-fn set_without_count(counted: &[u8]) -> Vec<u8> {
-    if counted.len() >= 4 {
-        counted[4..].to_vec()
-    } else {
-        counted.to_vec()
-    }
-}
-
-fn upstream_value(kind: &str, value: &[u8]) -> Vec<u8> {
-    if kind == "hash" {
-        hash_with_count(value)
-    } else if kind == "set" || kind == "list" {
-        set_with_count(value)
-    } else {
-        value.to_vec()
-    }
-}
-
-fn downstream_value(kind: &str, value: Vec<u8>) -> Vec<u8> {
-    if kind == "hash" {
-        hash_without_count(&value)
-    } else if kind == "set" || kind == "list" {
-        set_without_count(&value)
-    } else {
-        value
-    }
-}
-
-impl KeyValueExecutor for StoreExecutor<'_> {
-    fn execute(
-        &self,
-        fence: Option<&FenceToken>,
-        command: KeyValueCommand,
-    ) -> database_types::cluster::Result<KeyValueResult> {
-        // This executor serves one local shard, so there is no lease to fence.
-        let _ = fence;
-        let (db, kind) = locate(&command.namespace).ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
-        let mut node = self
-            .node
-            .lock()
-            .map_err(|_| ClusterError::Unsupported("store lock poisoned"))?;
-        let key = command.key.as_slice();
-        match command.action {
-            KeyValueAction::Get => Ok(KeyValueResult::Get(
-                node.get_kind(db, kind, key)
-                    .map(|record| upstream_value(kind, record_bytes(record))),
-            )),
-            KeyValueAction::Exists => Ok(KeyValueResult::Exists(node.contains_kind(db, kind, key))),
-            KeyValueAction::GetDelete => {
-                let value = node
-                    .get_kind(db, kind, key)
-                    .map(|record| upstream_value(kind, record_bytes(record)));
-                if value.is_some() {
-                    node.delete_kind(db, kind, key).map_err(ClusterError::Io)?;
-                }
-                Ok(KeyValueResult::GetDelete(value))
-            }
-            KeyValueAction::GetSet(value) => {
-                let previous = node
-                    .get_kind(db, kind, key)
-                    .map(|record| upstream_value(kind, record_bytes(record)));
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, None)
-                    .map_err(ClusterError::Io)?;
-                let _ = revision;
-                Ok(KeyValueResult::GetSet(previous))
-            }
-            KeyValueAction::Put(value) => {
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, None)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::Put { revision })
-            }
-            KeyValueAction::PutKeepingExpiry(value) => {
-                let value = downstream_value(kind, value);
-                let expires_at = node.deadline_kind(db, kind, key);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, expires_at)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::Put { revision })
-            }
-            KeyValueAction::PutIfAbsent(value) => {
-                if node.contains_kind(db, kind, key) {
-                    return Ok(KeyValueResult::PutIfAbsent { revision: None });
-                }
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, None)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::PutIfAbsent {
-                    revision: Some(revision),
-                })
-            }
-            KeyValueAction::PutIfPresent(value) => {
-                if !node.contains_kind(db, kind, key) {
-                    return Ok(KeyValueResult::PutIfPresent { revision: None });
-                }
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, None)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::PutIfPresent {
-                    revision: Some(revision),
-                })
-            }
-            KeyValueAction::PutIfPresentKeepingExpiry(value) => {
-                if !node.contains_kind(db, kind, key) {
-                    return Ok(KeyValueResult::PutIfPresent { revision: None });
-                }
-                let value = downstream_value(kind, value);
-                let expires_at = node.deadline_kind(db, kind, key);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, expires_at)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::PutIfPresent {
-                    revision: Some(revision),
-                })
-            }
-            KeyValueAction::PutExpiring { value, expires_at } => {
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, Some(expires_at))
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::Put { revision })
-            }
-            KeyValueAction::PutIfAbsentExpiring { value, expires_at } => {
-                if node.contains_kind(db, kind, key) {
-                    return Ok(KeyValueResult::PutIfAbsent { revision: None });
-                }
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, Some(expires_at))
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::PutIfAbsent {
-                    revision: Some(revision),
-                })
-            }
-            KeyValueAction::PutIfPresentExpiring { value, expires_at } => {
-                if !node.contains_kind(db, kind, key) {
-                    return Ok(KeyValueResult::PutIfPresent { revision: None });
-                }
-                let value = downstream_value(kind, value);
-                let revision = node
-                    .set_kind_revision(db, kind, key, &value, Some(expires_at))
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::PutIfPresent {
-                    revision: Some(revision),
-                })
-            }
-            KeyValueAction::Delete => Ok(KeyValueResult::Delete {
-                removed: node.delete_kind(db, kind, key).map_err(ClusterError::Io)?,
-            }),
-            KeyValueAction::SetExpiry { expires_at } => Ok(KeyValueResult::ExpiryChanged {
-                applied: node
-                    .set_deadline_kind(db, kind, key, Some(expires_at))
-                    .map_err(ClusterError::Io)?,
-            }),
-            KeyValueAction::ClearExpiry => {
-                let had_deadline = node.contains_kind(db, kind, key) && node.deadline_kind(db, kind, key).is_some();
-                node.set_deadline_kind(db, kind, key, None).map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::ExpiryChanged { applied: had_deadline })
-            }
-            KeyValueAction::GetExpiry => Ok(KeyValueResult::Expiry {
-                present: node.contains_kind(db, kind, key),
-                expires_at: node.deadline_kind(db, kind, key),
-            }),
-            KeyValueAction::GetRevision => Ok(KeyValueResult::Revision(
-                node.get_kind(db, kind, key).map(|record| record.revision),
-            )),
-            KeyValueAction::IncrementBy(delta) => {
-                if kind != "" {
-                    return Err(ClusterError::Unsupported(
-                        "increments are only defined for the string kind",
-                    ));
-                }
-                let outcome = node.incr_by(db, key, delta).map_err(ClusterError::Io)?;
-                match outcome {
-                    Ok(value) => Ok(KeyValueResult::Increment { value }),
-                    Err(message) if message.contains("not an integer") => Err(ClusterError::InvalidIntegerValue),
-                    Err(_) => Err(ClusterError::IntegerOverflow),
-                }
-            }
-            KeyValueAction::Rename { destination, if_absent } => {
-                let outcome = node
-                    .rename(db, key, &destination, if_absent)
-                    .map_err(ClusterError::Io)?;
-                Ok(KeyValueResult::Rename {
-                    source_present: !matches!(outcome, RenameOutcome::Missing),
-                    applied: matches!(outcome, RenameOutcome::Renamed),
-                })
-            }
-        }
-    }
-
-    fn execute_read_batch(
-        &self,
-        fence: Option<&FenceToken>,
-        commands: &[KeyValueCommand],
-    ) -> database_types::cluster::Result<Vec<KeyValueResult>> {
-        // The binding drives one synchronous client call at a time, so replaying
-        // the reads back to back cannot interleave with a concurrent write.
-        let _ = fence;
-        commands
-            .iter()
-            .map(|command| self.execute(None, command.clone()))
-            .collect()
-    }
-
-    fn execute_scan(
-        &self,
-        fence: Option<&FenceToken>,
-        namespace: &Namespace,
-        prefix: &[u8],
-        after: Option<&[u8]>,
-        before: Option<&[u8]>,
-        limit: usize,
-    ) -> database_types::cluster::Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        // This executor serves one local shard, so there is no lease to fence.
-        let _ = fence;
-        let (db, kind) = locate(namespace).ok_or(ClusterError::Unsupported("unknown redis namespace"))?;
-        let node = self
-            .node
-            .lock()
-            .map_err(|_| ClusterError::Unsupported("store lock poisoned"))?;
-        let mut records = Vec::new();
-        for key in node.keys(db) {
-            if !key.starts_with(prefix) {
-                continue;
-            }
-            if after.is_some_and(|after| key.as_slice() <= after) {
-                continue;
-            }
-            if before.is_some_and(|before| key.as_slice() >= before) {
-                continue;
-            }
-            if limit != 0 && records.len() >= limit {
-                break;
-            }
-            // `keys` merges every kind of the database, so a key that only lives
-            // in another kind namespace is not part of this scan.
-            if let Some(record) = node.get_kind(db, kind, &key) {
-                records.push((key, upstream_value(kind, record_bytes(record))));
-            }
-        }
-        Ok(records)
-    }
-}
-
 /// Creates the shard registered by an existing `.yyds` catalog when it is missing.
 ///
 /// Recovery entry for the `catalog.shard-file` open error. The catalog is
 /// validated but never rewritten, and an existing shard is never overwritten.
 #[napi]
 pub fn repair_shard(data_dir: String) -> std::result::Result<String, napi::Error> {
-    redis_wasm::store::repair_missing_shard(data_dir).map_err(reason)
+    repair_missing_shard(data_dir).map_err(reason)
 }
 
 #[napi]
@@ -619,7 +285,7 @@ impl Store {
     #[napi(constructor)]
     pub fn new(data_dir: String) -> std::result::Result<Self, napi::Error> {
         Ok(Self {
-            node: Mutex::new(Node::open(data_dir).map_err(reason)?),
+            node: Mutex::new(RedisShard::open(data_dir).map_err(reason)?),
             server: Mutex::new(ServerSessions {
                 registry: Arc::new(ClientRegistry::standalone()),
                 faces: HashMap::new(),
@@ -800,7 +466,7 @@ impl Store {
             },
             Err(error) => Increment {
                 value: None,
-                error: Some(error),
+                error: Some(error.to_string()),
             },
         })
     }
@@ -905,11 +571,11 @@ impl Store {
         db: u8,
         protocol: u8,
         args: &[Buffer],
-        run: impl FnOnce(&mut Vec<u8>, &[&[u8]], &Namespace, &StoreExecutor<'_>, u8) -> std::io::Result<()>,
+        run: impl FnOnce(&mut Vec<u8>, &[&[u8]], &Namespace, &RedisExecutor<'_>, u8) -> std::io::Result<()>,
     ) -> std::result::Result<Vec<u8>, napi::Error> {
         let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
-        let namespace = Namespace(redis_wasm::store::namespace(db));
-        let executor = StoreExecutor { node: &self.node };
+        let namespace = Namespace(namespace(db));
+        let executor = RedisExecutor::new(&self.node);
         let mut frame = Vec::new();
         run(&mut frame, &arguments, &namespace, &executor, protocol).map_err(reason)?;
         Ok(frame)
@@ -931,7 +597,7 @@ impl Store {
                 protocol,
             )
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("hash command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
@@ -968,7 +634,7 @@ impl Store {
                 protocol,
             )
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("set command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
@@ -1005,7 +671,7 @@ impl Store {
                 protocol,
             )
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("list command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
@@ -1040,7 +706,7 @@ impl Store {
                 protocol,
             )
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("string command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
@@ -1081,7 +747,7 @@ impl Store {
                 protocol,
             )
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("keyspace command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
@@ -1117,7 +783,7 @@ impl Store {
         let frame = self.reply_frame(db, 2, &args, |frame, arguments, namespace, executor, _| {
             database_server::yyds::redis::execute_hyperloglog_command(frame, arguments, executor, namespace)
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("hyperloglog command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
@@ -1147,7 +813,7 @@ impl Store {
         args: Vec<Buffer>,
     ) -> std::result::Result<String, napi::Error> {
         let (frame, close, killed) = self.run_server_command(session, db, protocol, &args)?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("server command produced an empty reply frame"))?;
         let killed = killed.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",");
@@ -1205,7 +871,7 @@ impl Store {
                 protocol,
             )
         })?;
-        let (reply, _) = redis_wasm::resp::decode_reply(&frame)
+        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
             .ok_or_else(|| reason("zset command produced an empty reply frame"))?;
         Ok(reply.to_spec().to_string())
