@@ -1,0 +1,15 @@
+[package]
+name = "redis-conformance"
+description = "Redis gateway detailed correctness matrix: conformance suite migrated from the upstream database-server integration tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dev-dependencies]
+database-cluster = { workspace = true }
+database-execution = { workspace = true }
+database-query = { workspace = true }
+database-server = { workspace = true }
+database-storage = { workspace = true }
+database-types = { workspace = true }
