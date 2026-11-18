@@ -698,7 +698,7 @@ impl Store {
     #[napi]
     pub fn string_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
         let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_string_command(
+            database_execution::cluster::redis::string::execute(
                 frame,
                 arguments,
                 executor,
@@ -716,7 +716,7 @@ impl Store {
     #[napi]
     pub fn string_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
         self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_string_command(
+            database_execution::cluster::redis::string::execute(
                 frame,
                 arguments,
                 executor,
@@ -739,7 +739,7 @@ impl Store {
         args: Vec<Buffer>,
     ) -> std::result::Result<String, napi::Error> {
         let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_keyspace_command(
+            database_execution::cluster::redis::string::execute_keyspace(
                 frame,
                 arguments,
                 executor,
@@ -762,7 +762,7 @@ impl Store {
         args: Vec<Buffer>,
     ) -> std::result::Result<CommandFrame, napi::Error> {
         self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_keyspace_command(
+            database_execution::cluster::redis::string::execute_keyspace(
                 frame,
                 arguments,
                 executor,

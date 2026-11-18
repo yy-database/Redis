@@ -12,9 +12,8 @@ use std::{
 
 use database_cluster::topology::ShardMap;
 use database_execution::cluster::LocalExecutor;
-use database_server::yyds::redis::{
-    connection::serve_cancellable_with_executor, execute_string_command, resp::RequestLimits,
-};
+use database_execution::cluster::redis::string::execute as execute_string_command;
+use database_server::yyds::redis::{connection::serve_cancellable_with_executor, resp::RequestLimits};
 use database_storage::cluster_kv::MemoryShard;
 use database_types::cluster::{Namespace, ShardEpoch, ShardId};
 

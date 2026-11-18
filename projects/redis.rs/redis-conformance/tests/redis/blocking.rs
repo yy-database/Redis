@@ -16,8 +16,9 @@ use std::{
 use database_cluster::topology::ShardMap;
 use database_execution::cluster::{KeyValueExecutor, LocalExecutor};
 use database_execution::cluster::redis::blocking::BlockingRegistry;
+use database_execution::cluster::redis::string::KeyAccessTracker;
 use database_server::yyds::redis::{
-    connection::{KeyAccessTracker, serve_cancellable_with_executor_and_tracker},
+    connection::serve_cancellable_with_executor_and_tracker,
     pubsub::PubSubRegistry,
     resp::RequestLimits,
 };
