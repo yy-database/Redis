@@ -33,11 +33,11 @@ function temporaryDir() {
 }
 
 function session(protocol = 2) {
-    return { db: 0, protocol, queued: null, name: '' };
+    return { id: 1, db: 0, protocol, name: '' };
 }
 
 function helloSpec(protocol) {
-    return map([
+    const fields = [
         ['server', bulk('redis')],
         ['version', bulk('7.4.0')],
         ['proto', integer(protocol)],
@@ -45,7 +45,12 @@ function helloSpec(protocol) {
         ['mode', bulk('standalone')],
         ['role', bulk('master')],
         ['modules', array([])],
-    ]);
+    ];
+    // The gateway frames `HELLO` for the connection protocol before the reply
+    // crosses the binding, so RESP2 already carries the map as a flat array.
+    return protocol === 3
+        ? map(fields)
+        : array(fields.flatMap(([key, value]) => [bulk(key), value]));
 }
 
 function record(snapshot, key) {

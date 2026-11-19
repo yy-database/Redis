@@ -411,7 +411,7 @@ export class Redis extends CommandHost {
         this.#opening = (async () => {
             try {
                 this.#store = new Store(directory);
-                this.#session = { db: 0, protocol: 3, queued: null, name: '', hub: this.#hub };
+                this.#session = { db: 0, protocol: 3, name: '', hub: this.#hub };
                 this.#state = 'open';
             }
             catch (error) {
@@ -499,7 +499,7 @@ export class Redis extends CommandHost {
         if (!Number.isInteger(database) || database < 0 || database >= DATABASES) {
             throw configurationError(`\`database\` must be an integer within 0..${DATABASES - 1}`);
         }
-        const session: Session = { db: database, protocol: 3, queued: null, name: '', hub: this.#hub };
+        const session: Session = { db: database, protocol: 3, name: '', hub: this.#hub };
         const runner: EngineRunner = (child, args) => this.#runOn(child, args);
         const handle = new RedisSession(session, runner, () => {
             this.#sessions.delete(handle);

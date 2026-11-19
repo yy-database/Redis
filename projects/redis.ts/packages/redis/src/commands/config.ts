@@ -1,8 +1,9 @@
-//! `CONFIG`: the upstream facade answers its own option table, while the host
+//! `CONFIG`: the upstream gateway answers its own option table, while the host
 //! overlays the options it owns at runtime (`requirepass`,
 //! `notify-keyspace-events`, `appendfsync` and the two `slowlog-*` knobs).
-//! Keeping the overlay here means a `CONFIG SET` takes effect on the live
-//! server instead of only at startup.
+//! `execute` asks this module which pairs to rewrite out of the forwarded
+//! request and what to apply once the gateway answered, so a `CONFIG SET` still
+//! takes effect on the live server instead of only at startup.
 
 import type { Store } from '../native.js';
 import { parseInteger } from '../native.js';
@@ -17,13 +18,13 @@ import {
     slowlogMaxLen,
 } from './introspection.js';
 import { text } from './kinds.js';
-import type { CommandPlan, ServerSettings, Session } from './session.js';
+import type { ServerSettings, Session } from './session.js';
 
 /** Options whose value lives in the listener's `ServerSettings`. */
 const SERVER_OPTIONS = ['appendfsync', 'requirepass', 'notify-keyspace-events'] as const;
 /** Options owned by the process-wide slow log, changed without a listener copy. */
 const SLOWLOG_OPTIONS = ['slowlog-log-slower-than', 'slowlog-max-len'] as const;
-/** Option names the host applies itself; everything else is the facade's. */
+/** Option names the host applies itself; everything else is the gateway's. */
 const LOCAL_OPTIONS = [...SERVER_OPTIONS, ...SLOWLOG_OPTIONS] as const;
 type LocalOption = (typeof LOCAL_OPTIONS)[number];
 
@@ -67,14 +68,14 @@ function invalidAppendfsync(): ReplySpec {
     );
 }
 
-/** Error text the facade answers for a non-integer slow log setting. */
+/** Error text the gateway answers for a non-integer slow log setting. */
 function invalidSlowlogInteger(name: string): ReplySpec {
     return replyError(
         `ERR CONFIG SET failed (possibly related to argument '${name}') - argument couldn't be parsed into an integer`,
     );
 }
 
-/** Overlays the host-owned options on the array reply the facade answered. */
+/** Overlays the host-owned options on the array reply the gateway answered. */
 function mergeLocalGet(settings: ServerSettings, patterns: Buffer[], base: ReplySpec): ReplySpec {
     if (base.type !== 'array') {
         return base;
@@ -100,30 +101,38 @@ function mergeLocalGet(settings: ServerSettings, patterns: Buffer[], base: Reply
     return array(pairs.flatMap(([name, value]) => [bulk(name), value]));
 }
 
-/** Runs one `CONFIG` request through the facade and returns only its reply. */
-function serverReply(store: Store, session: Session, args: Buffer[]): ReplySpec {
-    return store.serverCommand(session.id ?? 0, session.db ?? 0, session.protocol ?? 2, args).reply;
+/** What one `CONFIG` request needs from the host beyond the gateway answer. */
+export interface ConfigOverlay {
+    /** `CONFIG GET` patterns whose host-owned values merge into the gateway reply. */
+    getPatterns: Buffer[] | null;
+    /** Host-owned pairs to apply once the gateway accepted the forwarded ones. */
+    local: [LocalOption, string][];
+    /** Pairs the gateway validates and applies itself; empty when all are host-owned. */
+    forwarded: Buffer[];
+    /** Host validation error that must be answered before any option applies. */
+    error: ReplySpec | null;
 }
 
-/** Plans one `CONFIG GET` or `CONFIG SET`, delegating every other option. */
-export function planConfig(store: Store, session: Session, args: Buffer[]): CommandPlan {
+/**
+ * Inspects one `CONFIG` request, or returns `null` when the gateway answers it
+ * verbatim. A host validation failure is reported here without collecting any
+ * pairs, so the forwarded request is neutralized before the gateway sees it.
+ */
+export function inspectConfig(session: Session, args: Buffer[]): ConfigOverlay | null {
     const settings = session.settings;
     if (settings === undefined || args.length < 2) {
-        return { run: () => store.serverCommand(session.id ?? 0, session.db ?? 0, session.protocol ?? 2, args) };
+        return null;
     }
     const subcommand = text(args[1]).toLowerCase();
     if (subcommand === 'get') {
         if (args.length < 3) {
-            return { run: () => store.serverCommand(session.id ?? 0, session.db ?? 0, session.protocol ?? 2, args) };
+            return null;
         }
-        return {
-            run: () => mergeLocalGet(settings, args.slice(2), serverReply(store, session, args)),
-        };
+        return { getPatterns: args.slice(2), local: [], forwarded: [], error: null };
     }
     if (subcommand !== 'set' || args.length < 4 || args.length % 2 !== 0) {
-        return { run: () => store.serverCommand(session.id ?? 0, session.db ?? 0, session.protocol ?? 2, args) };
+        return null;
     }
-
     const local: [LocalOption, string][] = [];
     const forwarded: Buffer[] = [];
     for (let index = 2; index < args.length; index += 2) {
@@ -134,59 +143,75 @@ export function planConfig(store: Store, session: Session, args: Buffer[]): Comm
             continue;
         }
         if (name === 'notify-keyspace-events' && [...value].some(character => !NOTIFICATION_CLASSES.has(character))) {
-            return { error: invalidNotificationClass() };
+            return { getPatterns: null, local: [], forwarded: [], error: invalidNotificationClass() };
         }
         if (name === 'appendfsync' && value !== 'always' && value !== 'everysec') {
-            return { error: invalidAppendfsync() };
+            return { getPatterns: null, local: [], forwarded: [], error: invalidAppendfsync() };
         }
         if (name === 'slowlog-log-slower-than') {
             const parsed = parseInteger(args[index + 1]);
             if (parsed === null || parsed < -1) {
-                return { error: invalidSlowlogInteger(name) };
+                return { getPatterns: null, local: [], forwarded: [], error: invalidSlowlogInteger(name) };
             }
         }
         if (name === 'slowlog-max-len') {
             const parsed = parseInteger(args[index + 1]);
             if (parsed === null || parsed < 0) {
-                return { error: invalidSlowlogInteger(name) };
+                return { getPatterns: null, local: [], forwarded: [], error: invalidSlowlogInteger(name) };
             }
         }
         local.push([name, value]);
     }
-    return {
-        run: () => {
-            // The facade owns the rest of the option table and its error text, so
-            // it validates the forwarded pairs before any host option is applied.
-            if (forwarded.length > 0) {
-                const base = serverReply(
-                    store,
-                    session,
-                    [Buffer.from('CONFIG'), Buffer.from('SET'), ...forwarded],
-                );
-                if (base.type === 'error') {
-                    return base;
-                }
-            }
-            for (const [name, value] of local) {
-                if (name === 'appendfsync') {
-                    settings.appendfsync = value === 'always' ? 'always' : 'everysec';
-                    store.setSyncAlways(settings.appendfsync === 'always');
-                }
-                else if (name === 'requirepass') {
-                    settings.requirepass = value.length === 0 ? undefined : value;
-                }
-                else if (name === 'notify-keyspace-events') {
-                    settings.notifyKeyspaceEvents = value;
-                    settings.notifications = parseNotificationFlags(value);
-                }
-                else if (name === 'slowlog-log-slower-than') {
-                    setSlowlogLogSlowerThan(Number(value));
-                }
-                else {
-                    setSlowlogMaxLen(Number(value));
-                }
-            }
-            return simple('OK');
-        },
-    };
+    return { getPatterns: null, local, forwarded, error: null };
+}
+
+/**
+ * Answers one gateway `CONFIG` reply after the host overlay has been applied.
+ *
+ * The gateway runs first, so its `NOAUTH` gate wins over any host validation,
+ * and the old precedence is kept after that: a host validation error is answered
+ * before the forwarded pairs could matter, a forwarded-pair error is answered
+ * verbatim, and only a clean round lets the host options take effect.
+ */
+export function applyConfigOverlay(
+    store: Store,
+    session: Session,
+    overlay: ConfigOverlay,
+    spec: ReplySpec | undefined,
+): { reply: ReplySpec } {
+    if (spec !== undefined && spec.type === 'error' && spec.value.startsWith('NOAUTH')) {
+        return { reply: spec };
+    }
+    if (overlay.error !== null) {
+        return { reply: overlay.error };
+    }
+    const settings = session.settings as ServerSettings;
+    if (overlay.getPatterns !== null) {
+        return { reply: mergeLocalGet(settings, overlay.getPatterns, spec ?? array([])) };
+    }
+    if (overlay.forwarded.length > 0 && spec !== undefined && spec.type === 'error') {
+        return { reply: spec };
+    }
+    for (const [name, value] of overlay.local) {
+        if (name === 'appendfsync') {
+            settings.appendfsync = value === 'always' ? 'always' : 'everysec';
+            store.setSyncAlways(settings.appendfsync === 'always');
+        }
+        else if (name === 'requirepass') {
+            settings.requirepass = value.length === 0 ? undefined : value;
+            // The gateway's gate reads the listener password from the registry.
+            store.setRequirepass(value.length === 0 ? null : value);
+        }
+        else if (name === 'notify-keyspace-events') {
+            settings.notifyKeyspaceEvents = value;
+            settings.notifications = parseNotificationFlags(value);
+        }
+        else if (name === 'slowlog-log-slower-than') {
+            setSlowlogLogSlowerThan(Number(value));
+        }
+        else {
+            setSlowlogMaxLen(Number(value));
+        }
+    }
+    return { reply: simple('OK') };
 }

@@ -72,7 +72,7 @@
       "steps": [
         {
           "argsText": ["BGSAVE", "SCHEDULE"],
-          "reply": { "type": "simple", "value": "Background saving started" }
+          "reply": { "type": "bulk", "bytes": [66, 97, 99, 107, 103, 114, 111, 117, 110, 100, 32, 115, 97, 118, 105, 110, 103, 32, 115, 116, 97, 114, 116, 101, 100] }
         }
       ]
     },
@@ -82,7 +82,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["BGSAVE"],
-      "reply": { "type": "simple", "value": "Background saving started" },
+      "reply": { "type": "bulk", "bytes": [66, 97, 99, 107, 103, 114, 111, 117, 110, 100, 32, 115, 97, 118, 105, 110, 103, 32, 115, 116, 97, 114, 116, 101, 100] },
       "setup": [],
       "effect": []
     },
@@ -171,7 +171,7 @@
       "op": "command",
       "sides": ["ts"],
       "argsText": ["BGREWRITEAOF"],
-      "reply": { "type": "simple", "value": "Background append only file rewriting started" },
+      "reply": { "type": "bulk", "bytes": [66, 97, 99, 107, 103, 114, 111, 117, 110, 100, 32, 97, 112, 112, 101, 110, 100, 32, 111, 110, 108, 121, 32, 102, 105, 108, 101, 32, 114, 101, 119, 114, 105, 116, 105, 110, 103, 32, 115, 116, 97, 114, 116, 101, 100] },
       "setup": [],
       "effect": []
     },
@@ -195,7 +195,7 @@
           "reply": {
             "type": "array",
             "value": [
-              { "type": "simple", "value": "Background append only file rewriting started" }
+              { "type": "bulk", "bytes": [66, 97, 99, 107, 103, 114, 111, 117, 110, 100, 32, 97, 112, 112, 101, 110, 100, 32, 111, 110, 108, 121, 32, 102, 105, 108, 101, 32, 114, 101, 119, 114, 105, 116, 105, 110, 103, 32, 115, 116, 97, 114, 116, 101, 100] }
             ]
           }
         }

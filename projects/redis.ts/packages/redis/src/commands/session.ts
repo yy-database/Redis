@@ -28,15 +28,8 @@ export interface PubSubTable {
  */
 export type CommandRun = (() => RunOutcome) & { frame?: () => CommandFrame };
 
-/** A reply plus the connection effects the binding reports for it. */
-export interface ServerOutcome {
-    reply: ReplySpec;
-    close?: boolean;
-    killed?: number[];
-}
-
-/** What one planned command run answers: a reply specification or a server outcome. */
-export type RunOutcome = ReplySpec | ServerOutcome;
+/** What one planned command run answers: a reply specification. */
+export type RunOutcome = ReplySpec;
 
 /** The descriptor `startServer` parks in the blocking hub. */
 export interface BlockDescriptor {
@@ -53,13 +46,6 @@ export interface CommandPlan {
     run?: CommandRun;
     frames?: () => ReplySpec[];
     block?: BlockDescriptor;
-}
-
-/** One key pinned by `WATCH`, with the version observed when the watch was taken. */
-export interface WatchedKey {
-    db: number;
-    key: Buffer;
-    version: number;
 }
 
 /** Server-wide options this product adds on top of the upstream command surface. */
@@ -81,11 +67,6 @@ export interface Session {
     id?: number;
     db?: number;
     protocol?: number;
-    queued?: CommandRun[] | null;
-    multiError?: boolean;
-    watched?: WatchedKey[];
-    /** `false` while the connection still owes an `AUTH`; absent means authorized. */
-    authenticated?: boolean;
     /** Password configured on the server, absent when the default user has none. */
     requirepass?: string;
     /** Live server options, shared by every connection of one listener. */

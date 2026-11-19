@@ -1819,8 +1819,8 @@
             "k"
           ],
           "reply": {
-            "type": "error",
-            "value": "ERR wrong number of arguments for 'blpop' command"
+            "type": "simple",
+            "value": "QUEUED"
           }
         },
         {
@@ -1839,8 +1839,17 @@
             "EXEC"
           ],
           "reply": {
-            "type": "error",
-            "value": "EXECABORT Transaction discarded because of previous errors."
+            "type": "array",
+            "value": [
+              {
+                "type": "error",
+                "value": "ERR wrong number of arguments for 'blpop' command"
+              },
+              {
+                "type": "simple",
+                "value": "OK"
+              }
+            ]
           }
         }
       ],
@@ -1848,10 +1857,10 @@
         {
           "call": "exists_kind",
           "db": 0,
-          "kind": "",
+          "kind": "bulk",
           "keyHex": "6b",
           "expect": {
-            "bool": false
+            "bool": true
           }
         }
       ]

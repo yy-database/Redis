@@ -35,7 +35,7 @@ function commandStore(store) {
         get(target, property) {
             if (property === 'hashCommand' || property === 'setCommand' || property === 'listCommand'
                 || property === 'zsetCommand' || property === 'stringCommand' || property === 'hyperloglogCommand'
-                || property === 'keyspaceCommand' || property === 'serverCommand') {
+                || property === 'keyspaceCommand') {
                 return (...call) => JSON.parse(target[property](...call));
             }
             const value = Reflect.get(target, property);
@@ -225,7 +225,7 @@ function runSteps(store, steps, directory) {
 
 /** One harness connection: `id` matches the first id a fresh registry hands out. */
 function session() {
-    return { id: 1, db: 0, protocol: 2, queued: null, name: '' };
+    return { id: 1, db: 0, protocol: 2, name: '' };
 }
 
 /** Executes one scan-family command, returning its cursor and page tokens in hex. */

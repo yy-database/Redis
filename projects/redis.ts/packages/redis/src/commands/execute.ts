@@ -1,19 +1,25 @@
-//! The `execute` dispatcher, the plan switch and `HELLO` framing.
+//! The `execute` dispatcher and the host-owned plan switch.
+//!
+//! The command state machines (`AUTH`, `HELLO`, `QUIT`, `RESET`, `WATCH`, `MULTI`
+//! / `EXEC`, `DISCARD`, `UNWATCH`, persistence, `WAIT`, `LATENCY`, `CLIENT`,
+//! `COMMAND`, `INFO`, `ACL` and `CONFIG`) live in the upstream embedded gateway.
+//! This dispatcher runs the request through that gateway, mirrors the effects it
+//! reports onto the session, and keeps only the host-owned families in `plan`.
 
-import { timingSafeEqual } from 'node:crypto';
 import { parseInteger } from '../native.js';
 import type { Store } from '../native.js';
-import { array, bulk, error as replyError, integer, map, nullArray, simple } from '../reply.js';
+import { decodeReply } from '../native.js';
+import { array, bulk, error as replyError, integer, simple } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
 import { sweepExpired } from './expiry.js';
-import { planConfig } from './config.js';
+import { applyConfigOverlay, inspectConfig } from './config.js';
+import type { ConfigOverlay } from './config.js';
 import { planCollection, planHyperLogLog, planKeyspace, planSetAggregate, planSMisMember, planSort, planSPop, planString, planZSet } from './forward.js';
 import { DATABASES, commandName, unknownCommand, wrongArity } from './kinds.js';
 import { planIntrospection } from './introspection.js';
-import { planPersistence } from './persistence.js';
 import { planPubsub, pubsubSubcommand, pubsubSubcommandError, publish, SUBSCRIBER_COMMANDS, subscribed, subscriptionFrames } from './pubsub.js';
 import { planStream, planXRead, planXReadGroup, planXGroup, planXAck, planXPending, planXClaim, planXAutoClaim, planXInfo } from './streams.js';
-import type { BlockDescriptor, CommandPlan, CommandRun, RunOutcome, ServerOutcome, Session } from './session.js';
+import type { BlockDescriptor, CommandPlan, RunOutcome, Session } from './session.js';
 
 /** The frames one executed command owes the connection. */
 export interface ExecuteResult {
@@ -28,77 +34,17 @@ export interface ExecuteResult {
     shutdown?: boolean;
 }
 
-/** Commands the upstream refuses to queue; they never enter a transaction. */
-const NO_MULTI_COMMANDS = new Set(['save', 'shutdown']);
-
-function hello(protocol: number, id?: number): ReplySpec {
-    return map([
-        ['server', bulk('redis')],
-        ['version', bulk('7.4.0')],
-        ['proto', integer(protocol)],
-        ['id', integer(id ?? 1)],
-        ['mode', bulk('standalone')],
-        ['role', bulk('master')],
-        ['modules', array([])],
-    ]);
-}
-
-/** Commands an unauthenticated connection may still run, as on the real server. */
-const UNAUTHENTICATED_COMMANDS = new Set(['auth', 'hello', 'quit', 'reset']);
-
-/** Error Redis answers when a command needs an authenticated connection. */
-function noAuth(): ReplySpec {
-    return replyError('NOAUTH Authentication required.');
-}
-
-/** Error Redis answers for a bad user name or password. */
-function wrongPass(): ReplySpec {
-    return replyError('WRONGPASS invalid username-password pair or user is disabled.');
-}
-
-function passwordMatches(given: Buffer, configured: string): boolean {
-    const expected = Buffer.from(configured);
-    return given.length === expected.length && timingSafeEqual(given, expected);
-}
-
-/** Runs `AUTH [username] password` against the single configured default user. */
-function authenticate(session: Session, args: Buffer[]): ReplySpec {
-    const username = args.length === 3 ? args[1].toString('utf8') : 'default';
-    const password = args.length === 3 ? args[2] : args[1];
-    const error = credentialError(session, username, password, args.length === 2);
-    if (error !== null) return error;
-    session.authenticated = true;
-    return simple('OK');
-}
-
-/**
- * Checks one username/password pair, returning the error reply or `null`.
- *
- * `legacy` marks the single-argument `AUTH <password>` form, which upstream
- * answers with a dedicated message when no password is configured at all.
- */
-function credentialError(session: Session, username: string, password: Buffer, legacy: boolean): ReplySpec | null {
-    const configured = session.settings?.requirepass ?? session.requirepass;
-    if (configured === undefined) {
-        if (legacy) {
-            return replyError(
-                'ERR AUTH <password> called without any password configured for the default user. Are you sure your configuration is correct?',
-            );
-        }
-        return username === 'default' ? null : wrongPass();
-    }
-    return username === 'default' && passwordMatches(password, configured) ? null : wrongPass();
-}
-
 /**
  * Executes one command and returns the reply specification.
  *
- * `writeFrames` is set by the socket loop, which writes raw bytes: a forwarding
- * family command then answers with the frame the facade already built instead of
- * a specification. Every other caller (transactions, the acceptance harness)
- * keeps the specification form.
+ * `writeFrames` is set by the socket loop, which writes raw bytes: a gateway
+ * command then answers with the frame the upstream already built, and a
+ * forwarding family command keeps its framed fast path. Every other caller
+ * (transactions, the acceptance harness) keeps the specification form.
+ * `replaying` marks a command released by `EXEC`, so the gateway answers
+ * replay-only commands such as `WAIT` immediately instead of parking.
  */
-export function execute(store: Store, session: Session, args: Buffer[], writeFrames = false): ExecuteResult {
+export function execute(store: Store, session: Session, args: Buffer[], writeFrames = false, replaying = false): ExecuteResult {
     if (args.length === 0) {
         // An empty multibulk request is a no-op on the real server: no reply,
         // and the connection stays open for the next command.
@@ -106,15 +52,11 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
     }
     const name = commandName(args);
 
-    if (session.authenticated === false && (session.settings?.requirepass ?? session.requirepass) !== undefined
-        && !UNAUTHENTICATED_COMMANDS.has(name)) {
-        return { reply: noAuth() };
-    }
-
     // RESP2 subscriber mode: only the pub/sub verbs, PING, QUIT and RESET may run.
     // RESP3 dropped the restriction and runs any command while subscribed.
     // Following Redis, an unknown `PUBSUB` subcommand is reported before the
-    // restriction, and a known one is named `pubsub|<subcommand>`.
+    // restriction, and a known one is named `pubsub|<subcommand>`. A subscriber
+    // has necessarily passed the gateway's authentication gate already.
     if (session.protocol === 2 && subscribed(session) && !SUBSCRIBER_COMMANDS.has(name)) {
         const subcommand = name === 'pubsub' ? pubsubSubcommand(args) : null;
         if (name === 'pubsub') {
@@ -129,116 +71,85 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
         };
     }
 
-    if (name === 'quit') {
-        // The connection layer accepts QUIT with any extra arguments and always
-        // answers OK before closing, so there is no arity check here.
-        return { reply: simple('OK'), close: true };
-    }
-    if (name === 'auth') {
-        if (args.length !== 2 && args.length !== 3) {
-            return { reply: wrongArity('auth') };
+    // The gateway keys every session effect by the host connection id, and host
+    // CONFIG pairs it does not own are rewritten out of the forwarded request.
+    const face = session.id ?? 0;
+    let gatewayArgs = args;
+    let configOverlay: ConfigOverlay | null = null;
+    if (name === 'config') {
+        configOverlay = inspectConfig(session, args);
+        if (configOverlay !== null && (configOverlay.error !== null || configOverlay.local.length > 0)) {
+            // Host-owned pairs (or a host validation failure) must not reach the
+            // gateway table; the bare header still runs the authentication gate.
+            gatewayArgs = [Buffer.from('CONFIG'), Buffer.from('SET'), ...configOverlay.forwarded];
         }
-        return { reply: authenticate(session, args) };
     }
-    if (name === 'hello') {
-        return helloCommand(store, session, args);
-    }
-    if (name === 'reset') {
-        if (args.length !== 1) {
-            return { reply: wrongArity('reset') };
+    const outcome = store.serverExecute(face, session.db ?? 0, session.protocol ?? 2, gatewayArgs, replaying);
+
+    if (outcome.handled) {
+        if (outcome.protocol !== null && outcome.protocol !== undefined) {
+            session.protocol = outcome.protocol;
         }
-        session.subscriptions?.channels.clear();
-        session.subscriptions?.patterns.clear();
-        session.queued = null;
-        clearWatches(store, session);
-        session.protocol = 2;
-        session.db = 0;
-        return { reply: simple('RESET') };
-    }
-    if (name === 'watch') {
-        if (args.length < 2) {
-            return { reply: wrongArity('watch') };
+        if (outcome.name !== null && outcome.name !== undefined) {
+            session.name = outcome.name.toString('utf8');
         }
-        // `WATCH` is the one command upstream refuses to queue, so it never
-        // enters a transaction and the existing watch list stays untouched.
-        if (session.queued) {
-            return { reply: replyError('ERR WATCH inside MULTI is not allowed') };
+        if (outcome.reset) {
+            session.subscriptions?.channels.clear();
+            session.subscriptions?.patterns.clear();
+            session.db = 0;
         }
-        const db = session.db ?? 0;
-        const watched = session.watched ?? (session.watched = []);
-        for (const key of args.slice(1)) {
-            if (watched.some(entry => entry.db === db && entry.key.equals(key))) {
-                continue;
+        if (outcome.wait !== null && outcome.wait !== undefined) {
+            // The gateway parked `WAIT`: the connection suspends and answers the
+            // integer `0` the binding encodes once the timeout elapses.
+            const timeoutReply = specOf(store.serverWaitComplete(session.protocol ?? 2));
+            if (session.hub === undefined) {
+                return { reply: timeoutReply };
             }
-            watched.push({ db, key: Buffer.from(key), version: store.watchKey(db, key) });
+            return { block: { db: 0, keys: [], timeoutMs: outcome.wait, attempt: () => null, timeoutReply } };
         }
-        return { reply: simple('OK') };
-    }
-    if (name === 'multi') {
-        if (args.length !== 1) {
-            return { reply: wrongArity('multi') };
+        if (outcome.replay.length > 0) {
+            // `EXEC` released its queue through the gateway: replay every entry in
+            // order and assemble the nested array from the individual replies.
+            const specs = outcome.replay.map((entry) => execute(store, session, entry, false, true).reply ?? null);
+            return { reply: array(specs as ReplySpec[]) };
         }
-        if (session.queued) {
-            return { reply: replyError('ERR MULTI calls can not be nested') };
+        if (outcome.shutdown) {
+            return { reply: undefined, close: true, shutdown: true };
         }
-        session.queued = [];
-        session.multiError = false;
-        return { reply: simple('OK') };
-    }
-    if (name === 'exec') {
-        if (!session.queued) {
-            return { reply: replyError('ERR EXEC without MULTI') };
+        if (configOverlay !== null) {
+            const spec = outcome.frame.length === 0 ? undefined : specOf(outcome.frame);
+            return applyConfigOverlay(store, session, configOverlay, spec);
         }
-        const queued = session.queued;
-        const dirty = session.multiError === true;
-        session.queued = null;
-        session.multiError = false;
-        if (dirty) {
-            clearWatches(store, session);
-            return { reply: replyError('EXECABORT Transaction discarded because of previous errors.') };
+        if (writeFrames) {
+            return { frame: outcome.frame, close: outcome.close, killed: outcome.killed };
         }
-        // Expired keys count as modified, so sweep them before comparing the
-        // watch versions. Without watches the sweep is skipped entirely.
-        if (session.watched !== undefined && session.watched.length > 0) {
-            sweepExpired(store);
-        }
-        const modified = watchedModified(store, session);
-        clearWatches(store, session);
-        if (modified) {
-            return { reply: nullArray() };
-        }
-        return { reply: array(queued.map(run => run()) as ReplySpec[]) };
-    }
-    if (name === 'discard') {
-        if (!session.queued) {
-            return { reply: replyError('ERR DISCARD without MULTI') };
-        }
-        session.queued = null;
-        session.multiError = false;
-        clearWatches(store, session);
-        return { reply: simple('OK') };
+        return { reply: outcome.frame.length === 0 ? undefined : specOf(outcome.frame), close: outcome.close, killed: outcome.killed };
     }
 
-    // Upstream rejects the `NO_MULTI` commands while they are being queued, so
-    // the transaction is poisoned before the command could ever run.
-    if (session.queued && NO_MULTI_COMMANDS.has(name)) {
-        session.multiError = true;
-        return { reply: replyError(`ERR Command ${name.toUpperCase()} can not be used in MULTI`) };
+    if (outcome.inMulti) {
+        // The gateway validated the command family but does not execute it, so the
+        // host plans it and forwards it into the upstream queue, which keeps the
+        // ordering, the poison flag and the `EXEC` release. A command the host
+        // rejects now poisons the transaction, exactly as upstream validation does.
+        const planned = plan(store, session, name, args);
+        if (planned.error !== undefined) {
+            store.serverPoison(face);
+            return { reply: planned.error };
+        }
+        if (planned.frames !== undefined) {
+            return { frames: planned.frames() };
+        }
+        const queued = store.serverQueue(face, session.protocol ?? 2, args);
+        return writeFrames ? { frame: queued } : { reply: specOf(queued) };
     }
 
+    // Host-owned families outside a transaction.
     const planned = plan(store, session, name, args);
-    if (planned.error) {
-        // A command rejected while queued poisons the transaction: EXEC answers
-        // EXECABORT and drops every command queued so far.
-        if (session.queued) session.multiError = true;
+    if (planned.error !== undefined) {
         return { reply: planned.error };
     }
     if (planned.frames !== undefined) {
         return { frames: planned.frames() };
-    }
-    if (session.queued) {
-        session.queued.push(planned.run);
-        return { reply: simple('QUEUED') };
     }
     // The facade already framed this reply for the connection protocol, so hand
     // the bytes to the socket loop instead of decoding and re-encoding them.
@@ -259,90 +170,16 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
         }
         return { block: planned.block };
     }
-    const outcome = planned.run() as RunOutcome & Partial<ServerOutcome> & { shutdown?: boolean };
-    if (outcome !== null && typeof outcome === 'object' && outcome.close !== undefined) {
-        return { reply: outcome.reply, close: outcome.close, killed: outcome.killed, shutdown: outcome.shutdown };
-    }
-    return { reply: outcome };
+    return { reply: planned.run() };
 }
 
-function helloCommand(store: Store, session: Session, args: Buffer[]): ExecuteResult {
-    if (args.length === 1) {
-        return { reply: hello(session.protocol ?? 2, session.id) };
-    }
-    const protocol = parseInteger(args[1]);
-    if (protocol === null || (protocol !== 2 && protocol !== 3)) {
-        return { reply: replyError('NOPROTO unsupported protocol version') };
-    }
-    let username: string | undefined;
-    let password: Buffer | undefined;
-    let name: string | undefined;
-    for (let index = 2; index < args.length;) {
-        const option = args[index].toString('utf8').toUpperCase();
-        if (option === 'AUTH') {
-            if (username !== undefined || index + 2 >= args.length) {
-                return { reply: replyError('ERR syntax error') };
-            }
-            username = args[index + 1].toString('utf8');
-            password = args[index + 2];
-            index += 3;
-        }
-        else if (option === 'SETNAME') {
-            if (name !== undefined || index + 1 >= args.length) {
-                return { reply: replyError('ERR syntax error') };
-            }
-            name = args[index + 1].toString('utf8');
-            index += 2;
-        }
-        else {
-            return { reply: replyError('ERR syntax error') };
-        }
-    }
-    if (username !== undefined && password !== undefined) {
-        const error = credentialError(session, username, password, false);
-        if (error !== null) {
-            return { reply: error };
-        }
-        session.authenticated = true;
-    }
-    session.protocol = protocol;
-    if (name !== undefined) {
-        session.name = name;
-        // `CLIENT GETNAME` and `CLIENT LIST` read the upstream face, so mirror
-        // the name into the embedded session as well.
-        store.serverCommand(session.id ?? 0, session.db ?? 0, protocol, [
-            Buffer.from('CLIENT'),
-            Buffer.from('SETNAME'),
-            Buffer.from(name),
-        ]);
-    }
-    return { reply: hello(protocol, session.id) };
-}
-
-/** Whether any key pinned by `WATCH` was modified since it was pinned. */
-function watchedModified(store: Store, session: Session): boolean {
-    return (session.watched ?? []).some(entry => store.watchVersion(entry.db, entry.key) !== entry.version);
-}
-
-/** Releases every native watch held by one connection. */
-export function clearWatches(store: Store, session: Session): void {
-    for (const entry of session.watched ?? []) {
-        store.unwatchKey(entry.db, entry.key);
-    }
-    session.watched = [];
+/** Decodes one upstream reply frame into the specification the host re-encodes. */
+function specOf(frame: Buffer): ReplySpec {
+    return JSON.parse(decodeReply(frame).spec) as ReplySpec;
 }
 
 function plan(store: Store, session: Session, name: string, args: Buffer[]): CommandPlan {
     switch (name) {
-        case 'unwatch':
-            if (args.length !== 1) return { error: wrongArity('unwatch') };
-            return {
-                run: () => {
-                    clearWatches(store, session);
-                    return simple('OK');
-                },
-            };
-
         case 'ping':
             if (args.length > 2) return { error: wrongArity('ping') };
             return {
@@ -388,27 +225,6 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
             }
             return { run: () => { session.db = index; return simple('OK'); } };
         }
-
-        case 'client':
-        case 'command':
-        case 'info':
-        case 'acl': {
-            // The facade already framed the reply, so the socket loop writes it
-            // directly instead of decoding it into a specification and back.
-            const run = (() => store.serverCommand(session.id ?? 0, session.db, session.protocol ?? 2, args)) as CommandRun;
-            run.frame = () => store.serverCommandFrame(session.id ?? 0, session.db, session.protocol ?? 2, args);
-            return { run };
-        }
-
-        case 'config':
-            return planConfig(store, session, args);
-
-        case 'save':
-        case 'bgsave':
-        case 'lastsave':
-        case 'bgrewriteaof':
-        case 'shutdown':
-            return planPersistence(store, session, name, args);
 
         case 'flushdb':
         case 'flushall': {
@@ -611,8 +427,6 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
         case 'smismember':
             return planSMisMember(store, session, args);
 
-        case 'wait':
-        case 'latency':
         case 'slowlog':
         case 'memory':
             return planIntrospection(store, session, name, args);

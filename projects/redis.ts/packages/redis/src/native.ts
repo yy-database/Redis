@@ -35,18 +35,30 @@ export interface DecodedReplies {
     error?: string | null;
 }
 
-/** One server-face reply plus the connection effects the binding reports. */
-export interface ServerCommandOutcome {
-    reply: ReplySpec;
-    close: boolean;
-    killed: number[];
-}
-
-/** One server-face reply frame plus the connection effects the binding reports. */
-export interface ServerCommandFrameOutcome {
+/** One server-face reply plus the session effects the upstream gateway reports. */
+export interface ServerOutcome {
+    /** Reply bytes the gateway already framed for the connection protocol. */
     frame: Buffer;
+    /** Whether the gateway answered or absorbed the command; the host must not run it. */
+    handled: boolean;
+    /** Whether the host must close this connection after writing `frame`. */
     close: boolean;
+    /** Host connection ids a peer `CLIENT KILL` selected. */
     killed: number[];
+    /** The queue `EXEC` released; the host replays each entry in order. */
+    replay: Buffer[][];
+    /** A `WAIT` park: the host suspends the connection and answers integer `0` at timeout. */
+    wait?: number | null;
+    /** The effective RESP version after `HELLO` / `RESET`, mirrored by the host. */
+    protocol?: number | null;
+    /** The connection name written by `HELLO ... SETNAME`, mirrored by the host. */
+    name?: Buffer | null;
+    /** `RESET` ran; the host drops subscriptions and returns to database `0`. */
+    reset: boolean;
+    /** Whether the connection is still inside a `MULTI` block after this command. */
+    inMulti: boolean;
+    /** `SHUTDOWN` ran; the host stops the server after closing the connection. */
+    shutdown: boolean;
 }
 
 /** One reply frame the binding produced upstream, plus whether it is an error. */
@@ -136,8 +148,11 @@ interface NativeStore {
     keyspaceCommandFrame(db: number, protocol: number, args: Buffer[]): CommandFrame;
     hyperloglogCommand(db: number, args: Buffer[]): string;
     hyperloglogCommandFrame(db: number, args: Buffer[]): CommandFrame;
-    serverCommand(session: number, db: number, protocol: number, args: Buffer[]): string;
-    serverCommandFrame(session: number, db: number, protocol: number, args: Buffer[]): ServerCommandFrameOutcome;
+    serverExecute(session: number, db: number, protocol: number, args: Buffer[], replaying: boolean): ServerOutcome;
+    serverQueue(session: number, protocol: number, args: Buffer[]): Buffer;
+    serverPoison(session: number): void;
+    serverWaitComplete(protocol: number): Buffer;
+    setRequirepass(requirepass: string | null): void;
     serverRelease(session: number): void;
 }
 
@@ -424,14 +439,35 @@ export class Store {
         return this.native.hyperloglogCommandFrame(db, args.map(bytes));
     }
 
-    /** Server-face commands keep their per-connection session state inside the binding. */
-    serverCommand(session: number, db: number, protocol: number, args: (string | Buffer)[]): ServerCommandOutcome {
-        return JSON.parse(this.native.serverCommand(session, db, protocol, args.map(bytes)));
+    /**
+     * Runs one request against the upstream session gateway.
+     *
+     * The gateway owns the command state machines (`AUTH`, `HELLO`, `MULTI` / `EXEC`,
+     * `WATCH`, `RESET`, persistence and `WAIT`) and the per-connection `CLIENT` state,
+     * so the host only mirrors the outcome fields and replays what `EXEC` releases.
+     */
+    serverExecute(session: number, db: number, protocol: number, args: (string | Buffer)[], replaying: boolean): ServerOutcome {
+        return this.native.serverExecute(session, db, protocol, args.map(bytes), replaying);
     }
 
-    /** Runs one server-face request and returns the facade frame verbatim. */
-    serverCommandFrame(session: number, db: number, protocol: number, args: (string | Buffer)[]): ServerCommandFrameOutcome {
-        return this.native.serverCommandFrame(session, db, protocol, args.map(bytes));
+    /** Queues one host-owned command inside the open `MULTI` block, returning the `+QUEUED` frame. */
+    serverQueue(session: number, protocol: number, args: (string | Buffer)[]): Buffer {
+        return this.native.serverQueue(session, protocol, args.map(bytes));
+    }
+
+    /** Marks the open `MULTI` block dirty after a host-side queue validation error. */
+    serverPoison(session: number): void {
+        this.native.serverPoison(session);
+    }
+
+    /** Encodes the integer `0` reply a parked `WAIT` answers at its timeout. */
+    serverWaitComplete(protocol: number): Buffer {
+        return this.native.serverWaitComplete(protocol);
+    }
+
+    /** Sets the listener-wide `requirepass` the gateway gate reads per command. */
+    setRequirepass(requirepass: string | null): void {
+        this.native.setRequirepass(requirepass);
     }
 
     /** Drops the embedded session of one connection that just closed. */

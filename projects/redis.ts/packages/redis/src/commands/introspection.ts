@@ -1,121 +1,21 @@
-//! Introspection command family: `WAIT`, `LATENCY`, `SLOWLOG` and `MEMORY`.
+//! Introspection command family: `SLOWLOG` and `MEMORY`.
 //!
-//! The semantics follow the upstream command implementations: a single
-//! instance has no replicas, no latency events and no allocator statistics,
-//! so the answers that depend on those subsystems collapse to the shapes the
-//! real server produces in the same situation.
+//! `WAIT` and `LATENCY` are answered by the upstream embedded gateway, which
+//! owns their session effects. The semantics here follow the upstream command
+//! implementations: a single instance has no allocator statistics, so the
+//! answers that depend on that subsystem collapse to the shapes the real
+//! server produces in the same situation.
 
 import { parseInteger } from '../native.js';
 import type { Store } from '../native.js';
 import { array, bulk, error as replyError, integer, map, nullReply, simple } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
-import { blockingPlan } from './blocking-plan.js';
 import { DATABASES, kindOf, text, wrongArity } from './kinds.js';
 import type { CommandPlan, Session } from './session.js';
 
 /** Upstream echoes the subcommand exactly as typed, capped at 128 bytes. */
 function subcommandSyntaxError(command: string, typed: string): ReplySpec {
     return replyError(`ERR Unknown subcommand or wrong number of arguments for '${typed.slice(0, 128)}'. Try ${command} HELP.`);
-}
-
-/* ---------------------------------- WAIT ---------------------------------- */
-
-/**
- * Plans `WAIT numreplicas timeout`.
- *
- * A single instance never has a replica to acknowledge, so the answered count
- * is always zero. `numreplicas <= 0` is satisfied without blocking, and any
- * larger value parks the connection for `timeout` milliseconds and answers
- * zero when it expires, exactly like the upstream timeout path. A timeout of
- * zero blocks forever, which is what the upstream documents for `WAIT`.
- * Inside `MULTI` the blocking context is denied, so the plan also carries the
- * immediate non-blocking `run` form.
- */
-function planWait(session: Session, args: Buffer[]): CommandPlan {
-    if (args.length !== 3) {
-        return { error: wrongArity('wait') };
-    }
-    const numreplicas = parseInteger(args[1]);
-    if (numreplicas === null) {
-        return { error: replyError('ERR value is not an integer or out of range') };
-    }
-    const timeout = parseInteger(args[2]);
-    if (timeout === null) {
-        return { error: replyError('ERR timeout is not an integer or out of range') };
-    }
-    if (timeout < 0) {
-        return { error: replyError('ERR timeout is negative') };
-    }
-    if (numreplicas <= 0) {
-        return { run: () => integer(0) };
-    }
-    return blockingPlan(session.db ?? 0, [], timeout, () => null, integer(0));
-}
-
-/* -------------------------------- LATENCY --------------------------------- */
-
-/** The report upstream answers when the latency monitor was never enabled. */
-const LATENCY_DOCTOR_DISABLED =
-    'I\'m sorry, Dave, I can\'t do that. Latency monitoring is disabled in this Redis instance. '
-    + 'You may use "CONFIG SET latency-monitor-threshold <milliseconds>." in order to enable it. '
-    + 'If we weren\'t in a deep space mission I\'d suggest to take a look at '
-    + 'https://redis.io/docs/latest/operate/oss_and_stack/management/optimization/latency-monitor.\n';
-
-const LATENCY_HELP: string[] = [
-    'LATENCY <subcommand> [<arg> [value] [opt] ...]. Subcommands are:',
-    'DOCTOR',
-    '    Return a human readable latency analysis report.',
-    'GRAPH <event>',
-    '    Return an ASCII latency graph for the <event> class.',
-    'HISTORY <event>',
-    '    Return time-latency samples for the <event> class.',
-    'LATEST',
-    '    Return the latest latency samples for all events.',
-    'RESET [<event> ...]',
-    '    Reset latency data of one or more <event> classes.',
-    '    (default: reset all data for all event classes)',
-    'HISTOGRAM [COMMAND ...]',
-    '    Return a cumulative distribution of latencies in the format of a histogram for the specified command names.',
-    '    If no commands are specified then all histograms are replied.',
-    'HELP',
-    '    Print this help.',
-];
-
-/**
- * Plans the `LATENCY` family.
- *
- * This server records no latency events, so `LATEST` and `HISTORY` answer with
- * empty arrays, `RESET` answers the number of events it cleared (always zero)
- * and `GRAPH` reports the upstream "no samples" error for the requested event.
- */
-function planLatency(args: Buffer[]): CommandPlan {
-    if (args.length < 2) {
-        return { error: wrongArity('latency') };
-    }
-    const typed = text(args[1]);
-    const subcommand = typed.toLowerCase();
-    if (subcommand === 'latest' && args.length === 2) {
-        return { run: () => array([]) };
-    }
-    if (subcommand === 'history' && args.length === 3) {
-        return { run: () => array([]) };
-    }
-    if (subcommand === 'graph' && args.length === 3) {
-        return { run: () => replyError(`ERR No samples available for event '${text(args[2])}'`) };
-    }
-    if (subcommand === 'doctor' && args.length === 2) {
-        return { run: () => bulk(LATENCY_DOCTOR_DISABLED) };
-    }
-    if (subcommand === 'reset' && args.length >= 2) {
-        return { run: () => integer(0) };
-    }
-    if (subcommand === 'histogram' && args.length >= 2) {
-        return { run: () => map([]) };
-    }
-    if (subcommand === 'help' && args.length === 2) {
-        return { run: () => array(LATENCY_HELP.map(line => bulk(line))) };
-    }
-    return { error: subcommandSyntaxError('LATENCY', typed) };
 }
 
 /* -------------------------------- SLOWLOG --------------------------------- */
@@ -460,13 +360,9 @@ function planMemory(store: Store, session: Session, args: Buffer[]): CommandPlan
 
 /* ------------------------------- dispatcher ------------------------------- */
 
-/** Plans one `WAIT`, `LATENCY`, `SLOWLOG` or `MEMORY` request. */
+/** Plans one `SLOWLOG` or `MEMORY` request. */
 export function planIntrospection(store: Store, session: Session, name: string, args: Buffer[]): CommandPlan {
     switch (name) {
-        case 'wait':
-            return planWait(session, args);
-        case 'latency':
-            return planLatency(args);
         case 'slowlog':
             return planSlowlog(args);
         case 'memory':

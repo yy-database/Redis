@@ -6,7 +6,7 @@ import type { AddressInfo, Socket } from 'node:net';
 import { join, resolve } from 'node:path';
 import { BlockingHub } from './blocking.js';
 import type { BlockEntry } from './blocking.js';
-import { clearWatches, execute, PubSubHub } from './commands.js';
+import { execute, PubSubHub } from './commands.js';
 import { sweepExpired } from './commands/expiry.js';
 import { slowlogObserve } from './commands/introspection.js';
 import type { ExecuteResult } from './commands/execute.js';
@@ -184,6 +184,9 @@ export async function startServer(
         notifications: parseNotificationFlags(notifyKeyspaceEvents),
     };
     store.setSyncAlways(settings.appendfsync === 'always');
+    // The gateway's authentication gate reads the listener password from the
+    // shared registry, so publish it before any connection opens a face.
+    store.setRequirepass(settings.requirepass ?? null);
     const connections = new Set<Socket>();
     // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
     const clients = new Map<number, Session>();
@@ -215,9 +218,6 @@ export async function startServer(
             commandCount: 0,
             db: 0,
             protocol: 2,
-            queued: null,
-            watched: [],
-            authenticated: settings.requirepass === undefined,
             requirepass: settings.requirepass,
             settings,
             name: '',
@@ -427,13 +427,11 @@ export async function startServer(
         socket.on('close', () => {
             if (blocked !== null) hub.cancel(blocked);
             pubsub.detach(session);
-            clearWatches(store, session);
             connections.delete(socket);
             clients.delete(id);
             store.serverRelease(id);
         });
         socket.on('error', () => {
-            clearWatches(store, session);
             connections.delete(socket);
             clients.delete(id);
             store.serverRelease(id);
