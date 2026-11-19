@@ -41,3 +41,6 @@ data/
 *.yyds
 *.yykv
 *.tmp
+
+# npm secrets (nifty)
+.secrets/
