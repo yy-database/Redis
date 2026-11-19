@@ -14,7 +14,7 @@ use database::harness::{
 };
 use database_execution::cluster::redis::{RedisExecutor, persistence::PersistenceAction};
 use database_protocol_redis::codec::Reply;
-use database_server::yyds::redis::{ClientRegistry, EmbeddedServerFace};
+use database_server::yyds::redis::{ClientRegistry, EmbeddedServerFace, pubsub::PubSubState};
 use database_storage::cluster_kv::{
     now_unix_ms,
     redis::{RedisShard, RenameOutcome, format::record_bytes, namespace, repair_missing_shard},
@@ -103,6 +103,42 @@ pub struct ServerOutcome {
     pub in_multi: bool,
     /// `SHUTDOWN` ran; the host stops the server after closing the connection.
     pub shutdown: bool,
+    /// `CONFIG SET` pairs the gateway stored and the host must mirror at runtime.
+    pub config: Vec<ServerConfigChange>,
+}
+
+/// One `CONFIG SET` pair the gateway accepted and the host mirrors.
+#[napi(object)]
+pub struct ServerConfigChange {
+    pub name: String,
+    pub value: String,
+}
+
+/// One subscription acknowledgement the host encodes.
+#[napi(object)]
+pub struct PubSubAck {
+    /// Name acknowledged; `None` is the "nothing left to unsubscribe" form.
+    pub name: Option<Buffer>,
+    /// Total channel plus pattern subscriptions after the change.
+    pub count: u32,
+}
+
+/// One delivery target of a published message.
+#[napi(object)]
+pub struct PubSubDelivery {
+    /// Host connection id holding the subscription.
+    pub client: u32,
+    /// Matching pattern for `pmessage`, absent for a direct channel delivery.
+    pub pattern: Option<Buffer>,
+    pub channel: Buffer,
+    pub payload: Buffer,
+}
+
+/// Subscriber count of one channel.
+#[napi(object)]
+pub struct PubSubCount {
+    pub channel: Buffer,
+    pub count: u32,
 }
 
 /// One reply frame produced upstream, carried to the host without re-encoding.
@@ -237,6 +273,8 @@ pub fn parse_integer(value: Buffer) -> Option<i64> {
 /// when a peer kill reports it back.
 struct ServerSessions {
     registry: Arc<ClientRegistry>,
+    /// Listener-wide subscription table; the gateway owns admission and counts.
+    pubsub: Arc<PubSubState>,
     faces: HashMap<u32, EmbeddedServerFace>,
 }
 
@@ -273,10 +311,11 @@ impl Store {
         let (outcome, registry) = {
             let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
             let registry = Arc::clone(&sessions.registry);
+            let pubsub = Arc::clone(&sessions.pubsub);
             let face = sessions
                 .faces
                 .entry(session)
-                .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
+                .or_insert_with(|| EmbeddedServerFace::with_id_and_pubsub(Arc::clone(&registry), u64::from(session), pubsub));
             let outcome =
                 database_server::yyds::redis::execute_server_command(
                     face,
@@ -340,6 +379,11 @@ impl Store {
             reset: outcome.reset,
             in_multi: outcome.in_multi,
             shutdown,
+            config: outcome
+                .config
+                .into_iter()
+                .map(|change| ServerConfigChange { name: change.name, value: change.value })
+                .collect(),
         })
     }
 
@@ -357,10 +401,11 @@ impl Store {
     fn face_with<R>(&self, session: u32, run: impl FnOnce(&mut EmbeddedServerFace, &Arc<ClientRegistry>) -> R) -> R {
         let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let registry = Arc::clone(&sessions.registry);
+        let pubsub = Arc::clone(&sessions.pubsub);
         let face = sessions
             .faces
             .entry(session)
-            .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
+            .or_insert_with(|| EmbeddedServerFace::with_id_and_pubsub(Arc::clone(&registry), u64::from(session), pubsub));
         run(face, &registry)
     }
 }
@@ -383,6 +428,7 @@ impl Store {
             node: Arc::new(Mutex::new(RedisShard::open(data_dir).map_err(reason)?)),
             server: Mutex::new(ServerSessions {
                 registry: Arc::new(ClientRegistry::standalone()),
+                pubsub: Arc::new(PubSubState::new()),
                 faces: HashMap::new(),
             }),
         })
@@ -914,6 +960,94 @@ impl Store {
         let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         if sessions.faces.remove(&session).is_some() {
             sessions.registry.detach(u64::from(session));
+            sessions.pubsub.detach(u64::from(session));
+        }
+    }
+
+    /// Registers one subscription in the gateway's table and answers the total count.
+    #[napi]
+    pub fn pubsub_subscribe(&self, session: u32, name: Buffer, pattern: bool) -> u32 {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.pubsub.subscribe(u64::from(session), name.as_ref(), pattern) as u32
+    }
+
+    /// Removes subscriptions and answers one acknowledgement per frame.
+    #[napi]
+    pub fn pubsub_unsubscribe(&self, session: u32, names: Vec<Buffer>, pattern: bool) -> Vec<PubSubAck> {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let names = names.iter().map(|name| name.as_ref()).collect::<Vec<&[u8]>>();
+        sessions
+            .pubsub
+            .unsubscribe(u64::from(session), &names, pattern)
+            .into_iter()
+            .map(|(name, count)| PubSubAck { name: name.map(Buffer::from), count: count as u32 })
+            .collect()
+    }
+
+    /// Whether one session holds at least one channel or pattern subscription.
+    #[napi]
+    pub fn pubsub_subscribed(&self, session: u32) -> bool {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.pubsub.is_subscribed(u64::from(session))
+    }
+
+    /// Drops every subscription of one session, used by `RESET` and disconnects.
+    #[napi]
+    pub fn pubsub_detach(&self, session: u32) {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.pubsub.detach(u64::from(session));
+    }
+
+    /// Publishes one message and answers every delivery the host must write.
+    #[napi]
+    pub fn pubsub_publish(&self, channel: Buffer, payload: Buffer) -> Vec<PubSubDelivery> {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let (_, deliveries) = sessions.pubsub.publish(channel.as_ref(), payload.as_ref());
+        deliveries
+            .into_iter()
+            .map(|delivery| PubSubDelivery {
+                client: delivery.client as u32,
+                pattern: delivery.pattern.map(Buffer::from),
+                channel: Buffer::from(delivery.channel),
+                payload: Buffer::from(delivery.payload),
+            })
+            .collect()
+    }
+
+    /// Active channels, optionally filtered by a glob, in sorted order.
+    #[napi]
+    pub fn pubsub_channels(&self, pattern: Option<Buffer>) -> Vec<Buffer> {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.pubsub.channels(pattern.as_ref().map(|pattern| pattern.as_ref())).into_iter().map(Buffer::from).collect()
+    }
+
+    /// Subscriber count of each requested channel, unknown channels counting zero.
+    #[napi]
+    pub fn pubsub_numsub(&self, channels: Vec<Buffer>) -> Vec<PubSubCount> {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let channels = channels.iter().map(|channel| channel.as_ref()).collect::<Vec<&[u8]>>();
+        sessions
+            .pubsub
+            .numsub(&channels)
+            .into_iter()
+            .map(|(channel, count)| PubSubCount { channel: Buffer::from(channel), count: count as u32 })
+            .collect()
+    }
+
+    /// Number of distinct patterns subscribed across every session.
+    #[napi]
+    pub fn pubsub_numpat(&self) -> u32 {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.pubsub.numpat() as u32
+    }
+
+    /// Aligns one gateway `CONFIG` value with the host's runtime settings.
+    #[napi]
+    pub fn set_config(&self, name: String, value: String) {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.registry.set_config(&name, &value);
+        if name == "requirepass" {
+            sessions.registry.set_requirepass(if value.is_empty() { None } else { Some(value) });
         }
     }
 

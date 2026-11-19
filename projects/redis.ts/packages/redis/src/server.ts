@@ -184,9 +184,10 @@ export async function startServer(
         notifications: parseNotificationFlags(notifyKeyspaceEvents),
     };
     store.setSyncAlways(settings.appendfsync === 'always');
-    // The gateway's authentication gate reads the listener password from the
-    // shared registry, so publish it before any connection opens a face.
-    store.setRequirepass(settings.requirepass ?? null);
+    // The gateway owns the `CONFIG` table and the authentication gate, so publish
+    // the listener settings into it before any connection opens a face.
+    store.setConfig('requirepass', settings.requirepass ?? '');
+    store.setConfig('notify-keyspace-events', settings.notifyKeyspaceEvents);
     const connections = new Set<Socket>();
     // Sessions keyed by client id, so `CLIENT LIST` and `CLIENT KILL` see peers.
     const clients = new Map<number, Session>();
@@ -206,7 +207,7 @@ export async function startServer(
     };
     let nextClientId = 1;
     const hub = new BlockingHub();
-    const pubsub = new PubSubHub();
+    const pubsub = new PubSubHub(store);
     const listener = createServer(socket => {
         connections.add(socket);
         const id = nextClientId;

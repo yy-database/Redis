@@ -12,12 +12,11 @@ import { decodeReply } from '../native.js';
 import { array, bulk, error as replyError, integer, simple } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
 import { sweepExpired } from './expiry.js';
-import { applyConfigOverlay, inspectConfig } from './config.js';
-import type { ConfigOverlay } from './config.js';
+import { applyConfigEffects } from './config.js';
 import { planCollection, planHyperLogLog, planKeyspace, planSetAggregate, planSMisMember, planSort, planSPop, planString, planZSet } from './forward.js';
 import { DATABASES, commandName, unknownCommand, wrongArity } from './kinds.js';
 import { planIntrospection } from './introspection.js';
-import { planPubsub, pubsubSubcommand, pubsubSubcommandError, publish, SUBSCRIBER_COMMANDS, subscribed, subscriptionFrames } from './pubsub.js';
+import { isSubscribed, planPubsub, publish, subscriptionFrames } from './pubsub.js';
 import { planStream, planXRead, planXReadGroup, planXGroup, planXAck, planXPending, planXClaim, planXAutoClaim, planXInfo } from './streams.js';
 import type { BlockDescriptor, CommandPlan, RunOutcome, Session } from './session.js';
 
@@ -52,39 +51,10 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
     }
     const name = commandName(args);
 
-    // RESP2 subscriber mode: only the pub/sub verbs, PING, QUIT and RESET may run.
-    // RESP3 dropped the restriction and runs any command while subscribed.
-    // Following Redis, an unknown `PUBSUB` subcommand is reported before the
-    // restriction, and a known one is named `pubsub|<subcommand>`. A subscriber
-    // has necessarily passed the gateway's authentication gate already.
-    if (session.protocol === 2 && subscribed(session) && !SUBSCRIBER_COMMANDS.has(name)) {
-        const subcommand = name === 'pubsub' ? pubsubSubcommand(args) : null;
-        if (name === 'pubsub') {
-            const unknown = pubsubSubcommandError(args, subcommand);
-            if (unknown !== null) return { reply: unknown };
-        }
-        const context = subcommand === null ? name : `pubsub|${subcommand}`;
-        return {
-            reply: replyError(
-                `ERR Can't execute '${context}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context`,
-            ),
-        };
-    }
-
-    // The gateway keys every session effect by the host connection id, and host
-    // CONFIG pairs it does not own are rewritten out of the forwarded request.
+    // The gateway owns the subscriber-mode admission gate, the `CONFIG` option
+    // table and its validation, keyed by the host connection id.
     const face = session.id ?? 0;
-    let gatewayArgs = args;
-    let configOverlay: ConfigOverlay | null = null;
-    if (name === 'config') {
-        configOverlay = inspectConfig(session, args);
-        if (configOverlay !== null && (configOverlay.error !== null || configOverlay.local.length > 0)) {
-            // Host-owned pairs (or a host validation failure) must not reach the
-            // gateway table; the bare header still runs the authentication gate.
-            gatewayArgs = [Buffer.from('CONFIG'), Buffer.from('SET'), ...configOverlay.forwarded];
-        }
-    }
-    const outcome = store.serverExecute(face, session.db ?? 0, session.protocol ?? 2, gatewayArgs, replaying);
+    const outcome = store.serverExecute(face, session.db ?? 0, session.protocol ?? 2, args, replaying);
 
     if (outcome.handled) {
         if (outcome.protocol !== null && outcome.protocol !== undefined) {
@@ -94,8 +64,7 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
             session.name = outcome.name.toString('utf8');
         }
         if (outcome.reset) {
-            session.subscriptions?.channels.clear();
-            session.subscriptions?.patterns.clear();
+            store.pubsubDetach(face);
             session.db = 0;
         }
         if (outcome.wait !== null && outcome.wait !== undefined) {
@@ -116,9 +85,8 @@ export function execute(store: Store, session: Session, args: Buffer[], writeFra
         if (outcome.shutdown) {
             return { reply: undefined, close: true, shutdown: true };
         }
-        if (configOverlay !== null) {
-            const spec = outcome.frame.length === 0 ? undefined : specOf(outcome.frame);
-            return applyConfigOverlay(store, session, configOverlay, spec);
+        if (outcome.config.length > 0) {
+            applyConfigEffects(store, session, outcome.config);
         }
         if (writeFrames) {
             return { frame: outcome.frame, close: outcome.close, killed: outcome.killed };
@@ -187,7 +155,7 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
                     if (args.length === 2) return bulk(args[1]);
                     // A RESP2 subscriber gets the two-element `pong` array instead
                     // of the simple string. RESP3 keeps the ordinary reply.
-                    if (session.protocol === 2 && subscribed(session)) {
+                    if (session.protocol === 2 && isSubscribed(store, session)) {
                         return array([bulk('pong'), bulk('')]);
                     }
                     return simple('PONG');
@@ -195,23 +163,23 @@ function plan(store: Store, session: Session, name: string, args: Buffer[]): Com
             };
 
         case 'subscribe':
-            return args.length < 2 ? { error: wrongArity('subscribe') } : { frames: () => subscriptionFrames(session, args, false) };
+            return args.length < 2 ? { error: wrongArity('subscribe') } : { frames: () => subscriptionFrames(store, session, args, false) };
 
         case 'unsubscribe':
-            return { frames: () => subscriptionFrames(session, args, false, true) };
+            return { frames: () => subscriptionFrames(store, session, args, false, true) };
 
         case 'psubscribe':
-            return args.length < 2 ? { error: wrongArity('psubscribe') } : { frames: () => subscriptionFrames(session, args, true) };
+            return args.length < 2 ? { error: wrongArity('psubscribe') } : { frames: () => subscriptionFrames(store, session, args, true) };
 
         case 'punsubscribe':
-            return { frames: () => subscriptionFrames(session, args, true, true) };
+            return { frames: () => subscriptionFrames(store, session, args, true, true) };
 
         case 'publish':
             if (args.length !== 3) return { error: wrongArity('publish') };
             return { run: () => integer(publish(session, args[1], args[2])) };
 
         case 'pubsub':
-            return planPubsub(session, args);
+            return planPubsub(store, session, args);
 
         case 'echo':
             if (args.length !== 2) return { error: wrongArity('echo') };

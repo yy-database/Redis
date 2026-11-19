@@ -1,186 +1,57 @@
-//! Pub/sub subscriptions, the server-wide hub and the `PUBSUB` plans.
+//! Pub/sub plans and the server-wide delivery hub.
+//!
+//! The subscription table, the subscriber-mode admission gate and the reply
+//! counts live in the upstream gateway. This module only turns the returned
+//! counts into reply specifications and routes the deliveries it reports to the
+//! host connections that own them.
 
+import type { Store } from '../native.js';
 import { array, bulk, error as replyError, integer, nullReply, push } from '../reply.js';
 import type { ReplySpec } from '../reply.js';
-import { globMatch } from './glob.js';
 import { text } from './kinds.js';
-import type { CommandPlan, Session, Subscriptions } from './session.js';
+import type { CommandPlan, Session } from './session.js';
 
-/** Commands Redis still honours while a RESP2 connection is in subscriber mode. */
-export const SUBSCRIBER_COMMANDS: Set<string> = new Set(['subscribe', 'unsubscribe', 'psubscribe', 'punsubscribe', 'ping', 'quit', 'reset']);
-
-/** Canonical map key of one channel or pattern so duplicate names deduplicate. */
-function subscriptionKey(name: Buffer | string): string {
-    return Buffer.from(name).toString('hex');
-}
-
-function ensureSubscriptions(session: Session): Subscriptions {
-    if (session.subscriptions === undefined) {
-        session.subscriptions = { channels: new Map(), patterns: new Map() };
-    }
-    return session.subscriptions;
-}
-
-export function subscribed(session: Session): boolean {
-    const subscriptions = session.subscriptions;
-    return subscriptions !== undefined && (subscriptions.channels.size > 0 || subscriptions.patterns.size > 0);
+/** Whether one session holds at least one channel or pattern subscription. */
+export function isSubscribed(store: Store, session: Session): boolean {
+    return store.pubsubSubscribed(session.id ?? 0);
 }
 
 /**
  * Builds one ack frame per name for `SUBSCRIBE`/`PSUBSCRIBE` or `UNSUBSCRIBE`/`PUNSUBSCRIBE`.
  *
- * With no names the whole kind is removed, and when nothing was subscribed Redis still
- * answers one frame whose name is null. The trailing count is the total number of live
- * channel plus pattern subscriptions, exactly as the receiver-side Redis reports it.
+ * With no names the whole kind is removed, and when nothing was subscribed Redis
+ * still answers one frame whose name is null. The trailing count is the total
+ * number of live channel plus pattern subscriptions, exactly as the gateway
+ * reports it.
  */
-export function subscriptionFrames(session: Session, args: Buffer[], pattern: boolean, removing = false): ReplySpec[] {
-    const subscriptions = ensureSubscriptions(session);
-    const target = pattern ? subscriptions.patterns : subscriptions.channels;
+export function subscriptionFrames(
+    store: Store,
+    session: Session,
+    args: Buffer[],
+    pattern: boolean,
+    removing = false,
+): ReplySpec[] {
+    const id = session.id ?? 0;
     const kind = removing
         ? (pattern ? 'punsubscribe' : 'unsubscribe')
         : (pattern ? 'psubscribe' : 'subscribe');
-    const frames: ReplySpec[] = [];
-    if (removing && args.length === 1) {
-        if (target.size === 0) {
-            frames.push(push([bulk(kind), nullReply(), integer(subscriptions.channels.size + subscriptions.patterns.size)]));
-            return frames;
-        }
-        for (const [key, name] of target) {
-            target.delete(key);
-            frames.push(push([bulk(kind), bulk(name), integer(subscriptions.channels.size + subscriptions.patterns.size)]));
-        }
-        return frames;
-    }
     if (!removing) {
-        for (const name of args.slice(1)) {
-            const key = subscriptionKey(name);
-            if (!target.has(key)) {
-                target.set(key, Buffer.from(name));
-            }
-            frames.push(push([bulk(kind), bulk(name), integer(subscriptions.channels.size + subscriptions.patterns.size)]));
-        }
-        return frames;
+        return args.slice(1).map(name => push([
+            bulk(kind),
+            bulk(name),
+            integer(store.pubsubSubscribe(id, name, pattern)),
+        ]));
     }
-    for (const name of args.slice(1)) {
-        target.delete(subscriptionKey(name));
-        frames.push(push([bulk(kind), bulk(name), integer(subscriptions.channels.size + subscriptions.patterns.size)]));
-    }
-    return frames;
-}
-
-/** Delivers one published message to a single session, answering its receiver count. */
-function deliverTo(session: Session, channel: Buffer | string, payload: Buffer | string): number {
-    const subscriptions = session.subscriptions;
-    if (subscriptions === undefined) {
-        return 0;
-    }
-    const channelBytes = Buffer.from(channel);
-    const payloadBytes = Buffer.from(payload);
-    let delivered = 0;
-    if (subscriptions.channels.has(subscriptionKey(channelBytes))) {
-        session.deliver?.(push([bulk('message'), bulk(channelBytes), bulk(payloadBytes)]));
-        delivered += 1;
-    }
-    for (const pattern of subscriptions.patterns.values()) {
-        if (globMatch(pattern, channelBytes)) {
-            session.deliver?.(push([bulk('pmessage'), bulk(pattern), bulk(channelBytes), bulk(payloadBytes)]));
-            delivered += 1;
-        }
-    }
-    return delivered;
-}
-
-/** Collects the active channels of one session, optionally filtered by a glob. */
-function channelNames(session: Session, pattern?: Buffer): Buffer[] {
-    const subscriptions = session.subscriptions;
-    if (subscriptions === undefined) {
-        return [];
-    }
-    const names: Buffer[] = [];
-    for (const name of subscriptions.channels.values()) {
-        if (pattern === undefined || globMatch(pattern, name)) {
-            names.push(name);
-        }
-    }
-    return names;
-}
-
-/** Counts the sessions subscribed directly to each requested channel. */
-function channelSubscribers(session: Session, channels: Buffer[]): [Buffer, number][] {
-    return channels.map(channel => {
-        const key = subscriptionKey(channel);
-        if (session.pubsub !== undefined) {
-            return [channel, session.pubsub.countSubscribers(key)];
-        }
-        const subscriptions = session.subscriptions;
-        return [channel, subscriptions !== undefined && subscriptions.channels.has(key) ? 1 : 0];
-    });
-}
-
-/**
- * One server-wide pub/sub table.
- *
- * The server runs a single event loop, so a publish runs synchronously and writes the
- * push frame straight to each subscriber's socket through its `deliver` callback. That
- * keeps a subscriber's ack frames and deliveries ordered without a queue.
- */
-export class PubSubHub {
-    sessions: Set<Session>;
-
-    constructor() {
-        this.sessions = new Set();
-    }
-
-    attach(session: Session): void {
-        this.sessions.add(session);
-    }
-
-    detach(session: Session): void {
-        this.sessions.delete(session);
-    }
-
-    publish(channel: Buffer | string, payload: Buffer | string): number {
-        let delivered = 0;
-        for (const session of this.sessions) {
-            delivered += deliverTo(session, channel, payload);
-        }
-        return delivered;
-    }
-
-    channels(pattern?: Buffer): Buffer[] {
-        const names = new Map<string, Buffer>();
-        for (const session of this.sessions) {
-            for (const name of channelNames(session, pattern)) {
-                names.set(subscriptionKey(name), name);
-            }
-        }
-        return [...names.values()];
-    }
-
-    countSubscribers(key: string): number {
-        let count = 0;
-        for (const session of this.sessions) {
-            if (session.subscriptions?.channels.has(key)) {
-                count += 1;
-            }
-        }
-        return count;
-    }
-
-    numpat(): number {
-        let total = 0;
-        for (const session of this.sessions) {
-            total += session.subscriptions?.patterns.size ?? 0;
-        }
-        return total;
-    }
+    const names = args.length === 1 ? [] : args.slice(1);
+    return store.pubsubUnsubscribe(id, names, pattern).map(ack => push([
+        bulk(kind),
+        ack.name == null ? nullReply() : bulk(ack.name),
+        integer(ack.count),
+    ]));
 }
 
 export function publish(session: Session, channel: Buffer, payload: Buffer): number {
-    if (session.pubsub !== undefined) {
-        return session.pubsub.publish(channel, payload);
-    }
-    return deliverTo(session, channel, payload);
+    return session.pubsub?.publish(channel, payload) ?? 0;
 }
 
 /** Resolved `PUBSUB` subcommand in lower case, `null` when absent or unknown. */
@@ -194,7 +65,8 @@ export function pubsubSubcommand(args: Buffer[]): string | null {
  * The error Redis reports for a malformed `PUBSUB` call, before anything else.
  *
  * An absent or unknown subcommand and a bad `NUMPAT` arity differ in wording,
- * so each branch mirrors the text the real server answers with.
+ * so each branch mirrors the text the real server answers with. The
+ * subscriber-mode gate upstream applies the same precedence.
  */
 export function pubsubSubcommandError(args: Buffer[], subcommand: string | null): ReplySpec | null {
     if (args.length < 2) {
@@ -213,33 +85,73 @@ export function pubsubSubcommandError(args: Buffer[], subcommand: string | null)
     return null;
 }
 
-export function planPubsub(session: Session, args: Buffer[]): CommandPlan {
+export function planPubsub(store: Store, session: Session, args: Buffer[]): CommandPlan {
     const subcommand = pubsubSubcommand(args);
     const malformed = pubsubSubcommandError(args, subcommand);
     if (malformed !== null) {
         return { error: malformed };
     }
     if (subcommand === 'channels') {
-        return {
-            run: () => {
-                const names = session.pubsub !== undefined
-                    ? session.pubsub.channels(args[2])
-                    : channelNames(session, args[2]);
-                return array(names.map(name => bulk(name)));
-            },
-        };
+        return { run: () => array(store.pubsubChannels(args[2]).map(name => bulk(name))) };
     }
     if (subcommand === 'numsub') {
         return {
-            run: () => {
-                const pairs = channelSubscribers(session, args.slice(2));
-                return array(pairs.flatMap(([name, count]) => [bulk(name), integer(count)]));
-            },
+            run: () => array(store.pubsubNumsub(args.slice(2)).flatMap(({ channel, count }) => [bulk(channel), integer(count)])),
         };
     }
-    return {
-        run: () => integer(session.pubsub !== undefined
-            ? session.pubsub.numpat()
-            : session.subscriptions?.patterns.size ?? 0),
-    };
+    return { run: () => integer(store.pubsubNumpat()) };
+}
+
+/**
+ * Server-wide pub/sub delivery over the gateway-owned subscription table.
+ *
+ * The gateway computes the delivery targets; the hub maps each client id back to
+ * the host session and writes the push frame through its socket. That keeps the
+ * ordering of ack frames and deliveries without a host-side subscription copy.
+ */
+export class PubSubHub {
+    readonly sessions: Map<number, Session>;
+    readonly #store: Store;
+
+    constructor(store: Store) {
+        this.#store = store;
+        this.sessions = new Map();
+    }
+
+    attach(session: Session): void {
+        if (session.id !== undefined) {
+            this.sessions.set(session.id, session);
+        }
+    }
+
+    detach(session: Session): void {
+        if (session.id !== undefined) {
+            this.sessions.delete(session.id);
+            this.#store.pubsubDetach(session.id);
+        }
+    }
+
+    publish(channel: Buffer | string, payload: Buffer | string): number {
+        const deliveries = this.#store.pubsubPublish(channel, payload);
+        let delivered = 0;
+        for (const delivery of deliveries) {
+            const target = this.sessions.get(delivery.client);
+            if (target === undefined) {
+                continue;
+            }
+            target.deliver?.(delivery.pattern == null
+                ? push([bulk('message'), bulk(delivery.channel), bulk(delivery.payload)])
+                : push([bulk('pmessage'), bulk(delivery.pattern), bulk(delivery.channel), bulk(delivery.payload)]));
+            delivered += 1;
+        }
+        return delivered;
+    }
+
+    channels(pattern?: Buffer): Buffer[] {
+        return this.#store.pubsubChannels(pattern);
+    }
+
+    numpat(): number {
+        return this.#store.pubsubNumpat();
+    }
 }

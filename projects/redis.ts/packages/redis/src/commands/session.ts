@@ -4,17 +4,10 @@ import type { BlockingHub } from '../blocking.js';
 import type { CommandFrame } from '../native.js';
 import type { ReplySpec } from '../reply.js';
 
-/** Channel and pattern subscriptions of one connection, keyed by hex name. */
-export interface Subscriptions {
-    channels: Map<string, Buffer>;
-    patterns: Map<string, Buffer>;
-}
-
-/** The pub/sub table commands reach through the session. */
+/** The pub/sub delivery surface commands reach through the session. */
 export interface PubSubTable {
     publish(channel: Buffer | string, payload: Buffer | string): number;
     channels(pattern?: Buffer): Buffer[];
-    countSubscribers(key: string): number;
     numpat(): number;
 }
 
@@ -76,7 +69,6 @@ export interface Session {
     clients?: Map<number, Session>;
     stats?: Record<string, number>;
     deliver?: (frame: ReplySpec) => void;
-    subscriptions?: Subscriptions;
     kill?: () => void;
     name?: string;
     runId?: string;

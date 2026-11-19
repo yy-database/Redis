@@ -59,6 +59,36 @@ export interface ServerOutcome {
     inMulti: boolean;
     /** `SHUTDOWN` ran; the host stops the server after closing the connection. */
     shutdown: boolean;
+    /** `CONFIG SET` pairs the gateway stored and the host must mirror at runtime. */
+    config: ServerConfigChange[];
+}
+
+/** One `CONFIG SET` pair the gateway accepted and the host mirrors. */
+export interface ServerConfigChange {
+    name: string;
+    value: string;
+}
+
+/** One subscription acknowledgement the host encodes. */
+export interface PubSubAck {
+    name: Buffer | null;
+    /** Total channel plus pattern subscriptions after the change. */
+    count: number;
+}
+
+/** One delivery target of a published message. */
+export interface PubSubDelivery {
+    client: number;
+    /** Matching pattern for `pmessage`, absent for a direct channel delivery. */
+    pattern: Buffer | null;
+    channel: Buffer;
+    payload: Buffer;
+}
+
+/** Subscriber count of one channel. */
+export interface PubSubCount {
+    channel: Buffer;
+    count: number;
 }
 
 /** One reply frame the binding produced upstream, plus whether it is an error. */
@@ -153,7 +183,16 @@ interface NativeStore {
     serverPoison(session: number): void;
     serverWaitComplete(protocol: number): Buffer;
     setRequirepass(requirepass: string | null): void;
+    setConfig(name: string, value: string): void;
     serverRelease(session: number): void;
+    pubsubSubscribe(session: number, name: Buffer, pattern: boolean): number;
+    pubsubUnsubscribe(session: number, names: Buffer[], pattern: boolean): PubSubAck[];
+    pubsubSubscribed(session: number): boolean;
+    pubsubDetach(session: number): void;
+    pubsubPublish(channel: Buffer, payload: Buffer): PubSubDelivery[];
+    pubsubChannels(pattern: Buffer | null): Buffer[];
+    pubsubNumsub(channels: Buffer[]): PubSubCount[];
+    pubsubNumpat(): number;
 }
 
 const require = createRequire(import.meta.url);
@@ -470,8 +509,53 @@ export class Store {
         this.native.setRequirepass(requirepass);
     }
 
+    /** Aligns one gateway `CONFIG` value with the host's runtime settings. */
+    setConfig(name: string, value: string): void {
+        this.native.setConfig(name, value);
+    }
+
     /** Drops the embedded session of one connection that just closed. */
     serverRelease(session: number): void {
         this.native.serverRelease(session);
+    }
+
+    /** Registers one subscription in the gateway table and returns the total count. */
+    pubsubSubscribe(session: number, name: string | Buffer, pattern: boolean): number {
+        return this.native.pubsubSubscribe(session, bytes(name), pattern);
+    }
+
+    /** Removes subscriptions and returns one acknowledgement per reply frame. */
+    pubsubUnsubscribe(session: number, names: (string | Buffer)[], pattern: boolean): PubSubAck[] {
+        return this.native.pubsubUnsubscribe(session, names.map(bytes), pattern);
+    }
+
+    /** Whether one session holds at least one channel or pattern subscription. */
+    pubsubSubscribed(session: number): boolean {
+        return this.native.pubsubSubscribed(session);
+    }
+
+    /** Drops every subscription of one session. */
+    pubsubDetach(session: number): void {
+        this.native.pubsubDetach(session);
+    }
+
+    /** Publishes one message and returns every delivery the host must write. */
+    pubsubPublish(channel: string | Buffer, payload: string | Buffer): PubSubDelivery[] {
+        return this.native.pubsubPublish(bytes(channel), bytes(payload));
+    }
+
+    /** Active channels, optionally filtered by a glob, in sorted order. */
+    pubsubChannels(pattern?: string | Buffer): Buffer[] {
+        return this.native.pubsubChannels(pattern === undefined ? null : bytes(pattern));
+    }
+
+    /** Subscriber count of each requested channel, unknown channels counting zero. */
+    pubsubNumsub(channels: (string | Buffer)[]): PubSubCount[] {
+        return this.native.pubsubNumsub(channels.map(bytes));
+    }
+
+    /** Number of distinct patterns subscribed across every session. */
+    pubsubNumpat(): number {
+        return this.native.pubsubNumpat();
     }
 }
