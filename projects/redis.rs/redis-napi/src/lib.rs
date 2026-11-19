@@ -12,11 +12,12 @@ use database::harness::{
     Baseline, BaselineIdentity, DifferenceObservation, Digest, GatePolicy, ReportEnvelope, Stats, SuiteReport,
     check_baseline, evaluate, per_op_ms, render_json, summarize,
 };
-use database_execution::cluster::redis::RedisExecutor;
+use database_execution::cluster::redis::{RedisExecutor, persistence::PersistenceAction};
 use database_protocol_redis::codec::Reply;
 use database_server::yyds::redis::{ClientRegistry, EmbeddedServerFace};
-use database_storage::cluster_kv::redis::{
-    RedisShard, RenameOutcome, format::record_bytes, namespace, repair_missing_shard,
+use database_storage::cluster_kv::{
+    now_unix_ms,
+    redis::{RedisShard, RenameOutcome, format::record_bytes, namespace, repair_missing_shard},
 };
 use database_types::cluster::Namespace;
 use napi::bindgen_prelude::*;
@@ -72,15 +73,36 @@ pub struct ExpiredKey {
     pub key: Buffer,
 }
 
-/// One server-face reply plus the connection effects the binding reports.
+/// One server-face reply plus the session effects the binding reports.
+///
+/// The upstream gateway owns the connection state machines (`AUTH`, `HELLO`,
+/// `MULTI` / `EXEC`, `WATCH`, persistence and `WAIT`), so every follow-up the
+/// host must take travels as an explicit field instead of a reply the host
+/// would otherwise parse again.
 #[napi(object)]
-pub struct ServerCommandFrame {
-    /// Reply bytes the facade already framed for the connection protocol.
+pub struct ServerOutcome {
+    /// Reply bytes the gateway already framed for the connection protocol.
     pub frame: Buffer,
+    /// Whether the gateway answered or absorbed the command; the host must not run it.
+    pub handled: bool,
     /// Whether the host must close this connection after writing `frame`.
     pub close: bool,
     /// Host connection ids a peer `CLIENT KILL` selected.
     pub killed: Vec<u32>,
+    /// The queue `EXEC` released; the host replays each entry in order.
+    pub replay: Vec<Vec<Buffer>>,
+    /// A `WAIT` park: the host suspends the connection and answers integer `0` at timeout.
+    pub wait: Option<i64>,
+    /// The effective RESP version after `HELLO` / `RESET`, mirrored by the host.
+    pub protocol: Option<u8>,
+    /// The connection name written by `HELLO ... SETNAME`, mirrored by the host.
+    pub name: Option<Buffer>,
+    /// `RESET` ran; the host drops subscriptions and returns to database `0`.
+    pub reset: bool,
+    /// Whether the connection is still inside a `MULTI` block after this command.
+    pub in_multi: bool,
+    /// `SHUTDOWN` ran; the host stops the server after closing the connection.
+    pub shutdown: bool,
 }
 
 /// One reply frame produced upstream, carried to the host without re-encoding.
@@ -221,7 +243,7 @@ struct ServerSessions {
 /// A `.yyds` catalog plus `.yykv` shard opened by the host.
 #[napi]
 pub struct Store {
-    node: Mutex<RedisShard>,
+    node: Arc<Mutex<RedisShard>>,
     server: Mutex<ServerSessions>,
 }
 
@@ -235,38 +257,111 @@ impl Store {
     ///
     /// `session` is the host connection id. The embedded face keeps per-connection
     /// `CLIENT` state, while the shared registry backs peer listing and kills.
+    /// The upstream gateway owns the session state machines, so the binding only
+    /// carries the outcome fields and performs the persistence action it reports.
     fn run_server_command(
         &self,
         session: u32,
         db: u8,
         protocol: u8,
         args: &[Buffer],
-    ) -> std::result::Result<(Vec<u8>, bool, Vec<u32>), napi::Error> {
+        replaying: bool,
+    ) -> std::result::Result<ServerOutcome, napi::Error> {
         let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let executor = RedisExecutor::new(&self.node);
-        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let registry = Arc::clone(&sessions.registry);
-        let face = sessions
-            .faces
-            .entry(session)
-            .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
         let mut frame = Vec::new();
-        let close = !database_server::yyds::redis::execute_server_command(
-            face,
-            &mut frame,
-            &arguments,
-            &executor,
-            db,
-            protocol,
-        )
-        .map_err(reason)?;
+        let (outcome, registry) = {
+            let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let registry = Arc::clone(&sessions.registry);
+            let face = sessions
+                .faces
+                .entry(session)
+                .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
+            let outcome =
+                database_server::yyds::redis::execute_server_command(
+                    face,
+                    &mut frame,
+                    &arguments,
+                    &executor,
+                    db,
+                    protocol,
+                    replaying,
+                )
+                .map_err(reason)?;
+            (outcome, registry)
+        };
+        let mut shutdown = false;
+        let mut close = outcome.close;
+        match outcome.action {
+            PersistenceAction::None => {}
+            PersistenceAction::Save => self.save_to_disk(&registry)?,
+            PersistenceAction::BackgroundSave => {
+                let shard = Arc::clone(&self.node);
+                let registry = Arc::clone(&registry);
+                std::thread::spawn(move || {
+                    // The background child keeps the saving flag set for a real
+                    // interval, so follow-up `SAVE` / `BGSAVE` commands observe
+                    // `Background save already in progress` like the socket server.
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    let mut node = shard.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let _ = node.flush();
+                    let _ = node.sync();
+                    drop(node);
+                    registry.note_background_finished(now_unix_ms() / 1_000);
+                });
+            }
+            PersistenceAction::Shutdown { persist } => {
+                if persist {
+                    self.save_to_disk(&registry)?;
+                }
+                shutdown = true;
+                close = true;
+            }
+        }
         let killed = registry
             .take_killed()
             .into_iter()
             .filter(|id| *id != u64::from(session))
             .map(|id| id as u32)
             .collect::<Vec<_>>();
-        Ok((frame, close, killed))
+        Ok(ServerOutcome {
+            frame: Buffer::from(frame),
+            handled: outcome.handled,
+            close,
+            killed,
+            replay: outcome
+                .replay
+                .into_iter()
+                .map(|entry| entry.into_iter().map(Buffer::from).collect::<Vec<_>>())
+                .collect(),
+            wait: outcome.wait,
+            protocol: outcome.protocol,
+            name: outcome.name.map(Buffer::from),
+            reset: outcome.reset,
+            in_multi: outcome.in_multi,
+            shutdown,
+        })
+    }
+
+    /// Persists the shard synchronously and stamps the registry save time.
+    fn save_to_disk(&self, registry: &ClientRegistry) -> std::result::Result<(), napi::Error> {
+        let mut node = self.shard();
+        node.flush().map_err(reason)?;
+        node.sync().map_err(reason)?;
+        drop(node);
+        registry.note_saved(now_unix_ms() / 1_000);
+        Ok(())
+    }
+
+    /// The embedded face for one host connection, created on first use.
+    fn face_with<R>(&self, session: u32, run: impl FnOnce(&mut EmbeddedServerFace, &Arc<ClientRegistry>) -> R) -> R {
+        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let registry = Arc::clone(&sessions.registry);
+        let face = sessions
+            .faces
+            .entry(session)
+            .or_insert_with(|| EmbeddedServerFace::with_id(Arc::clone(&registry), u64::from(session)));
+        run(face, &registry)
     }
 }
 
@@ -285,7 +380,7 @@ impl Store {
     #[napi(constructor)]
     pub fn new(data_dir: String) -> std::result::Result<Self, napi::Error> {
         Ok(Self {
-            node: Mutex::new(RedisShard::open(data_dir).map_err(reason)?),
+            node: Arc::new(Mutex::new(RedisShard::open(data_dir).map_err(reason)?)),
             server: Mutex::new(ServerSessions {
                 registry: Arc::new(ClientRegistry::standalone()),
                 faces: HashMap::new(),
@@ -743,50 +838,72 @@ impl Store {
         .map(CommandFrame::from)
     }
 
-    /// Executes one server-face request and returns the reply specification as JSON.
+    /// Executes one server-face request against the upstream session gateway.
     ///
     /// `session` is the host connection id. Each id gets its own embedded session, so
-    /// `CLIENT` state is connection-scoped while `CLIENT LIST` and `CLIENT KILL` see the
-    /// host's other sessions. The reply also carries `killed`, the host ids a peer kill
-    /// closed and that the host must disconnect.
+    /// the command state machines (`AUTH`, `HELLO`, `MULTI` / `EXEC`, `WATCH`, `RESET`,
+    /// persistence, `WAIT`) and `CLIENT` state are connection-scoped while `CLIENT LIST`
+    /// and `CLIENT KILL` see the host's other sessions. The outcome carries the reply
+    /// frame plus every effect the host must mirror or perform.
     #[napi]
-    pub fn server_command(
+    pub fn server_execute(
         &self,
         session: u32,
         db: u8,
         protocol: u8,
         args: Vec<Buffer>,
-    ) -> std::result::Result<String, napi::Error> {
-        let (frame, close, killed) = self.run_server_command(session, db, protocol, &args)?;
-        let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
-            .map_err(reason)?
-            .ok_or_else(|| reason("server command produced an empty reply frame"))?;
-        let killed = killed.iter().map(|id| id.to_string()).collect::<Vec<_>>().join(",");
-        Ok(format!(
-            "{{\"reply\":{},\"close\":{close},\"killed\":[{killed}]}}",
-            reply.to_spec()
-        ))
+        replaying: bool,
+    ) -> std::result::Result<ServerOutcome, napi::Error> {
+        self.run_server_command(session, db, protocol, &args, replaying)
     }
 
-    /// Executes one server-face request and returns the upstream reply frame verbatim.
+    /// Queues one host-owned command inside the open `MULTI` block.
     ///
-    /// The socket loop writes the bytes directly, so `CLIENT` / `COMMAND` / `INFO` /
-    /// `CONFIG` / `ACL` do not cross the binding as a reply specification and back.
-    /// The connection effects still travel with the frame.
+    /// The gateway validated the command family but does not execute it, so the host
+    /// forwards the arguments here and the upstream queue keeps the ordering, the
+    /// poison flag and the `EXEC` release. The reply is the `+QUEUED` frame encoded
+    /// for the connection protocol.
     #[napi]
-    pub fn server_command_frame(
+    pub fn server_queue(
         &self,
         session: u32,
-        db: u8,
         protocol: u8,
         args: Vec<Buffer>,
-    ) -> std::result::Result<ServerCommandFrame, napi::Error> {
-        let (frame, close, killed) = self.run_server_command(session, db, protocol, &args)?;
-        Ok(ServerCommandFrame {
-            frame: Buffer::from(frame),
-            close,
-            killed,
+    ) -> std::result::Result<Buffer, napi::Error> {
+        let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
+        self.face_with(session, |face, _| {
+            face.queue_host_command(&arguments);
+            let mut frame = Vec::new();
+            Reply::status("QUEUED").encode(protocol, &mut frame);
+            Ok(Buffer::from(frame))
         })
+    }
+
+    /// Marks the open `MULTI` block dirty after a host-side queue validation error.
+    ///
+    /// The next `EXEC` must answer `EXECABORT` without running the queue, exactly as
+    /// if the gateway itself had rejected the command.
+    #[napi]
+    pub fn server_poison(&self, session: u32) {
+        let mut sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(face) = sessions.faces.get_mut(&session) {
+            face.poison_host_command();
+        }
+    }
+
+    /// Encodes the integer `0` reply a parked `WAIT` answers at its timeout.
+    #[napi]
+    pub fn server_wait_complete(&self, protocol: u8) -> Buffer {
+        let mut frame = Vec::new();
+        Reply::Integer(0).encode(protocol, &mut frame);
+        Buffer::from(frame)
+    }
+
+    /// Sets the listener-wide `requirepass` the gateway gate reads per command.
+    #[napi]
+    pub fn set_requirepass(&self, requirepass: Option<String>) {
+        let sessions = self.server.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        sessions.registry.set_requirepass(requirepass);
     }
 
     /// Drops the embedded session opened for one host connection.

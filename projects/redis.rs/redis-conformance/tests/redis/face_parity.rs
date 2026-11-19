@@ -385,7 +385,7 @@ fn embedded_server_face_keeps_session_state() {
     let mut session = EmbeddedServerFace::new();
     let run = |session: &mut EmbeddedServerFace, protocol: u8, arguments: &[&[u8]]| {
         let mut output = Vec::new();
-        execute_server_command(session, &mut output, arguments, &executor, 0, protocol).unwrap();
+        execute_server_command(session, &mut output, arguments, &executor, 0, protocol, false).unwrap();
         String::from_utf8(output).unwrap()
     };
     assert_eq!(run(&mut session, 2, &[b"CLIENT", b"SETNAME", b"entry"]), "+OK\r\n");
@@ -418,7 +418,7 @@ fn embedded_server_face_kills_a_peer_session() {
     let _victim = EmbeddedServerFace::with_id(Arc::clone(&registry), 2);
     let run = |session: &mut EmbeddedServerFace, arguments: &[&[u8]]| {
         let mut output = Vec::new();
-        execute_server_command(session, &mut output, arguments, &executor, 0, 2).unwrap();
+        execute_server_command(session, &mut output, arguments, &executor, 0, 2, false).unwrap();
         String::from_utf8(output).unwrap()
     };
     assert!(run(&mut client, &[b"CLIENT", b"LIST"]).contains("id=2 "));

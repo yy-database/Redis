@@ -75,7 +75,7 @@ dependencies = [
 [[package]]
 name = "boost-collection"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "boost-collection-macro",
 ]
@@ -83,7 +83,7 @@ dependencies = [
 [[package]]
 name = "boost-collection-macro"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -93,7 +93,7 @@ dependencies = [
 [[package]]
 name = "boost-crypto"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "base64",
  "boost-random",
@@ -106,7 +106,7 @@ dependencies = [
 [[package]]
 name = "boost-math"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "boost-collection",
 ]
@@ -114,7 +114,7 @@ dependencies = [
 [[package]]
 name = "boost-random"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "boost-math",
 ]
@@ -214,7 +214,7 @@ checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
 [[package]]
 name = "data-compression"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "ruzstd",
 ]
@@ -222,7 +222,7 @@ dependencies = [
 [[package]]
 name = "database"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-harness",
 ]
@@ -230,7 +230,7 @@ dependencies = [
 [[package]]
 name = "database-cluster"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-formats",
  "database-types",
@@ -244,13 +244,14 @@ dependencies = [
 [[package]]
 name = "database-execution"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "boost-crypto",
  "boost-random",
  "database-cluster",
  "database-formats",
  "database-protocol-mongo",
+ "database-protocol-mysql",
  "database-protocol-redis",
  "database-query",
  "database-storage",
@@ -272,7 +273,7 @@ dependencies = [
 [[package]]
 name = "database-formats"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "blake3",
  "database-protocol-mongo",
@@ -286,7 +287,7 @@ dependencies = [
 [[package]]
 name = "database-harness"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-types",
  "serde",
@@ -298,7 +299,7 @@ dependencies = [
 [[package]]
 name = "database-protocol"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-protocol-mongo",
  "database-protocol-mysql",
@@ -310,7 +311,7 @@ dependencies = [
 [[package]]
 name = "database-protocol-mongo"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "data-compression",
  "database-types",
@@ -321,7 +322,7 @@ dependencies = [
 [[package]]
 name = "database-protocol-mysql"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-types",
  "serde",
@@ -332,7 +333,7 @@ dependencies = [
 [[package]]
 name = "database-protocol-pgsql"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "base64",
  "database-types",
@@ -344,7 +345,7 @@ dependencies = [
 [[package]]
 name = "database-protocol-redis"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-types",
  "serde",
@@ -354,7 +355,7 @@ dependencies = [
 [[package]]
 name = "database-protocol-yy"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "base64",
  "database-types",
@@ -366,7 +367,7 @@ dependencies = [
 [[package]]
 name = "database-query"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "database-cluster",
  "database-formats",
@@ -390,7 +391,7 @@ dependencies = [
 [[package]]
 name = "database-server"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "base64",
  "boost-random",
@@ -417,7 +418,7 @@ dependencies = [
 [[package]]
 name = "database-storage"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "base64",
  "blake3",
@@ -439,7 +440,7 @@ dependencies = [
 [[package]]
 name = "database-types"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "schema-input-vos",
  "serde",
@@ -450,7 +451,7 @@ dependencies = [
 [[package]]
 name = "database-udf"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "serde",
  "serde_json",
@@ -1178,7 +1179,7 @@ dependencies = [
 [[package]]
 name = "schema-input-vos"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "oak-vos",
  "schema-types",
@@ -1190,7 +1191,7 @@ dependencies = [
 [[package]]
 name = "schema-types"
 version = "0.1.0"
-source = "git+https://github.com/oovm/boost.rs.git?rev=afb6afd7e7fb62966f579814ff61b884babf5950#afb6afd7e7fb62966f579814ff61b884babf5950"
+source = "git+https://github.com/oovm/boost.rs.git?rev=7c9921ae0af946a543cd16d1a192e57f99eb3cef#7c9921ae0af946a543cd16d1a192e57f99eb3cef"
 dependencies = [
  "serde",
  "serde_json",
