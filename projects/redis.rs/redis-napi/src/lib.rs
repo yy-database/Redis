@@ -571,13 +571,14 @@ impl Store {
         db: u8,
         protocol: u8,
         args: &[Buffer],
-        run: impl FnOnce(&mut Vec<u8>, &[&[u8]], &Namespace, &RedisExecutor<'_>, u8) -> std::io::Result<()>,
+        run: impl FnOnce(&[&[u8]], &Namespace, &RedisExecutor<'_>, u8) -> Reply,
     ) -> std::result::Result<Vec<u8>, napi::Error> {
         let arguments = args.iter().map(|argument| argument.as_ref()).collect::<Vec<&[u8]>>();
         let namespace = Namespace(namespace(db));
         let executor = RedisExecutor::new(&self.node);
+        let reply = run(&arguments, &namespace, &executor, protocol);
         let mut frame = Vec::new();
-        run(&mut frame, &arguments, &namespace, &executor, protocol).map_err(reason)?;
+        reply.encode(protocol, &mut frame);
         Ok(frame)
     }
 
@@ -588,14 +589,8 @@ impl Store {
     /// command semantics stay in the upstream facade.
     #[napi]
     pub fn hash_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_hash_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        let frame = self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_hash_command(arguments, executor, namespace, protocol)
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -606,14 +601,8 @@ impl Store {
     /// Executes one hash-family request and returns the upstream reply frame verbatim.
     #[napi]
     pub fn hash_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_hash_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_hash_command(arguments, executor, namespace, protocol)
         })
         .map(CommandFrame::from)
     }
@@ -625,14 +614,8 @@ impl Store {
     /// command semantics stay in the upstream facade.
     #[napi]
     pub fn set_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_set_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        let frame = self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_set_command(arguments, executor, namespace, protocol)
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -643,14 +626,8 @@ impl Store {
     /// Executes one set-family request and returns the upstream reply frame verbatim.
     #[napi]
     pub fn set_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_set_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_set_command(arguments, executor, namespace, protocol)
         })
         .map(CommandFrame::from)
     }
@@ -662,14 +639,8 @@ impl Store {
     /// the wait loop while the facade keeps the command semantics.
     #[napi]
     pub fn list_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_list_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        let frame = self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_list_command(arguments, executor, namespace, protocol)
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -680,14 +651,8 @@ impl Store {
     /// Executes one list-family request and returns the upstream reply frame verbatim.
     #[napi]
     pub fn list_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_list_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_list_command(arguments, executor, namespace, protocol)
         })
         .map(CommandFrame::from)
     }
@@ -697,14 +662,9 @@ impl Store {
     /// `protocol` is `2` or `3`, matching the connection that issued the request.
     #[napi]
     pub fn string_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_execution::cluster::redis::string::execute(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        let frame = self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_execution::cluster::redis::string::execute(arguments, executor, namespace, protocol)
+                .unwrap_or_else(|error| error.to_reply())
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -715,14 +675,9 @@ impl Store {
     /// Executes one string/key-family request and returns the upstream reply frame verbatim.
     #[napi]
     pub fn string_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_execution::cluster::redis::string::execute(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_execution::cluster::redis::string::execute(arguments, executor, namespace, protocol)
+                .unwrap_or_else(|error| error.to_reply())
         })
         .map(CommandFrame::from)
     }
@@ -738,14 +693,9 @@ impl Store {
         protocol: u8,
         args: Vec<Buffer>,
     ) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_execution::cluster::redis::string::execute_keyspace(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        let frame = self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_execution::cluster::redis::string::execute_keyspace(arguments, executor, namespace, protocol)
+                .unwrap_or_else(|error| error.to_reply())
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -761,14 +711,9 @@ impl Store {
         protocol: u8,
         args: Vec<Buffer>,
     ) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_execution::cluster::redis::string::execute_keyspace(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_execution::cluster::redis::string::execute_keyspace(arguments, executor, namespace, protocol)
+                .unwrap_or_else(|error| error.to_reply())
         })
         .map(CommandFrame::from)
     }
@@ -780,8 +725,8 @@ impl Store {
     /// serializes the reply, leaving hashing, registers and estimation upstream.
     #[napi]
     pub fn hyperloglog_command(&self, db: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, 2, &args, |frame, arguments, namespace, executor, _| {
-            database_server::yyds::redis::execute_hyperloglog_command(frame, arguments, executor, namespace)
+        let frame = self.reply_frame(db, 2, &args, |arguments, namespace, executor, _| {
+            database_server::yyds::redis::execute_hyperloglog_command(arguments, executor, namespace)
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -792,8 +737,8 @@ impl Store {
     /// Executes one HyperLogLog-family request and returns the upstream reply frame verbatim.
     #[napi]
     pub fn hyperloglog_command_frame(&self, db: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, 2, &args, |frame, arguments, namespace, executor, _| {
-            database_server::yyds::redis::execute_hyperloglog_command(frame, arguments, executor, namespace)
+        self.reply_frame(db, 2, &args, |arguments, namespace, executor, _| {
+            database_server::yyds::redis::execute_hyperloglog_command(arguments, executor, namespace)
         })
         .map(CommandFrame::from)
     }
@@ -862,14 +807,8 @@ impl Store {
     /// the wait loop while the facade keeps the command semantics.
     #[napi]
     pub fn zset_command(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<String, napi::Error> {
-        let frame = self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_zset_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        let frame = self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_zset_command(arguments, executor, namespace, protocol)
         })?;
         let (reply, _) = database_protocol_redis::codec::decode_reply(&frame)
             .map_err(reason)?
@@ -880,14 +819,8 @@ impl Store {
     /// Executes one zset-family request and returns the upstream reply frame verbatim.
     #[napi]
     pub fn zset_command_frame(&self, db: u8, protocol: u8, args: Vec<Buffer>) -> std::result::Result<CommandFrame, napi::Error> {
-        self.reply_frame(db, protocol, &args, |frame, arguments, namespace, executor, protocol| {
-            database_server::yyds::redis::execute_zset_command(
-                frame,
-                arguments,
-                executor,
-                namespace,
-                protocol,
-            )
+        self.reply_frame(db, protocol, &args, |arguments, namespace, executor, protocol| {
+            database_server::yyds::redis::execute_zset_command(arguments, executor, namespace, protocol)
         })
         .map(CommandFrame::from)
     }

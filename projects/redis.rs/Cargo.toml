@@ -24,16 +24,18 @@ repository = "https://github.com/yy-database/Redis"
 # 命令的非阻塞复放入口、`CLIENT`/`COMMAND`/`INFO`/`CONFIG`/`ACL` 的内嵌服务端会话、
 # 大集合的借用视图读取，以及 harness 的 bench provenance（跨运行场景格 provenance）与
 # gate tally 关闭判定修复（cases 与状态计数不一致时关闸）。
+# 最新钉入把 Redis 命令输出收敛为类型化 `Reply` 与 `CommandError`：RESP error 行的
+# 字节形状只由 `database.protocol.redis` codec 编码，命令族入口不再直接写字节流。
 # Redis 详细正确性矩阵已自上游 `tests` 目录迁入本 workspace 的 `redis-conformance` 承接区，
 # 上游只保留最小 smoke。
-database-types = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-types" }
-database-cluster = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-cluster" }
-database-execution = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-execution" }
-database-protocol-redis = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-protocol-redis" }
-database-query = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-query" }
-database-server = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-server" }
-database-storage = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database-storage" }
-database = { git = "https://github.com/oovm/boost.rs.git", rev = "9d40653b21e3bb8130f032e15cb56960b11071b4", package = "database", default-features = false }
+database-types = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-types" }
+database-cluster = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-cluster" }
+database-execution = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-execution" }
+database-protocol-redis = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-protocol-redis" }
+database-query = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-query" }
+database-server = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-server" }
+database-storage = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database-storage" }
+database = { git = "https://github.com/oovm/boost.rs.git", rev = "afb6afd7e7fb62966f579814ff61b884babf5950", package = "database", default-features = false }
 napi = { version = "3.14.2", default-features = false, features = ["napi4", "napi6"] }
 napi-derive = "3.6.12"
 napi-build = "2.6"

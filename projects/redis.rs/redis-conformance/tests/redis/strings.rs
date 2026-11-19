@@ -373,8 +373,9 @@ fn string_family_entry_matches_the_server() {
     .unwrap();
     let namespace = Namespace("redis:0".into());
     let run = |arguments: &[&[u8]]| {
+        let reply = execute_string_command(arguments, &executor, &namespace, 2).unwrap_or_else(|error| error.to_reply());
         let mut output = Vec::new();
-        execute_string_command(&mut output, arguments, &executor, &namespace, 2).unwrap();
+        reply.encode(2, &mut output);
         String::from_utf8(output).unwrap()
     };
     assert_eq!(run(&[b"SET", b"k", b"v"]), "+OK\r\n");
@@ -389,8 +390,9 @@ fn string_family_entry_matches_the_server() {
     // database helpers must preserve it instead of rebuilding `redis:<index>`.
     let prefixed = Namespace("redis:db0".into());
     let run_prefixed = |arguments: &[&[u8]]| {
+        let reply = execute_string_command(arguments, &executor, &prefixed, 2).unwrap_or_else(|error| error.to_reply());
         let mut output = Vec::new();
-        execute_string_command(&mut output, arguments, &executor, &prefixed, 2).unwrap();
+        reply.encode(2, &mut output);
         String::from_utf8(output).unwrap()
     };
     assert_eq!(run_prefixed(&[b"SET", b"k", b"v"]), "+OK\r\n");
